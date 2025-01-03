@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Common\IGStreamingAPI.cs" />
+    <Compile Remove="Models\MainApp.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lightstreamer.DotNetStandard.Client" Version="5.1.10" />
+    <PackageReference Include="log4net" Version="3.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Azure.SignalR.Management" Version="1.28.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="NLog" Version="5.3.4" />
+    <PackageReference Include="PCLCrypto" Version="2.0.147" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IGModelsDTM\IGModels\IGModels.csproj" />
+    <ProjectReference Include="..\IGStreamingAppDTM\IGWebApiClient\IGWebApiClient.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="DotNetClient_N2">
+      <HintPath>..\IGStreamingAppDTM\IGWebApiClient\bin\Debug\DotNetClient_N2.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

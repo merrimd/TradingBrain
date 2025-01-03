@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TradingBrain": {
+      "commandName": "Project",
+      "commandLineArgs": "IX.D.NASDAQ.CASH.IP "
+    }
+  }
+}
