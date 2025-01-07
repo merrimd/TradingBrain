@@ -603,6 +603,7 @@ namespace TradingBrain.Models
 
         public static async void SendBroadcast(string messageType, string messageValue)
         {
+            try { 
             string url = "";
             var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
             if (igWebApiConnectionConfig != null)
@@ -625,31 +626,52 @@ namespace TradingBrain.Models
 
             HttpResponseMessage response = client.PostAsync(url, content).Result;
             string results = response.Content.ReadAsStringAsync().Result;
+            }
+            catch (Exception e)
+            {
+                Log log = new Log();
+                log.Log_Message = e.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "SendMessage";
+                await log.Save();
+            }
         }
         public static async void SendMessage(string userid,string messageType, string messageValue)
         {
-            string url = "";
-            var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
-            if (igWebApiConnectionConfig != null)
+            try
             {
-                if (igWebApiConnectionConfig.Count > 0)
+                string url = "";
+                var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
+                if (igWebApiConnectionConfig != null)
                 {
-                    url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                    if (igWebApiConnectionConfig.Count > 0)
+                    {
+                        url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                    }
                 }
+
+                IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
+                newMsg.messageType = messageType;
+                newMsg.messageValue = messageValue;
+
+                HttpClient client = new HttpClient();
+                url = url + "/sendmessage?userid=" + userid;
+
+                string msg = JsonConvert.SerializeObject(newMsg);
+                HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
+
+                HttpResponseMessage response = client.PostAsync(url, content).Result;
+                string results = response.Content.ReadAsStringAsync().Result;
+            }
+            catch ( Exception e)
+            {
+                Log log = new Log();
+                log.Log_Message = e.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "SendMessage";
+                await log.Save();
             }
 
-            IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
-            newMsg.messageType = messageType;
-            newMsg.messageValue = messageValue;
-
-            HttpClient client = new HttpClient();
-            url = url + "/sendmessage?userid=" + userid;
-
-            string msg = JsonConvert.SerializeObject(newMsg);
-            HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
-
-            HttpResponseMessage response = client.PostAsync(url, content).Result;
-            string results = response.Content.ReadAsStringAsync().Result;
         }
         public static async void SaveLog(string logType, string logApp, string logMessage)
         {

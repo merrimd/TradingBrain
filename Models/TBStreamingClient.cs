@@ -29,7 +29,7 @@ namespace TradingBrain.Models
         private Delegates.LightstreamerUpdateDelegate updateDelegate;
         private Delegates.LightstreamerStatusChangedDelegate statusChangeDelegate;
    
-        private LightstreamerClient client;
+        public LightstreamerClient client;
         private Subscription subscription;
         //private Dictionary<ChartQuotes, Subscription> charts = new Dictionary<ChartQuotes, Subscription>();
 
@@ -75,7 +75,7 @@ namespace TradingBrain.Models
             NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
             string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
             _thisApp.igRestApiClient = new IgRestApiClient(env, smartDispatcher);
-
+            //_thisApp.igAccountId = this.client.connectionDetails.User;
 
 
         }
@@ -301,6 +301,7 @@ namespace TradingBrain.Models
             this.Connect(ph);
             this.ChartSubscribe();
             this.TradeSubscribe(CurrentAccountId);
+            this._thisApp.igAccountId = CurrentAccountId;
            // this.subscribeChart()
         }
 
@@ -511,6 +512,7 @@ namespace TradingBrain.Models
                             _thisApp.currentTrade.stopDistance = Convert.ToDecimal(tsm.StopDistance);
                             _thisApp.currentTrade.size = Convert.ToDecimal(tsm.Size);
                             _thisApp.currentTrade.direction = tsm.Direction;
+                            _thisApp.currentTrade.accountId = _thisApp.igAccountId;
 
                             _thisApp.model.thisModel.currentTrade = new tradeItem();
                             _thisApp.model.thisModel.currentTrade.quantity = Convert.ToDouble(_thisApp.currentTrade.size);
@@ -525,6 +527,8 @@ namespace TradingBrain.Models
                             _thisApp.model.thisModel.currentTrade.modelRunID = _thisApp.modelID;
                             _thisApp.model.thisModel.currentTrade.epic = _thisApp.epicName;
                             _thisApp.model.thisModel.currentTrade.timestamp = DateTime.UtcNow;
+                            _thisApp.model.thisModel.currentTrade.accountId = _thisApp.igAccountId;
+
                             if (tsm.Direction == "BUY")
                             {
                                 _thisApp.model.thisModel.currentTrade.longShort = "Long";

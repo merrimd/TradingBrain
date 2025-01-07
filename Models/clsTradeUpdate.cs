@@ -74,6 +74,7 @@ namespace TradingBrain.Models
         ///</Summary>
         public bool? guaranteedStop { get; set; }
         public DateTime lastUpdated { get; set; }
+        public string accountId { get; set; }
 
     public string modelRunID { get; set; }
 
@@ -97,6 +98,7 @@ namespace TradingBrain.Models
             this.guaranteedStop = false;
             this.lastUpdated = DateTime.MinValue;
             this.modelRunID = "";
+            this.accountId = "";
     }
         public async Task<bool> SaveDocument(Container container)
         {

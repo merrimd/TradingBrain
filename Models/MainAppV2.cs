@@ -126,11 +126,12 @@ namespace TradingBrain.Models
         public bool marketOpen = false;
         public bool paused { get; set; }
         public bool pausedAfterNGL { get; set; }
+        public string igAccountId { get; set; }
         //public delegate void LightstreamerChartUpdateDelegate(int item, ItemUpdate values);
         public ModelVars setInitialModelVar()
         {
             //firstTB = await clsCommonFunctions.GetTradingBrainSettings(this.the_db, this.epicName);
-                Task<TradingBrainSettings> tb = Task.Run<TradingBrainSettings>(async () => await IGModels.clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName));
+                Task<TradingBrainSettings> tb = Task.Run<TradingBrainSettings>(async () => await IGModels.clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId));
                 //return tb.Result;
 
             return tb.Result.lastRunVars;
@@ -141,7 +142,8 @@ namespace TradingBrain.Models
         {
             try
             {
-                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "MainApp", "TB Started");
+                //igAccountId = tbClient.client.connectionDetails.User;
+                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "MainApp", "TB Started - " + igAccountId);
                 tbClient = null;
                 forceT = forceTransport;
                 paused = false;
@@ -273,6 +275,7 @@ namespace TradingBrain.Models
 
 
             tbClient.Start();
+            
         }
         public void OnLightstreamerUpdate(int item, ItemUpdate values)
         {
@@ -296,13 +299,13 @@ namespace TradingBrain.Models
         }
 
 
-        async void PlaceDeal(string direction, double quantity, double stopLoss)
+        async void PlaceDeal(string direction, double quantity, double stopLoss,string accountId)
         {
             try
             {
                 bool newsession = false;
-                Console.WriteLine("Placing new deal = direction = {0}, quantity = {1}, stopLoss = {2}",direction,quantity,stopLoss);
-                TradingBrain.Models.clsCommonFunctions.SaveLog("Info",  "PlaceDeal", "Placing deal - direction = " + direction + ", quantity = " + quantity + ", stopLoss = " + stopLoss );
+                Console.WriteLine("Placing new deal = direction = {0}, quantity = {1}, stopLoss = {2}, accountId = {3} ",direction,quantity,stopLoss,accountId);
+                TradingBrain.Models.clsCommonFunctions.SaveLog("Info",  "PlaceDeal", "Placing deal - direction = " + direction + ", quantity = " + quantity + ", stopLoss = " + stopLoss + ", accountID = " + accountId );
 
                 dto.endpoint.positions.create.otc.v1.CreatePositionRequest pos = new dto.endpoint.positions.create.otc.v1.CreatePositionRequest();
                 pos.epic = "IX.D.NASDAQ.CASH.IP";
@@ -329,8 +332,8 @@ namespace TradingBrain.Models
                 IgResponse<CreatePositionResponse> ret = await igRestApiClient.createPositionV1(pos);
                 if (ret != null)
                 {
-                    Console.WriteLine("Place deal - " + direction + " - Status: " + ret.StatusCode);
-                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "PlaceDeal", "Place deal - " + direction + " - Status: " + ret.StatusCode  );
+                    Console.WriteLine("Place deal - " + direction + " - Status: " + ret.StatusCode + " - account = " + accountId);
+                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "PlaceDeal", "Place deal - " + direction + " - Status: " + ret.StatusCode + " - AccountId: " + accountId  );
                     if (ret.StatusCode.ToString() == "Unauthorized")
                     {
                         newsession = true;
@@ -343,8 +346,8 @@ namespace TradingBrain.Models
                      ret = await igRestApiClient.createPositionV1(pos);
                     if (ret != null)
                     {
-                        Console.WriteLine("Place deal - " + direction + " - Status: " + ret.StatusCode);
-                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "PlaceDeal", "Place deal - " + direction + " - Status: " + ret.StatusCode);
+                        Console.WriteLine("Place deal - " + direction + " - Status: " + ret.StatusCode + " - account = " + accountId);
+                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "PlaceDeal", "Place deal - " + direction + " - Status: " + ret.StatusCode + " - AccountId: " + accountId);
                     }
                 }
             }
@@ -477,6 +480,7 @@ namespace TradingBrain.Models
 
         async void RunCode(object sender, System.Timers.ElapsedEventArgs e)
         {
+       
             bool liveMode = true;
             bool marketOpen = false;
 
@@ -507,7 +511,7 @@ namespace TradingBrain.Models
 
 
 
-                        this.tb = await IGModels.clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName);
+                        this.tb = await IGModels.clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId);
                         //watch.Stop();
                         //Console.WriteLine(DateTime.Now.ToString("o") + " - GetSettings - Time taken = " + watch.ElapsedMilliseconds);
 
@@ -525,9 +529,8 @@ namespace TradingBrain.Models
                             model.modelVar.startingQuantity = tb.runDetails.quantity;
                             model.modelVar.minQuantity = tb.runDetails.quantity;
                             model.modelVar.quantity = tb.runDetails.quantity;
-
-
                         }
+
                         //model.counterVar = tb.runDetails.counterVar;
                         currentStatus.inputs = tb.runDetails.inputs;
                         currentStatus.countervar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -596,12 +599,12 @@ namespace TradingBrain.Models
                                 double targetVar = thisInput.targetVarInput / 100 + 1;
                                 double targetVarShort = thisInput.targetVarInputShort / 100 + 1;
 
-                                if (model.buyLong)
+                                if (model.buyLong && this.currentTrade != null)
                                 {
                                     Console.WriteLine("BuyLong activated");
                                     TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong");
                                     model.stopLossVar = (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
-                                    PlaceDeal("long", model.modelVar.quantity, model.stopLossVar);
+                                    PlaceDeal("long", model.modelVar.quantity, model.stopLossVar,this.igAccountId);
 
                                 }
                                 else
@@ -614,12 +617,12 @@ namespace TradingBrain.Models
                                     }
                                 }
 
-                                if (model.sellShort)
+                                if (model.sellShort && this.currentTrade != null)
                                 {
                                     Console.WriteLine("SellShort activated");
                                     TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellShort");
                                     model.stopLossVar = (double)thisInput.var5 * Math.Abs((double)targetVarShort * (double)model.candles.currentCandle.mATypicalShortTypical - (double)model.candles.currentCandle.mATypicalShortTypical);
-                                    PlaceDeal("short", model.modelVar.quantity, model.stopLossVar);
+                                    PlaceDeal("short", model.modelVar.quantity, model.stopLossVar, this.igAccountId);
                                 }
                                 else
                                 {
@@ -747,6 +750,7 @@ namespace TradingBrain.Models
                                 }
 
                                 currentStatus.carriedForwardLoss = modelVar.carriedForwardLoss;
+                                currentStatus.accountId = this.igAccountId;
                                 //send log to the website
                                 clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]));
                                 clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus));
