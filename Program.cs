@@ -77,8 +77,8 @@ namespace TradingBrain.Models
 
             try
             {
-                the_db = await IGModels.clsCommonFunctions.Get_Database();
-                the_app_db = await IGModels.clsCommonFunctions.Get_App_Database();
+                the_db = await IGModels.clsCommonFunctions.Get_Database(epic);
+                the_app_db = await IGModels.clsCommonFunctions.Get_App_Database(epic);
 
                 if (the_db != null)
                 {
@@ -89,7 +89,7 @@ namespace TradingBrain.Models
                     {
                         minute_container = the_db.GetContainer("MinuteCandle_NIKKEI");
                         TicksContainer = the_db.GetContainer("CandleTicks_NIKKEI");
-                        trade_container = the_app_db.GetContainer("TradingBrainTrades_NIKKEI");
+                        trade_container = the_app_db.GetContainer("TradingBrainTrades");
                     }
                     else
                     {
@@ -117,24 +117,24 @@ namespace TradingBrain.Models
             MainApp? app = null;
 
 
+            string epic = "IX.D.NASDAQ.CASH.IP";
+
+            // See if an epic has been passed in. if not then default to NASDAQ
+            if (Environment.GetCommandLineArgs().Length >= 2)
+            {
+                epic = Environment.GetCommandLineArgs()[1];
+            }
 
 
+            Console.WriteLine("Connecting to database....");
 
-            Console.Write("Connecting to database....");
-
-            Database? the_db = await IGModels.clsCommonFunctions.Get_Database();
-            Database? the_app_db = await IGModels.clsCommonFunctions.Get_App_Database();
+            Database? the_db = await IGModels.clsCommonFunctions.Get_Database(epic);
+            Database? the_app_db = await IGModels.clsCommonFunctions.Get_App_Database(epic);
 
 
             if (the_db != null)
             {
-                string epic = "IX.D.NASDAQ.CASH.IP";
 
-                // See if an epic has been passed in. if not then default to NASDAQ
-                if (Environment.GetCommandLineArgs().Length >= 2)
-                {
-                    epic = Environment.GetCommandLineArgs()[1];
-                }
 
                 Container container;
                 Container chart_container;
@@ -144,7 +144,7 @@ namespace TradingBrain.Models
                     case "IX.D.NIKKEI.DAILY.IP":
                         container = the_db.GetContainer("CandleUpdate");
                         chart_container = the_db.GetContainer("CandleTicks_NIKKEI"); 
-                        trade_container = the_app_db.GetContainer("TradingBrainTrades_NIKKEI");
+                        trade_container = the_app_db.GetContainer("TradingBrainTrades");
 
                         break;
 
@@ -157,7 +157,7 @@ namespace TradingBrain.Models
 
                 SetupDB(epic);
 
-                Console.Write("Initialising app");
+                Console.WriteLine("Initialising app");
 
                 app = new MainApp(the_db,the_app_db, container, chart_container, epic,minute_container,TicksContainer,trade_container);
 

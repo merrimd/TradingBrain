@@ -19,6 +19,7 @@ using IGModels;
 using Lightstreamer.DotNet.Client;
 using Newtonsoft.Json;
 using System.CodeDom;
+using Microsoft.AspNetCore.Components.Forms;
 
 namespace TradingBrain.Models
 {
@@ -47,36 +48,46 @@ namespace TradingBrain.Models
                 Delegates.LightstreamerUpdateDelegate lsUpdateDelegate,
                 Delegates.LightstreamerStatusChangedDelegate lsStatusChangeDelegate)
         {
-            _thisApp = thisApp;
-            Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
-            //demoForm = form;
-            updateDelegate = lsUpdateDelegate;
-            statusChangeDelegate = lsStatusChangeDelegate;
-            FirstConfirmUpdate = true;
-            var config = new NLog.Config.LoggingConfiguration();
+            try
+            {
+                _thisApp = thisApp;
+                Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
+                //demoForm = form;
+                updateDelegate = lsUpdateDelegate;
+                statusChangeDelegate = lsStatusChangeDelegate;
+                FirstConfirmUpdate = true;
+                var config = new NLog.Config.LoggingConfiguration();
 
-            var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
-            var logfile = new NLog.Targets.FileTarget("logfile") { FileName = filename };
-            var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
+                var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
+                var logfile = new NLog.Targets.FileTarget("logfile") { FileName = filename };
+                var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
 
-            // config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
-            config.AddRule(LogLevel.Warn, LogLevel.Fatal, logconsole);
-            config.AddRule(LogLevel.Trace, LogLevel.Fatal, logfile);
+                // config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
+                config.AddRule(LogLevel.Warn, LogLevel.Fatal, logconsole);
+                config.AddRule(LogLevel.Trace, LogLevel.Fatal, logfile);
 
-            NLog.LogManager.Configuration = config;
+                NLog.LogManager.Configuration = config;
 
-            LightstreamerClient.setLoggerProvider(new Log4NetLoggerProviderWrapper());
+                LightstreamerClient.setLoggerProvider(new Log4NetLoggerProviderWrapper());
 
-            //LightstreamerClient.setLoggerProvider(new );
-            bool connectionEstablished = false;
+                //LightstreamerClient.setLoggerProvider(new );
+                bool connectionEstablished = false;
 
-            SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
-            object v = ConfigurationManager.GetSection("appSettings");
-            NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
-            string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
-            _thisApp.igRestApiClient = new IgRestApiClient(env, smartDispatcher);
-            //_thisApp.igAccountId = this.client.connectionDetails.User;
-
+                SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
+                object v = ConfigurationManager.GetSection("appSettings");
+                NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
+                string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
+                _thisApp.igRestApiClient = new IgRestApiClient(env, smartDispatcher);
+                //_thisApp.igAccountId = this.client.connectionDetails.User;
+            }
+            catch (Exception ex)
+            {
+                Log log = new Log(_thisApp.the_app_db);
+                log.Log_Message = ex.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "TBStreamingClient";
+                log.Save();
+            }
 
         }
         public static void AddStatusMessage(string message)
@@ -218,11 +229,22 @@ namespace TradingBrain.Models
                 {
                     AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
                                         response.StatusCode);
+                    Log log = new Log(_thisApp.the_app_db);
+                    log.Log_Message = "Failed to login. HttpResponse StatusCode = " + response.StatusCode;
+                    log.Log_Type = "Error";
+                    log.Log_App = "Login";
+                    log.Save();
                 }
             }
             catch (Exception ex)
             {
-                AddStatusMessage("ApplicationViewModel exception : " + ex.Message);
+
+                Log log = new Log(_thisApp.the_app_db);
+                log.Log_Message = ex.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "Login";
+                log.Save();
+
             }
 
 
@@ -292,6 +314,7 @@ namespace TradingBrain.Models
         }
         private void Execute(int ph)
         {
+            try { 
             if (ph != this.phase)
             {
                 return;
@@ -302,14 +325,25 @@ namespace TradingBrain.Models
             this.ChartSubscribe();
             this.TradeSubscribe(CurrentAccountId);
             this._thisApp.igAccountId = CurrentAccountId;
-           // this.subscribeChart()
+                // this.subscribeChart()
+            }
+            catch (Exception ex)
+            {
+
+                Log log = new Log(_thisApp.the_app_db);
+                log.Log_Message = ex.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "Execute";
+                log.Save();
+
+            }
         }
 
         public void StatusChanged(int ph, int cStatus, string status)
         {
              if (ph != this.phase)
                 return;
-          
+            try { 
 
             Console.WriteLine("Status changed to " + status + " (" + cStatus + ")");
             if (cStatus == 0)
@@ -323,6 +357,17 @@ namespace TradingBrain.Models
                     }));
                     t.Start();
                 }
+            }
+            }
+            catch (Exception ex)
+            {
+
+                Log log = new Log(_thisApp.the_app_db);
+                log.Log_Message = ex.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "StatusChanged";
+                log.Save();
+
             }
         }
 
@@ -381,7 +426,7 @@ namespace TradingBrain.Models
 
             catch (Exception ex)
             {
-                Log log = new Log();
+                Log log = new Log(_thisApp.the_app_db);
                 log.Log_Message = ex.ToString();
                 log.Log_Type = "Error";
                 log.Log_App = "OnTickUpdate";
@@ -417,17 +462,17 @@ namespace TradingBrain.Models
 
                         if (!(String.IsNullOrEmpty(opu)))
                         {
-                            Console.WriteLine("Trade update - OPU" + opu);
+                            //Console.WriteLine("Trade update - OPU" + opu);
                             await UpdateTs(itemPos, update.ItemName, update, opu, TradeSubscriptionType.Opu);
                         }
                         if (!(String.IsNullOrEmpty(wou)))
                         {
-                            Console.WriteLine("Trade update - WOU" + wou);
+                            //Console.WriteLine("Trade update - WOU" + wou);
                             await UpdateTs(itemPos, update.ItemName, update, wou, TradeSubscriptionType.Wou);
                         }
                         if (!(String.IsNullOrEmpty(confirms)))
                         {
-                            Console.WriteLine("Trade update - CONFIRMS" + confirms);
+                            //Console.WriteLine("Trade update - CONFIRMS" + confirms);
                            await UpdateTs(itemPos, update.ItemName, update, confirms, TradeSubscriptionType.Confirm);
                         }
 
@@ -441,10 +486,10 @@ namespace TradingBrain.Models
             }
             catch (Exception ex)
             {
-                var log = new TradingBrain.Models.Log();
+                var log = new TradingBrain.Models.Log(_thisApp.the_app_db);
                 log.Log_Message = ex.ToString();
                 log.Log_Type = "Error";
-                log.Log_App = "MainApp";
+                log.Log_App = "TradeUpdateReceived";
                 log.Epic = "";
                 log.Save();
             }
@@ -456,160 +501,199 @@ namespace TradingBrain.Models
 
         private async  Task<IgPublicApiData.TradeSubscriptionModel> UpdateTs(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
         {
+           
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
 
             try
             {
                 var tradeSubUpdate = JsonConvert.DeserializeObject<LsTradeSubscriptionData>(inputData);
-                tsm.Channel = tradeSubUpdate.channel;
-                tsm.DealId = tradeSubUpdate.dealId;
-                tsm.AffectedDealId = tradeSubUpdate.affectedDealId;
-                tsm.DealReference = tradeSubUpdate.dealReference;
-                tsm.DealStatus = tradeSubUpdate.dealStatus.ToString();
-                tsm.Direction = tradeSubUpdate.direction.ToString();
-                tsm.ItemName = itemName;
-                tsm.Epic = tradeSubUpdate.epic;
-                tsm.Expiry = tradeSubUpdate.expiry;
-                tsm.GuaranteedStop = tradeSubUpdate.guaranteedStop;
-                tsm.Level = tradeSubUpdate.level;
-                tsm.Limitlevel = tradeSubUpdate.limitLevel;
-                tsm.Size = tradeSubUpdate.size;
-                tsm.Status = tradeSubUpdate.status.ToString();
-                tsm.StopLevel = tradeSubUpdate.stopLevel;
-                tsm.Reason = tradeSubUpdate.reason;
-                tsm.date = tradeSubUpdate.date;
-                tsm.StopDistance = tradeSubUpdate.stopDistance;
-                switch (updateType)
-                {
-                    case TradeSubscriptionType.Opu:
-                        tsm.TradeType = "OPU";
-                        break;
-                    case TradeSubscriptionType.Wou:
-                        tsm.TradeType = "WOU";
-                        break;
-                    case TradeSubscriptionType.Confirm:
-                        tsm.TradeType = "CONFIRM";
-                        break;
-                }
 
-                // Set the variables for a long or short trade
-                if (tsm.TradeType == "CONFIRM" && tsm.Status == "OPEN")
+                if (tradeSubUpdate.epic == _thisApp.epicName)
                 {
+                    tsm.Channel = tradeSubUpdate.channel;
+                    tsm.DealId = tradeSubUpdate.dealId;
+                    tsm.AffectedDealId = tradeSubUpdate.affectedDealId;
+                    tsm.DealReference = tradeSubUpdate.dealReference;
+                    tsm.DealStatus = tradeSubUpdate.dealStatus.ToString();
+                    tsm.Direction = tradeSubUpdate.direction.ToString();
+                    tsm.ItemName = itemName;
+                    tsm.Epic = tradeSubUpdate.epic;
+                    tsm.Expiry = tradeSubUpdate.expiry;
+                    tsm.GuaranteedStop = tradeSubUpdate.guaranteedStop;
+                    tsm.Level = tradeSubUpdate.level;
+                    tsm.Limitlevel = tradeSubUpdate.limitLevel;
+                    tsm.Size = tradeSubUpdate.size;
+                    tsm.Status = tradeSubUpdate.status.ToString();
+                    tsm.StopLevel = tradeSubUpdate.stopLevel;
+                    tsm.Reason = tradeSubUpdate.reason;
+                    tsm.date = tradeSubUpdate.date;
+                    tsm.StopDistance = tradeSubUpdate.stopDistance;
 
-                    if (tsm.Reason == "SUCCESS")
+                   
+
+                    switch (updateType)
                     {
-                        if (!_thisApp.model.onMarket)
+                        case TradeSubscriptionType.Opu:
+                            tsm.TradeType = "OPU";
+                            break;
+                        case TradeSubscriptionType.Wou:
+                            tsm.TradeType = "WOU";
+                            break;
+                        case TradeSubscriptionType.Confirm:
+                            tsm.TradeType = "CONFIRM";
+                            break;
+                    }
+                    Console.WriteLine("Trade update " + tsm.TradeType + " - " + inputData);
+                    // log the message
+                    clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
+
+                    // Set the variables for a long or short trade
+                    if (tsm.TradeType == "CONFIRM" && tsm.Status == "OPEN" && tsm.Epic == _thisApp.epicName)
+                    {
+
+                        if (tsm.Reason == "SUCCESS")
                         {
-                            _thisApp.currentTrade = new clsTradeUpdate();
-                            _thisApp.currentTrade.epic = tsm.Epic;
-                            _thisApp.currentTrade.dealReference = tsm.DealReference;
-                            _thisApp.currentTrade.dealId = tsm.DealId;
-                            _thisApp.currentTrade.lastUpdated = tsm.date;
-                            _thisApp.currentTrade.status = tsm.Status;
-                            _thisApp.currentTrade.dealStatus = tsm.DealStatus;
-                            _thisApp.currentTrade.level = Convert.ToDecimal(tsm.Level);
-                            _thisApp.currentTrade.stopLevel = Math.Abs(Convert.ToDecimal(tsm.StopLevel));
-                            _thisApp.currentTrade.stopDistance = Convert.ToDecimal(tsm.StopDistance);
-                            _thisApp.currentTrade.size = Convert.ToDecimal(tsm.Size);
-                            _thisApp.currentTrade.direction = tsm.Direction;
-                            _thisApp.currentTrade.accountId = _thisApp.igAccountId;
-
-                            _thisApp.model.thisModel.currentTrade = new tradeItem();
-                            _thisApp.model.thisModel.currentTrade.quantity = Convert.ToDouble(_thisApp.currentTrade.size);
-                            _thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.stopLevel) ;
-                            _thisApp.model.thisModel.currentTrade.tbDealId = tsm.DealId;
-                            _thisApp.model.thisModel.currentTrade.tbDealReference = tsm.DealReference;
-                            _thisApp.model.thisModel.currentTrade.tbDealStatus = tsm.DealStatus;
-                            _thisApp.model.thisModel.currentTrade.tbReason = tsm.Status;
-                            _thisApp.model.stopPrice = _thisApp.model.thisModel.currentTrade.stopLossValue;
-                            _thisApp.model.stopPriceOld = _thisApp.model.stopPrice;
-                            _thisApp.model.thisModel.currentTrade.tradeStarted = new DateTime(tsm.date.Year,tsm.date.Month,tsm.date.Day,tsm.date.Hour,tsm.date.Minute,tsm.date.Second);
-                            _thisApp.model.thisModel.currentTrade.modelRunID = _thisApp.modelID;
-                            _thisApp.model.thisModel.currentTrade.epic = _thisApp.epicName;
-                            _thisApp.model.thisModel.currentTrade.timestamp = DateTime.UtcNow;
-                            _thisApp.model.thisModel.currentTrade.accountId = _thisApp.igAccountId;
-
-                            if (tsm.Direction == "BUY")
+                            if (!_thisApp.model.onMarket)
                             {
-                                _thisApp.model.thisModel.currentTrade.longShort = "Long";
-                                _thisApp.model.thisModel.currentTrade.buyPrice = Convert.ToDecimal(_thisApp.currentTrade.level);
-                                _thisApp.model.thisModel.currentTrade.purchaseDate = tsm.date;
+                                _thisApp.currentTrade = new clsTradeUpdate();
+                                _thisApp.currentTrade.epic = tsm.Epic;
+                                _thisApp.currentTrade.dealReference = tsm.DealReference;
+                                _thisApp.currentTrade.dealId = tsm.DealId;
+                                _thisApp.currentTrade.lastUpdated = tsm.date;
+                                _thisApp.currentTrade.status = tsm.Status;
+                                _thisApp.currentTrade.dealStatus = tsm.DealStatus;
+                                _thisApp.currentTrade.level = Convert.ToDecimal(tsm.Level);
+                                _thisApp.currentTrade.stopLevel = Math.Abs(Convert.ToDecimal(tsm.StopLevel));
+                                _thisApp.currentTrade.stopDistance = Convert.ToDecimal(tsm.StopDistance);
+                                _thisApp.currentTrade.size = Convert.ToDecimal(tsm.Size);
+                                _thisApp.currentTrade.direction = tsm.Direction;
+                                _thisApp.currentTrade.accountId = _thisApp.igAccountId;
 
-                                _thisApp.model.sellLong = false;
-                                _thisApp.model.buyLong = false;
-                                _thisApp.model.longOnmarket = true;
-                                _thisApp.model.buyShort = false;
-                                _thisApp.model.shortOnMarket = false;
-                                if (_thisApp.model.modelLogs.logs.Count >= 1)
+                                _thisApp.model.thisModel.currentTrade = new tradeItem();
+                                _thisApp.model.thisModel.currentTrade.quantity = Convert.ToDouble(_thisApp.currentTrade.size);
+                                _thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.stopLevel);
+                                _thisApp.model.thisModel.currentTrade.tbDealId = tsm.DealId;
+                                _thisApp.model.thisModel.currentTrade.tbDealReference = tsm.DealReference;
+                                _thisApp.model.thisModel.currentTrade.tbDealStatus = tsm.DealStatus;
+                                _thisApp.model.thisModel.currentTrade.tbReason = tsm.Status;
+                                _thisApp.model.stopPrice = _thisApp.model.thisModel.currentTrade.stopLossValue;
+                                _thisApp.model.stopPriceOld = _thisApp.model.stopPrice;
+                                _thisApp.model.thisModel.currentTrade.tradeStarted = new DateTime(tsm.date.Year, tsm.date.Month, tsm.date.Day, tsm.date.Hour, tsm.date.Minute, tsm.date.Second);
+                                _thisApp.model.thisModel.currentTrade.modelRunID = _thisApp.modelID;
+                                _thisApp.model.thisModel.currentTrade.epic = _thisApp.epicName;
+                                _thisApp.model.thisModel.currentTrade.timestamp = DateTime.UtcNow;
+                                _thisApp.model.thisModel.currentTrade.accountId = _thisApp.igAccountId;
+
+                                if (tsm.Direction == "BUY")
                                 {
-                                    _thisApp.model.modelLogs.logs[0].tradeType = "Long";
-                                    _thisApp.model.modelLogs.logs[0].tradeAction = "Buy";
-                                    _thisApp.model.modelLogs.logs[0].quantity = _thisApp.model.thisModel.currentTrade.quantity;
-                                    _thisApp.model.modelLogs.logs[0].tradePrice = _thisApp.model.thisModel.currentTrade.buyPrice;
+                                    _thisApp.model.thisModel.currentTrade.longShort = "Long";
+                                    _thisApp.model.thisModel.currentTrade.buyPrice = Convert.ToDecimal(_thisApp.currentTrade.level);
+                                    _thisApp.model.thisModel.currentTrade.purchaseDate = tsm.date;
+
+                                    _thisApp.model.sellLong = false;
+                                    _thisApp.model.buyLong = false;
+                                    _thisApp.model.longOnmarket = true;
+                                    _thisApp.model.buyShort = false;
+                                    _thisApp.model.shortOnMarket = false;
+                                    if (_thisApp.model.modelLogs.logs.Count >= 1)
+                                    {
+                                        _thisApp.model.modelLogs.logs[0].tradeType = "Long";
+                                        _thisApp.model.modelLogs.logs[0].tradeAction = "Buy";
+                                        _thisApp.model.modelLogs.logs[0].quantity = _thisApp.model.thisModel.currentTrade.quantity;
+                                        _thisApp.model.modelLogs.logs[0].tradePrice = _thisApp.model.thisModel.currentTrade.buyPrice;
+                                    }
+                                    //log.tradeType = "Long";
+                                    //log.tradeAction = "Buy";
+                                    //log.quantity = quantity;
+                                    clsCommonFunctions.SendBroadcast("BuyLong", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade),_thisApp.the_app_db);
                                 }
-                                //log.tradeType = "Long";
-                                //log.tradeAction = "Buy";
-                                //log.quantity = quantity;
-                                clsCommonFunctions.SendBroadcast("BuyLong", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade));
+                                else
+                                {
+                                    _thisApp.model.thisModel.currentTrade.longShort = "Short";
+                                    _thisApp.model.thisModel.currentTrade.sellPrice = (decimal)_thisApp.currentTrade.level;
+                                    _thisApp.model.thisModel.currentTrade.sellDate = tsm.date;
+                                    _thisApp.model.thisModel.currentTrade.modelRunID = _thisApp.modelID;
+                                    _thisApp.model.sellShort = false;
+                                    _thisApp.model.shortOnMarket = true;
+                                    _thisApp.model.buyLong = false;
+                                    _thisApp.model.longOnmarket = false;
+                                    if (_thisApp.model.modelLogs.logs.Count >= 1)
+                                    {
+                                        _thisApp.model.modelLogs.logs[0].tradeType = "Short";
+                                        _thisApp.model.modelLogs.logs[0].tradeAction = "Sell";
+                                        _thisApp.model.modelLogs.logs[0].quantity = _thisApp.model.thisModel.currentTrade.quantity;
+                                        _thisApp.model.modelLogs.logs[0].tradePrice = _thisApp.model.thisModel.currentTrade.sellPrice;
+                                    }
+                                    clsCommonFunctions.SendBroadcast("SellShort", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade),_thisApp.the_app_db);
+                                }
+
+                                // Save this trade in the database
+                                _thisApp.model.thisModel.currentTrade.candleSold = null;
+                                _thisApp.model.thisModel.currentTrade.candleBought = null;
+                                _thisApp.model.thisModel.currentTrade.count = _thisApp.modelVar.counter;
+                                await _thisApp.model.thisModel.currentTrade.Add(_thisApp.the_app_db, _thisApp.trade_container);
+
+                                _thisApp.model.onMarket = true;
+
+
+                                //Send email
+                                string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
+                                if (region == "LIVE")
+                                {
+
+                                    clsEmail obj = new clsEmail();
+                                    List<recip> recips = new List<recip>();
+                                    recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
+                                    recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
+                                    string subject = "NEW TRADE STARTED - " + region;
+                                    string text = "A new trade has started in the " + region + " environment</br></br>";
+                                    text += "<ul>";
+                                    text += "<li>Trade ID : " + _thisApp.currentTrade.dealId + "</li>";
+                                    text += "<li>Epic : " + _thisApp.currentTrade.epic + "</li>";
+                                    text += "<li>Date : " + _thisApp.currentTrade.lastUpdated + "</li>";
+                                    text += "<li>Type : " + _thisApp.model.thisModel.currentTrade.longShort + "</li>";
+                                    text += "<li>Size : " + _thisApp.currentTrade.size + "</li>";
+                                    text += "<li>Price : " + _thisApp.currentTrade.level + "</li>";
+                                    text += "<li>Stop Level : " + _thisApp.currentTrade.stopLevel + "</li>";
+                                    text += "<li>NG count : " + _thisApp.modelVar.counter + "</li>";
+                                    text += "</ul>";
+
+                                    obj.sendEmail(recips, subject, text);
+                                }
                             }
                             else
                             {
-                                _thisApp.model.thisModel.currentTrade.longShort = "Short";
-                                _thisApp.model.thisModel.currentTrade.sellPrice = (decimal)_thisApp.currentTrade.level;
-                                _thisApp.model.thisModel.currentTrade.sellDate = tsm.date;
-                                _thisApp.model.thisModel.currentTrade.modelRunID = _thisApp.modelID;
+                                Console.WriteLine("CONFIRM deal failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
+                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "CONFIRM deal failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
                                 _thisApp.model.sellShort = false;
-                                _thisApp.model.shortOnMarket = true;
+                                _thisApp.model.sellLong = false;
+                                _thisApp.model.buyShort = false;
+                                _thisApp.model.shortOnMarket = false;
                                 _thisApp.model.buyLong = false;
                                 _thisApp.model.longOnmarket = false;
-                                if (_thisApp.model.modelLogs.logs.Count >= 1)
-                                {
-                                    _thisApp.model.modelLogs.logs[0].tradeType = "Short";
-                                    _thisApp.model.modelLogs.logs[0].tradeAction = "Sell";
-                                    _thisApp.model.modelLogs.logs[0].quantity = _thisApp.model.thisModel.currentTrade.quantity;
-                                    _thisApp.model.modelLogs.logs[0].tradePrice = _thisApp.model.thisModel.currentTrade.sellPrice;
-                                }
-                                clsCommonFunctions.SendBroadcast("SellShort", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade));
-                            }
+                                _thisApp.model.onMarket = false;
 
-                            // Save this trade in the database
-                            _thisApp.model.thisModel.currentTrade.candleSold = null;
-                            _thisApp.model.thisModel.currentTrade.candleBought = null;
-                            _thisApp.model.thisModel.currentTrade.count = _thisApp.modelVar.counter;
-                           await _thisApp.model.thisModel.currentTrade.Add(_thisApp.the_app_db,_thisApp.trade_container);
+                                // already on a trade so don't record this one please
 
-                            _thisApp.model.onMarket = true;
-
-
-                            //Send email
-                            string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
-                            if (region == "LIVE")
-                            {
-       
-                                clsEmail obj = new clsEmail();
-                                List<recip> recips = new List<recip>();
-                                recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
-                                recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
-                                string subject = "NEW TRADE STARTED - " + region;
-                                string text = "A new trade has started in the " + region + " environment</br></br>";
-                                text += "<ul>";
-                                text += "<li>Trade ID : " + _thisApp.currentTrade.dealId + "</li>";
-                                text += "<li>Epic : " + _thisApp.currentTrade.epic + "</li>";
-                                text += "<li>Date : " + _thisApp.currentTrade.lastUpdated + "</li>";
-                                text += "<li>Type : " + _thisApp.model.thisModel.currentTrade.longShort + "</li>";
-                                text += "<li>Size : " + _thisApp.currentTrade.size + "</li>";
-                                text += "<li>Price : " + _thisApp.currentTrade.level + "</li>";
-                                text += "<li>Stop Level : " + _thisApp.currentTrade.stopLevel + "</li>";
-                                text += "<li>NG count : " + _thisApp.modelVar.counter + "</li>";
-                                text += "</ul>";
-
-                                obj.sendEmail(recips, subject, text);
                             }
                         }
                         else
                         {
-                            Console.WriteLine("CONFIRM deal failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
-                            TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "CONFIRM deal failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
+
+                            Console.WriteLine("CONFIRM failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
+                            TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "CONFIRM failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason],_thisApp.the_app_db);
+                            // manage failed deals here. Maybe retry once or twice if necessary. Should log error as well I guess.
+                            //if (tsm.Direction == "BUY")
+                            //{
+                            //    _thisApp.model.buyLong = false;
+                            //    _thisApp.model.longOnmarket = false;
+                            //}
+                            //else
+                            //{
+                            //    _thisApp.model.buyShort = false;
+                            //    _thisApp.model.shortOnMarket = false;
+                            //}
+
                             _thisApp.model.sellShort = false;
                             _thisApp.model.sellLong = false;
                             _thisApp.model.buyShort = false;
@@ -617,28 +701,11 @@ namespace TradingBrain.Models
                             _thisApp.model.buyLong = false;
                             _thisApp.model.longOnmarket = false;
                             _thisApp.model.onMarket = false;
-
-                            // already on a trade so don't record this one please
-
                         }
                     }
-                    else
+                    if (tsm.TradeType == "CONFIRM" && tsm.Status == null && tsm.Epic == _thisApp.epicName)
                     {
-
-                        Console.WriteLine("CONFIRM failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
-                        TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "CONFIRM failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
-                        // manage failed deals here. Maybe retry once or twice if necessary. Should log error as well I guess.
-                        //if (tsm.Direction == "BUY")
-                        //{
-                        //    _thisApp.model.buyLong = false;
-                        //    _thisApp.model.longOnmarket = false;
-                        //}
-                        //else
-                        //{
-                        //    _thisApp.model.buyShort = false;
-                        //    _thisApp.model.shortOnMarket = false;
-                        //}
-
+                        TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "CONFIRM failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason],_thisApp.the_app_db);
                         _thisApp.model.sellShort = false;
                         _thisApp.model.sellLong = false;
                         _thisApp.model.buyShort = false;
@@ -647,289 +714,277 @@ namespace TradingBrain.Models
                         _thisApp.model.longOnmarket = false;
                         _thisApp.model.onMarket = false;
                     }
-                }
-                if (tsm.TradeType == "CONFIRM" && tsm.Status == null)
-                {
-                    TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "CONFIRM failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
-                    _thisApp.model.sellShort = false;
-                    _thisApp.model.sellLong = false;
-                    _thisApp.model.buyShort = false;
-                    _thisApp.model.shortOnMarket = false;
-                    _thisApp.model.buyLong = false;
-                    _thisApp.model.longOnmarket = false;
-                    _thisApp.model.onMarket = false;
-                }
 
-                if (tsm.TradeType == "OPU")
-                {
-                    if (tsm.Status == "UPDATED")
+                    if (tsm.TradeType == "OPU")
                     {
-                        // Deal has been updated, so save the new data and move on.
-                        if (tsm.DealStatus == "ACCEPTED")
+                        if (tsm.Status == "UPDATED" && tsm.Epic == _thisApp.epicName)
                         {
-                            Console.WriteLine("Updating  - " + tsm.DealId + " - Cuurent Deal = " + _thisApp.currentTrade.dealId);
-                            //Only update if it is the current trade that is affected (in case we have 2 trades running at the same time)
-                            if (tsm.DealId == _thisApp.currentTrade.dealId)
+                            // Deal has been updated, so save the new data and move on.
+                            if (tsm.DealStatus == "ACCEPTED")
                             {
+                                Console.WriteLine("Updating  - " + tsm.DealId + " - Cuurent Deal = " + _thisApp.currentTrade.dealId);
+                                //Only update if it is the current trade that is affected (in case we have 2 trades running at the same time)
+                                if (tsm.DealId == _thisApp.currentTrade.dealId)
+                                {
 
-                                await _thisApp.GetTradeFromDB(tsm.DealId);
-                                _thisApp.model.thisModel.currentTrade.candleSold = null;
-                                _thisApp.model.thisModel.currentTrade.candleBought = null;
-                                //_thisApp.currentTrade = new clsTradeUpdate();
-                                //_thisApp.currentTrade.epic = tsm.Epic;
-                                _thisApp.currentTrade.dealReference = tsm.DealReference;
-                                _thisApp.currentTrade.dealId = tsm.DealId;
+                                    await _thisApp.GetTradeFromDB(tsm.DealId);
+                                    _thisApp.model.thisModel.currentTrade.candleSold = null;
+                                    _thisApp.model.thisModel.currentTrade.candleBought = null;
+                                    //_thisApp.currentTrade = new clsTradeUpdate();
+                                    //_thisApp.currentTrade.epic = tsm.Epic;
+                                    _thisApp.currentTrade.dealReference = tsm.DealReference;
+                                    _thisApp.currentTrade.dealId = tsm.DealId;
 
 
-                                _thisApp.currentTrade.lastUpdated = tsm.date;
-                                _thisApp.currentTrade.status = tsm.Status;
-                                _thisApp.currentTrade.dealStatus = tsm.DealStatus;
-                                _thisApp.currentTrade.level = Convert.ToDecimal(tsm.Level);
-                                _thisApp.currentTrade.stopLevel = Convert.ToDecimal(tsm.StopLevel);
-                                _thisApp.currentTrade.stopDistance = Convert.ToDecimal(tsm.StopDistance);
-                                _thisApp.currentTrade.size = Convert.ToDecimal(tsm.Size);
-                                _thisApp.currentTrade.direction = tsm.Direction;
-                                //_thisApp.model.thisModel.currentTrade = new tradeItem();
+                                    _thisApp.currentTrade.lastUpdated = tsm.date;
+                                    _thisApp.currentTrade.status = tsm.Status;
+                                    _thisApp.currentTrade.dealStatus = tsm.DealStatus;
+                                    _thisApp.currentTrade.level = Convert.ToDecimal(tsm.Level);
+                                    _thisApp.currentTrade.stopLevel = Convert.ToDecimal(tsm.StopLevel);
+                                    _thisApp.currentTrade.stopDistance = Convert.ToDecimal(tsm.StopDistance);
+                                    _thisApp.currentTrade.size = Convert.ToDecimal(tsm.Size);
+                                    _thisApp.currentTrade.direction = tsm.Direction;
+                                    //_thisApp.model.thisModel.currentTrade = new tradeItem();
 
-                                _thisApp.model.thisModel.currentTrade.tbDealId = tsm.DealId;
-                                _thisApp.model.thisModel.currentTrade.tbDealReference = tsm.DealReference;
-                                _thisApp.model.thisModel.currentTrade.tbDealStatus = tsm.DealStatus;
-                                _thisApp.model.thisModel.currentTrade.timestamp = DateTime.UtcNow;
-                                _thisApp.model.thisModel.currentTrade.tbReason = tsm.Status;
-                                if (_thisApp.epicName != "") { _thisApp.model.thisModel.currentTrade.epic = _thisApp.epicName; }
-                                if (_thisApp.modelID != "") { _thisApp.model.thisModel.currentTrade.modelRunID = _thisApp.modelID; }
+                                    _thisApp.model.thisModel.currentTrade.tbDealId = tsm.DealId;
+                                    _thisApp.model.thisModel.currentTrade.tbDealReference = tsm.DealReference;
+                                    _thisApp.model.thisModel.currentTrade.tbDealStatus = tsm.DealStatus;
+                                    _thisApp.model.thisModel.currentTrade.timestamp = DateTime.UtcNow;
+                                    _thisApp.model.thisModel.currentTrade.tbReason = tsm.Status;
+                                    if (_thisApp.epicName != "") { _thisApp.model.thisModel.currentTrade.epic = _thisApp.epicName; }
+                                    if (_thisApp.modelID != "") { _thisApp.model.thisModel.currentTrade.modelRunID = _thisApp.modelID; }
 
-                                _thisApp.model.thisModel.currentTrade.quantity = Convert.ToDouble(_thisApp.currentTrade.size);
+                                    _thisApp.model.thisModel.currentTrade.quantity = Convert.ToDouble(_thisApp.currentTrade.size);
 
-                                _thisApp.model.thisModel.currentTrade.stopLossValue = Math.Abs(Convert.ToDouble(_thisApp.currentTrade.level) - Convert.ToDouble(_thisApp.currentTrade.stopLevel));
+                                    _thisApp.model.thisModel.currentTrade.stopLossValue = Math.Abs(Convert.ToDouble(_thisApp.currentTrade.level) - Convert.ToDouble(_thisApp.currentTrade.stopLevel));
 
-                                //if (_thisApp.modelVar.breakEvenVar == 1)
-                                //{
-                                //    if (tsm.Direction == "BUY")
-                                //    {
-                                //        _thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.level) + Convert.ToDouble(_thisApp.currentTrade.stopLevel);
-                                //    }
-                                //    else
-                                //    {
-                                //        _thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.level) - Convert.ToDouble(_thisApp.currentTrade.stopLevel);
-                                //    }
-                                //}
-                                //else
-                                //{
-                                //    if (tsm.Direction == "BUY")
-                                //    {
-                                //        _thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.level) - Convert.ToDouble(_thisApp.currentTrade.stopLevel);
-                                //    }
-                                //    else
-                                //    {
-                                //        _thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.level) + Convert.ToDouble(_thisApp.currentTrade.stopLevel);
-                                //    }
-                                //}
-                                _thisApp.model.stopPriceOld = Math.Abs(_thisApp.model.stopPrice);
-                                _thisApp.model.stopPrice = Math.Abs(_thisApp.model.thisModel.currentTrade.stopLossValue);
+                                    //if (_thisApp.modelVar.breakEvenVar == 1)
+                                    //{
+                                    //    if (tsm.Direction == "BUY")
+                                    //    {
+                                    //        _thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.level) + Convert.ToDouble(_thisApp.currentTrade.stopLevel);
+                                    //    }
+                                    //    else
+                                    //    {
+                                    //        _thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.level) - Convert.ToDouble(_thisApp.currentTrade.stopLevel);
+                                    //    }
+                                    //}
+                                    //else
+                                    //{
+                                    //    if (tsm.Direction == "BUY")
+                                    //    {
+                                    //        _thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.level) - Convert.ToDouble(_thisApp.currentTrade.stopLevel);
+                                    //    }
+                                    //    else
+                                    //    {
+                                    //        _thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.level) + Convert.ToDouble(_thisApp.currentTrade.stopLevel);
+                                    //    }
+                                    //}
+                                    _thisApp.model.stopPriceOld = Math.Abs(_thisApp.model.stopPrice);
+                                    _thisApp.model.stopPrice = Math.Abs(_thisApp.model.thisModel.currentTrade.stopLossValue);
 
-                                await _thisApp.model.thisModel.currentTrade.SaveDocument( _thisApp.trade_container);
+                                    await _thisApp.model.thisModel.currentTrade.SaveDocument(_thisApp.trade_container);
 
-                                // Save the last run vars into the TB settings table
-                                _thisApp.tb.lastRunVars = _thisApp.model.modelVar.DeepCopy();
-                                await _thisApp.tb.SaveDocument(_thisApp.the_app_db);
+                                    // Save the last run vars into the TB settings table
+                                    _thisApp.tb.lastRunVars = _thisApp.model.modelVar.DeepCopy();
+                                    await _thisApp.tb.SaveDocument(_thisApp.the_app_db);
 
-                                clsCommonFunctions.SendBroadcast("DealUpdated", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade));
-                                //_thisApp.model.stopPriceOld = _thisApp.model.stopPrice;
+                                    clsCommonFunctions.SendBroadcast("DealUpdated", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade),_thisApp.the_app_db);
+                                    //_thisApp.model.stopPriceOld = _thisApp.model.stopPrice;
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine("UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
+                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason],_thisApp.the_app_db);
                             }
                         }
-                        else
+                        else if (tsm.Status == "DELETED" && tsm.Epic == _thisApp.epicName)
                         {
-                            Console.WriteLine("UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
-                            TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
-                        }
-                    }
-                    else if (tsm.Status == "DELETED")
-                    {
-                        if (tsm.DealStatus == "ACCEPTED")
-                        {
-                            // Deal has been closed (either by the software or by the stop being met).
-
-                            //_thisApp.currentTrade = new clsTradeUpdate();
-                            //_thisApp.currentTrade.epic = tsm.Epic;
-                            //_thisApp.currentTrade.dealReference = tsm.DealReference;
-                            //_thisApp.currentTrade.dealId = tsm.DealId;
-
-                            Console.WriteLine("Deleting  - " + tsm.DealId + " - Cuurent Deal = " + _thisApp.currentTrade.dealId);
-                            //Only delete if it is the current trade that is affected (in case we have 2 trades running at the same time)
-                            if (tsm.DealId == _thisApp.currentTrade.dealId)
+                            if (tsm.DealStatus == "ACCEPTED")
                             {
-                                DateTime dtNow = DateTime.UtcNow;
-                                await _thisApp.GetTradeFromDB(tsm.DealId);
-                                _thisApp.model.thisModel.currentTrade.candleSold = null;
-                                _thisApp.model.thisModel.currentTrade.candleBought = null;
+                                // Deal has been closed (either by the software or by the stop being met).
 
-                                _thisApp.currentTrade.lastUpdated = dtNow;
-                                _thisApp.currentTrade.status = tsm.Status;
-                                _thisApp.currentTrade.dealStatus = tsm.DealStatus;
-                                _thisApp.currentTrade.level = Convert.ToDecimal(tsm.Level);
-                                _thisApp.currentTrade.stopLevel = Convert.ToDecimal(tsm.StopLevel);
-                                _thisApp.currentTrade.stopDistance = Convert.ToDecimal(tsm.StopDistance);
-                                
-                                if (Convert.ToDecimal(tsm.Size) > 0)
+                                //_thisApp.currentTrade = new clsTradeUpdate();
+                                //_thisApp.currentTrade.epic = tsm.Epic;
+                                //_thisApp.currentTrade.dealReference = tsm.DealReference;
+                                //_thisApp.currentTrade.dealId = tsm.DealId;
+
+                                Console.WriteLine("Deleting  - " + tsm.DealId + " - Cuurent Deal = " + _thisApp.currentTrade.dealId);
+                                //Only delete if it is the current trade that is affected (in case we have 2 trades running at the same time)
+                                if (tsm.DealId == _thisApp.currentTrade.dealId)
                                 {
-                                    _thisApp.currentTrade.size = Convert.ToDecimal(tsm.Size);
-                                }
-                                _thisApp.currentTrade.direction = tsm.Direction;
+                                    DateTime dtNow = DateTime.UtcNow;
+                                    await _thisApp.GetTradeFromDB(tsm.DealId);
+                                    _thisApp.model.thisModel.currentTrade.candleSold = null;
+                                    _thisApp.model.thisModel.currentTrade.candleBought = null;
 
-                                //_thisApp.model.thisModel.currentTrade = new tradeItem();
-                                //_thisApp.model.thisModel.currentTrade.quantity = Convert.ToDouble(_thisApp.currentTrade.size);
-                                //_thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.level) - Convert.ToDouble(_thisApp.currentTrade.stopLevel);
-                                _thisApp.model.stopPrice = 0;// Math.Abs(_thisApp.model.thisModel.currentTrade.stopLossValue);
-                                _thisApp.model.stopPriceOld = 0;// _thisApp.model.stopPrice;
+                                    _thisApp.currentTrade.lastUpdated = dtNow;
+                                    _thisApp.currentTrade.status = tsm.Status;
+                                    _thisApp.currentTrade.dealStatus = tsm.DealStatus;
+                                    _thisApp.currentTrade.level = Convert.ToDecimal(tsm.Level);
+                                    _thisApp.currentTrade.stopLevel = Convert.ToDecimal(tsm.StopLevel);
+                                    _thisApp.currentTrade.stopDistance = Convert.ToDecimal(tsm.StopDistance);
 
-                                _thisApp.model.thisModel.currentTrade.tradeEnded = dtNow;
-                                Console.WriteLine("tsm.Direction = " + tsm.Direction);
-                                if (tsm.Direction == "BUY")
-                                {
-                                    Console.WriteLine("deleting buy");
-                                    _thisApp.model.thisModel.currentTrade.sellPrice = Convert.ToDecimal(_thisApp.currentTrade.level);
-                                    _thisApp.model.thisModel.currentTrade.sellDate = dtNow;
-                                    _thisApp.model.thisModel.currentTrade.tradeValue = (_thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice) * (decimal)_thisApp.currentTrade.size;
+                                    if (Convert.ToDecimal(tsm.Size) > 0)
+                                    {
+                                        _thisApp.currentTrade.size = Convert.ToDecimal(tsm.Size);
+                                    }
+                                    _thisApp.currentTrade.direction = tsm.Direction;
 
+                                    //_thisApp.model.thisModel.currentTrade = new tradeItem();
+                                    //_thisApp.model.thisModel.currentTrade.quantity = Convert.ToDouble(_thisApp.currentTrade.size);
+                                    //_thisApp.model.thisModel.currentTrade.stopLossValue = Convert.ToDouble(_thisApp.currentTrade.level) - Convert.ToDouble(_thisApp.currentTrade.stopLevel);
+                                    _thisApp.model.stopPrice = 0;// Math.Abs(_thisApp.model.thisModel.currentTrade.stopLossValue);
+                                    _thisApp.model.stopPriceOld = 0;// _thisApp.model.stopPrice;
+
+                                    _thisApp.model.thisModel.currentTrade.tradeEnded = dtNow;
+                                    Console.WriteLine("tsm.Direction = " + tsm.Direction);
+                                    if (tsm.Direction == "BUY")
+                                    {
+                                        Console.WriteLine("deleting buy");
+                                        _thisApp.model.thisModel.currentTrade.sellPrice = Convert.ToDecimal(_thisApp.currentTrade.level);
+                                        _thisApp.model.thisModel.currentTrade.sellDate = dtNow;
+                                        _thisApp.model.thisModel.currentTrade.tradeValue = (_thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice) * (decimal)_thisApp.currentTrade.size;
+
+                                        _thisApp.model.sellLong = false;
+                                        _thisApp.model.buyLong = false;
+                                        _thisApp.model.longOnmarket = false;
+
+                                        if (_thisApp.model.modelLogs.logs.Count >= 1)
+                                        {
+                                            _thisApp.model.modelLogs.logs[0].tradeType = "Long";
+                                            _thisApp.model.modelLogs.logs[0].tradeAction = "Sell";
+                                            _thisApp.model.modelLogs.logs[0].quantity = _thisApp.model.thisModel.currentTrade.quantity;
+                                            _thisApp.model.modelLogs.logs[0].tradePrice = _thisApp.model.thisModel.currentTrade.sellPrice;
+                                            _thisApp.model.modelLogs.logs[0].tradeValue = (_thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice) * (decimal)_thisApp.currentTrade.size;
+                                        }
+                                        clsCommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade),_thisApp.the_app_db);
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine("deleting sell");
+                                        _thisApp.model.thisModel.currentTrade.buyPrice = Convert.ToDecimal(_thisApp.currentTrade.level);
+                                        _thisApp.model.thisModel.currentTrade.purchaseDate = dtNow;
+                                        _thisApp.model.thisModel.currentTrade.tradeValue = (_thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice) * (decimal)_thisApp.currentTrade.size;
+                                        _thisApp.model.buyShort = false;
+                                        _thisApp.model.sellShort = false;
+                                        _thisApp.model.shortOnMarket = false;
+                                        if (_thisApp.model.modelLogs.logs.Count >= 1)
+                                        {
+                                            _thisApp.model.modelLogs.logs[0].tradeType = "Short";
+                                            _thisApp.model.modelLogs.logs[0].tradeAction = "Buy";
+                                            _thisApp.model.modelLogs.logs[0].tradePrice = _thisApp.model.thisModel.currentTrade.buyPrice;
+                                            _thisApp.model.modelLogs.logs[0].tradeValue = (_thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice) * (decimal)_thisApp.currentTrade.size;
+                                        }
+                                        clsCommonFunctions.SendBroadcast("BuyShort", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade),_thisApp.the_app_db);
+                                    }
                                     _thisApp.model.sellLong = false;
                                     _thisApp.model.buyLong = false;
                                     _thisApp.model.longOnmarket = false;
-
-                                    if (_thisApp.model.modelLogs.logs.Count >= 1)
-                                    {
-                                        _thisApp.model.modelLogs.logs[0].tradeType = "Long";
-                                        _thisApp.model.modelLogs.logs[0].tradeAction = "Sell";
-                                        _thisApp.model.modelLogs.logs[0].quantity = _thisApp.model.thisModel.currentTrade.quantity;
-                                        _thisApp.model.modelLogs.logs[0].tradePrice = _thisApp.model.thisModel.currentTrade.sellPrice;
-                                        _thisApp.model.modelLogs.logs[0].tradeValue = (_thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice) * (decimal)_thisApp.currentTrade.size;
-                                    }
-                                    clsCommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade));
-                                }
-                                else
-                                {
-                                    Console.WriteLine("deleting sell");
-                                    _thisApp.model.thisModel.currentTrade.buyPrice = Convert.ToDecimal(_thisApp.currentTrade.level);
-                                    _thisApp.model.thisModel.currentTrade.purchaseDate = dtNow;
-                                    _thisApp.model.thisModel.currentTrade.tradeValue = (_thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice) * (decimal)_thisApp.currentTrade.size;
                                     _thisApp.model.buyShort = false;
                                     _thisApp.model.sellShort = false;
                                     _thisApp.model.shortOnMarket = false;
-                                    if (_thisApp.model.modelLogs.logs.Count >= 1)
+
+                                    //_thisApp.model.thisModel.currentTrade.tradeValue = _thisApp.model.thisModel.currentTrade.buyPrice - _thisApp.model.thisModel.currentTrade.sellPrice;
+
+                                    _thisApp.model.modelVar.strategyProfit += _thisApp.model.thisModel.currentTrade.tradeValue;
+                                    if (_thisApp.model.thisModel.currentTrade.tradeValue <= 0)
                                     {
-                                        _thisApp.model.modelLogs.logs[0].tradeType = "Short";
-                                        _thisApp.model.modelLogs.logs[0].tradeAction = "Buy";
-                                        _thisApp.model.modelLogs.logs[0].tradePrice = _thisApp.model.thisModel.currentTrade.buyPrice;
-                                        _thisApp.model.modelLogs.logs[0].tradeValue = (_thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice) * (decimal)_thisApp.currentTrade.size;
+                                        _thisApp.model.modelVar.carriedForwardLoss = _thisApp.model.modelVar.carriedForwardLoss + (double)Math.Abs(_thisApp.model.thisModel.currentTrade.tradeValue);
                                     }
-                                    clsCommonFunctions.SendBroadcast("BuyShort", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade));
+                                    else
+                                    {
+                                        //_thisApp.model.modelVar.carriedForwardLoss = 0;
+                                        _thisApp.model.modelVar.carriedForwardLoss = _thisApp.model.modelVar.carriedForwardLoss - (double)Math.Abs(_thisApp.model.thisModel.currentTrade.tradeValue);
+                                        if (_thisApp.model.modelVar.carriedForwardLoss < 0) { _thisApp.model.modelVar.carriedForwardLoss = 0; }
+
+                                    }
+                                    if (_thisApp.model.modelVar.strategyProfit > _thisApp.model.modelVar.maxStrategyProfit) { _thisApp.model.modelVar.maxStrategyProfit = _thisApp.model.modelVar.strategyProfit; }
+
+                                    // Save the last run vars into the TB settings table
+                                    _thisApp.tb.lastRunVars = _thisApp.model.modelVar.DeepCopy();
+                                    await _thisApp.tb.SaveDocument(_thisApp.the_app_db);
+
+                                    _thisApp.model.thisModel.currentTrade.units = _thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice;
+                                    _thisApp.model.thisModel.currentTrade.tbDealStatus = tsm.DealStatus;
+
+                                    _thisApp.model.thisModel.currentTrade.timestamp = DateTime.UtcNow;
+                                    _thisApp.model.thisModel.currentTrade.candleSold = null;
+                                    _thisApp.model.thisModel.currentTrade.candleBought = null;
+                                    if (_thisApp.epicName != "") { _thisApp.model.thisModel.currentTrade.epic = _thisApp.epicName; }
+                                    if (_thisApp.modelID != "") { _thisApp.model.thisModel.currentTrade.modelRunID = _thisApp.modelID; }
+                                    _thisApp.model.thisModel.currentTrade.tbReason = tsm.Status;
+                                    _thisApp.model.thisModel.modelTrades.Add(_thisApp.model.thisModel.currentTrade);
+
+                                    Console.WriteLine("Saving trade");
+                                    await _thisApp.model.thisModel.currentTrade.SaveDocument(_thisApp.trade_container);
+                                    Console.WriteLine("Trade saved");
+
+                                    //Send email
+                                    string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
+                                    if (region == "LIVE")
+                                    {
+                                        clsEmail obj = new clsEmail();
+                                        List<recip> recips = new List<recip>();
+                                        recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
+                                        recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
+                                        string subject = "TRADE ENDED - " + region;
+                                        string text = "The trade has ended in the " + region + " environment</br></br>";
+                                        text += "<ul>";
+                                        text += "<li>Trade ID : " + _thisApp.currentTrade.dealId + "</li>";
+                                        text += "<li>Epic : " + _thisApp.currentTrade.epic + "</li>";
+                                        text += "<li>Date : " + _thisApp.currentTrade.lastUpdated + "</li>";
+                                        text += "<li>Type : " + _thisApp.model.thisModel.currentTrade.longShort + "</li>";
+                                        text += "<li>Trade value : " + _thisApp.model.thisModel.currentTrade.tradeValue + "</li>";
+                                        text += "<li>Size : " + _thisApp.currentTrade.size + "</li>";
+                                        text += "<li>Price : " + _thisApp.currentTrade.level + "</li>";
+                                        text += "<li>Stop Level : " + _thisApp.currentTrade.stopLevel + "</li>";
+                                        text += "<li>NG count : " + _thisApp.modelVar.counter + "</li>";
+                                        text += "</ul>";
+                                        obj.sendEmail(recips, subject, text);
+                                    }
+
+                                    _thisApp.model.thisModel.currentTrade = null;
+                                    _thisApp.currentTrade = null;
+                                    _thisApp.model.onMarket = false;
+
+
+
                                 }
-                                _thisApp.model.sellLong = false;
-                                _thisApp.model.buyLong = false;
-                                _thisApp.model.longOnmarket = false;
-                                _thisApp.model.buyShort = false;
-                                _thisApp.model.sellShort = false;
-                                _thisApp.model.shortOnMarket = false;
-
-                                //_thisApp.model.thisModel.currentTrade.tradeValue = _thisApp.model.thisModel.currentTrade.buyPrice - _thisApp.model.thisModel.currentTrade.sellPrice;
-
-                                _thisApp.model.modelVar.strategyProfit += _thisApp.model.thisModel.currentTrade.tradeValue;
-                                if (_thisApp.model.thisModel.currentTrade.tradeValue <= 0)
-                                {
-                                    _thisApp.model.modelVar.carriedForwardLoss = _thisApp.model.modelVar.carriedForwardLoss + (double)Math.Abs(_thisApp.model.thisModel.currentTrade.tradeValue);
-                                }
-                                else
-                                {
-                                    //_thisApp.model.modelVar.carriedForwardLoss = 0;
-                                    _thisApp.model.modelVar.carriedForwardLoss = _thisApp.model.modelVar.carriedForwardLoss - (double)Math.Abs(_thisApp.model.thisModel.currentTrade.tradeValue);
-                                    if (_thisApp.model.modelVar.carriedForwardLoss < 0) { _thisApp.model.modelVar.carriedForwardLoss = 0; }
-
-                                }
-                                if (_thisApp.model.modelVar.strategyProfit > _thisApp.model.modelVar.maxStrategyProfit) { _thisApp.model.modelVar.maxStrategyProfit = _thisApp.model.modelVar.strategyProfit; }
-
-                                // Save the last run vars into the TB settings table
-                                _thisApp.tb.lastRunVars = _thisApp.model.modelVar.DeepCopy();
-                                await _thisApp.tb.SaveDocument(_thisApp.the_app_db);
-
-                                _thisApp.model.thisModel.currentTrade.units = _thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice;
-                                _thisApp.model.thisModel.currentTrade.tbDealStatus = tsm.DealStatus;
-
-                                _thisApp.model.thisModel.currentTrade.timestamp = DateTime.UtcNow;
-                                _thisApp.model.thisModel.currentTrade.candleSold = null;
-                                _thisApp.model.thisModel.currentTrade.candleBought = null;
-                                if (_thisApp.epicName != "") { _thisApp.model.thisModel.currentTrade.epic = _thisApp.epicName; }
-                                if (_thisApp.modelID != "") { _thisApp.model.thisModel.currentTrade.modelRunID = _thisApp.modelID; }
-                                _thisApp.model.thisModel.currentTrade.tbReason = tsm.Status;
-                                _thisApp.model.thisModel.modelTrades.Add(_thisApp.model.thisModel.currentTrade);
-                               
-                                Console.WriteLine("Saving trade");
-                                await _thisApp.model.thisModel.currentTrade.SaveDocument(_thisApp.trade_container);
-                                Console.WriteLine("Trade saved");
-
-                                //Send email
-                                string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
-                                if (region == "LIVE")
-                                {
-                                    clsEmail obj = new clsEmail();
-                                    List<recip> recips = new List<recip>();
-                                    recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
-                                    recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
-                                    string subject = "TRADE ENDED - " + region;
-                                    string text = "The trade has ended in the " + region + " environment</br></br>";
-                                    text += "<ul>";
-                                    text += "<li>Trade ID : " + _thisApp.currentTrade.dealId + "</li>";
-                                    text += "<li>Epic : " + _thisApp.currentTrade.epic + "</li>";
-                                    text += "<li>Date : " + _thisApp.currentTrade.lastUpdated + "</li>";
-                                    text += "<li>Type : " + _thisApp.model.thisModel.currentTrade.longShort + "</li>";
-                                    text += "<li>Trade value : " + _thisApp.model.thisModel.currentTrade.tradeValue + "</li>";
-                                    text += "<li>Size : " + _thisApp.currentTrade.size + "</li>";
-                                    text += "<li>Price : " + _thisApp.currentTrade.level + "</li>";
-                                    text += "<li>Stop Level : " + _thisApp.currentTrade.stopLevel + "</li>";
-                                    text += "<li>NG count : " + _thisApp.modelVar.counter + "</li>";
-                                    text += "</ul>";
-                                    obj.sendEmail(recips, subject, text);
-                                }
-
-                                _thisApp.model.thisModel.currentTrade = null;
-                                _thisApp.currentTrade = null;
-                                _thisApp.model.onMarket = false;
-
-
-
                             }
-                        }
-                        else
-                        {
-                            Console.WriteLine("DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
-                            TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
-                        }
-
-
-                    }
-                    else if (tsm.Status == "OPEN")
-                    {
-                        //Deal has bneen opened, however this should be caught by the CONFIRM message
-                        // check to see if we don't already have a deal open as this could have come from the IG Portal
-                        if (tsm.DealStatus == "ACCEPTED")
-                        {
-                            if (tsm.Channel == "WTP")
+                            else
                             {
-
+                                Console.WriteLine("DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
+                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason],_thisApp.the_app_db);
                             }
 
 
+                        }
+                        else if (tsm.Status == "OPEN")
+                        {
+                            //Deal has bneen opened, however this should be caught by the CONFIRM message
+                            // check to see if we don't already have a deal open as this could have come from the IG Portal
+                            if (tsm.DealStatus == "ACCEPTED")
+                            {
+                                if (tsm.Channel == "WTP")
+                                {
+
+                                }
+
+
+
+                            }
 
                         }
-
                     }
+
                 }
-
-
 
             }
             catch (Exception ex)
             {
-                var log = new TradingBrain.Models.Log();
+                var log = new TradingBrain.Models.Log(_thisApp.the_app_db);
                 log.Log_Message = ex.ToString();
                 log.Log_Type = "Error";
                 log.Log_App = "UpdateTs";
@@ -1017,8 +1072,12 @@ namespace TradingBrain.Models
 
             try
             {
-
-                subscription = new Subscription("DISTINCT", new string[1] { "CHART:IX.D.NASDAQ.CASH.IP:TICK" }, new string[11] { "BID", "OFR", "LTP", "LTV", "TTV", "UTM", "DAY_OPEN_MID", "DAY_NET_CHG_MID", "DAY_PERC_CHG_MID", "DAY_HIGH", "DAY_LOW" });
+                string chartName = "CHART:IX.D.NASDAQ.CASH.IP:TICK";
+                if (_thisApp.epicName != "")
+                {
+                    chartName = "CHART:" + _thisApp.epicName + ":TICK";
+                }
+                subscription = new Subscription("DISTINCT", new string[1] { chartName }, new string[11] { "BID", "OFR", "LTP", "LTV", "TTV", "UTM", "DAY_OPEN_MID", "DAY_NET_CHG_MID", "DAY_PERC_CHG_MID", "DAY_HIGH", "DAY_LOW" });
 
 
                 //subscription = new Subscription("MERGE", new string[30] { "item1", "item2", "item3", "item4", "item5", "item6", "item7", "item8", "item9", "item10", "item11", "item12", "item13", "item14", "item15", "item16", "item17", "item18", "item19", "item20", "item21", "item22", "item23", "item24", "item25", "item26", "item27", "item28", "item29", "item30" },
@@ -1031,9 +1090,12 @@ namespace TradingBrain.Models
             }
             catch (Exception e)
             {
-                //demoForm.Invoke(statusChangeDelegate, new Object[] {
-                //        StocklistConnectionListener.VOID, e.Message
-                //    });
+                var log = new TradingBrain.Models.Log(_thisApp.the_app_db);
+                log.Log_Message = e.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "ChartSubscribe";
+                log.Epic = "";
+                log.Save();
             }
         }
         private void TradeSubscribe(string accountId)
@@ -1064,7 +1126,12 @@ namespace TradingBrain.Models
                 //demoForm.Invoke(statusChangeDelegate, new Object[] {
                 //        StocklistConnectionListener.VOID, e.Message
                 //    });
-            
+                var log = new TradingBrain.Models.Log(_thisApp.the_app_db);
+                log.Log_Message = e.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "TradeSubscribe";
+                log.Epic = "";
+                log.Save();
             }
         }
         internal void ForceTransport(string selectedText)

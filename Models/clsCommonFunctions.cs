@@ -360,7 +360,7 @@ namespace TradingBrain.Models
             {
                 if (de.StatusCode != System.Net.HttpStatusCode.NotFound)
                 {
-                    Log log = new Log();
+                    Log log = new Log(the_db);
                     log.Log_Message = de.ToString();
                     log.Log_Type = "Error";
                     log.Log_App = "Epic/Get";
@@ -370,7 +370,7 @@ namespace TradingBrain.Models
             }
             catch (Exception e)
             {
-                Log log = new Log();
+                Log log = new Log(the_db);
                 log.Log_Message = e.ToString();
                 log.Log_Type = "Error";
                 log.Log_App = "Epic/Get";
@@ -428,7 +428,7 @@ namespace TradingBrain.Models
             }
             catch (CosmosException de)
             {
-                Log log = new Log();
+                Log log = new Log(the_db);
                 log.Log_Message = de.ToString();
                 log.Log_Type = "Error";
                 log.Log_App = "Epic/Get";
@@ -438,7 +438,7 @@ namespace TradingBrain.Models
             }
             catch (Exception e)
             {
-                Log log = new Log();
+                Log log = new Log(the_db);
                 log.Log_Message = e.ToString();
                 log.Log_Type = "Error";
                 log.Log_App = "Epic/Get";
@@ -536,7 +536,7 @@ namespace TradingBrain.Models
             {
                 if (de.StatusCode != System.Net.HttpStatusCode.NotFound)
                 {
-                    Log log = new Log();
+                    Log log = new Log(the_db);
                     log.Log_Message = de.ToString();
                     log.Log_Type = "Error";
                     log.Log_App = "Epic/Get";
@@ -546,7 +546,7 @@ namespace TradingBrain.Models
             }
             catch (Exception e)
             {
-                Log log = new Log();
+                Log log = new Log(the_db);
                 log.Log_Message = e.ToString();
                 log.Log_Type = "Error";
                 log.Log_App = "Epic/Get";
@@ -582,7 +582,7 @@ namespace TradingBrain.Models
             }
             catch (CosmosException de)
             {
-                Log log = new Log();
+                Log log = new Log(the_db);
                 log.Log_Message = de.ToString();
                 log.Log_Type = "Error";
                 log.Log_App = "Get Settings";
@@ -591,7 +591,7 @@ namespace TradingBrain.Models
             }
             catch (Exception e)
             {
-                Log log = new Log();
+                Log log = new Log(the_db);
                 log.Log_Message = e.ToString();
                 log.Log_Type = "Error";
                 log.Log_App = "Get Settings";
@@ -601,42 +601,42 @@ namespace TradingBrain.Models
             return (settings);
         }
 
-        public static async void SendBroadcast(string messageType, string messageValue)
+        public static async void SendBroadcast(string messageType, string messageValue, Database the_app_db)
         {
             try { 
-            string url = "";
-            var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
-            if (igWebApiConnectionConfig != null)
-            {
-                if (igWebApiConnectionConfig.Count > 0)
+                string url = "";
+                var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
+                if (igWebApiConnectionConfig != null)
                 {
-                    url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                    if (igWebApiConnectionConfig.Count > 0)
+                    {
+                        url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                    }
                 }
-            }
 
-            IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
-            newMsg.messageType = messageType;
-            newMsg.messageValue = messageValue;
+                IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
+                newMsg.messageType = messageType;
+                newMsg.messageValue = messageValue;
 
-            HttpClient client = new HttpClient();
-            url = url + "/broadcast";
+                HttpClient client = new HttpClient();
+                url = url + "/broadcast";
 
-            string msg = JsonConvert.SerializeObject(newMsg);
-            HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
+                string msg = JsonConvert.SerializeObject(newMsg);
+                HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
 
-            HttpResponseMessage response = client.PostAsync(url, content).Result;
-            string results = response.Content.ReadAsStringAsync().Result;
+                HttpResponseMessage response = client.PostAsync(url, content).Result;
+                string results = response.Content.ReadAsStringAsync().Result;
             }
             catch (Exception e)
             {
-                Log log = new Log();
+                Log log = new Log(the_app_db);
                 log.Log_Message = e.ToString();
                 log.Log_Type = "Error";
                 log.Log_App = "SendMessage";
                 await log.Save();
             }
         }
-        public static async void SendMessage(string userid,string messageType, string messageValue)
+        public static async void SendMessage(string userid,string messageType, string messageValue,Database the_app_db)
         {
             try
             {
@@ -665,7 +665,7 @@ namespace TradingBrain.Models
             }
             catch ( Exception e)
             {
-                Log log = new Log();
+                Log log = new Log(the_app_db);
                 log.Log_Message = e.ToString();
                 log.Log_Type = "Error";
                 log.Log_App = "SendMessage";
@@ -673,9 +673,9 @@ namespace TradingBrain.Models
             }
 
         }
-        public static async void SaveLog(string logType, string logApp, string logMessage)
+        public static async void SaveLog(string logType, string logApp, string logMessage,Database the_db)
         {
-            Log log = new Log();
+            Log log = new Log(the_db);
             log.Log_Message = logMessage;
             log.Log_Type = logType;
             log.Log_App = logApp;
