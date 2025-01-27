@@ -24,6 +24,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.SignalR.Client;
 using com.lightstreamer.client;
 
+using NLog;
+
 namespace TradingBrain.Models
 {
     partial class Program
@@ -39,8 +41,7 @@ namespace TradingBrain.Models
 
         static System.Timers.Timer t;
 
-
-
+ 
 
         public delegate void StopDelegate();
 
@@ -110,12 +111,30 @@ namespace TradingBrain.Models
             return ret;
 
         }
-
-
+    
+        
         static async Task Main(string[] args)
         {
             MainApp? app = null;
 
+            var config = new NLog.Config.LoggingConfiguration();
+
+            var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
+            var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App.${shortdate}.txt", MaxArchiveDays=31, KeepFileOpen=false, Layout = "${longdate}|${level:uppercase=true}|${message}|${exception:format=toString}" };
+            var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
+            logconsole.Layout = "${longdate}|${level:uppercase=true}|${logger}|${message}|${exception:format=toString}";
+
+            config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
+            config.AddRule(LogLevel.Debug, LogLevel.Fatal, logfile);
+
+            NLog.LogManager.Configuration = config;
+            Logger tbLog = LogManager.GetCurrentClassLogger();
+
+            //Serilog.Log.Logger = new LoggerConfiguration()
+            //.WriteTo.Console()               // Log to the console
+            //.WriteTo.File("c:/TBlogs/log.txt", rollingInterval: RollingInterval.Day,shared: true) // Log to a rolling file
+            //.MinimumLevel.Debug()
+            //.CreateLogger();
 
             string epic = "IX.D.NASDAQ.CASH.IP";
 
@@ -125,8 +144,11 @@ namespace TradingBrain.Models
                 epic = Environment.GetCommandLineArgs()[1];
             }
 
+            tbLog.Info("------------------------------------------------");
+            tbLog.Info($"-- TradingBrain started : {epic} --");
+            tbLog.Info("------------------------------------------------");
 
-            Console.WriteLine("Connecting to database....");
+            tbLog.Info("Connecting to database....");
 
             Database? the_db = await IGModels.clsCommonFunctions.Get_Database(epic);
             Database? the_app_db = await IGModels.clsCommonFunctions.Get_App_Database(epic);
@@ -157,19 +179,19 @@ namespace TradingBrain.Models
 
                 SetupDB(epic);
 
-                Console.WriteLine("Initialising app");
+                tbLog.Info("Initialising app");
 
-                app = new MainApp(the_db,the_app_db, container, chart_container, epic,minute_container,TicksContainer,trade_container);
+                app = new MainApp(the_db,the_app_db, container, chart_container, epic,minute_container,TicksContainer,trade_container );
 
 
                 if (app != null)
                 {
-                    Console.WriteLine("Waiting for changes...");
+                    tbLog.Info("Waiting for changes...");
 
                     int i = await app.WaitForChanges();
                 }
 
-                Console.WriteLine("Exiting...");
+                tbLog.Info("Exiting...");
 
                 Environment.Exit(0);
 
@@ -237,11 +259,11 @@ namespace TradingBrain.Models
 
                     if (exception == null)
                     {
-                        Console.WriteLine("normal proc exit");
+                        clsCommonFunctions.AddStatusMessage("normal proc exit","INFO");
                     }
                     else
                     {
-                        Console.WriteLine("unhandled exception: " + exception.GetType().Name);
+                        clsCommonFunctions.AddStatusMessage("unhandled exception: " + exception.GetType().Name,"ERROR");
                     }
                 }
 
@@ -254,7 +276,7 @@ namespace TradingBrain.Models
 
                 static void t_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
                 {
-                    Console.WriteLine(DateTime.Now.ToString("o"));
+                    //Console.WriteLine(DateTime.Now.ToString("o"));
                     t.Interval = GetInterval();
                     t.Start();
                 }

@@ -13,13 +13,38 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 
+using IGModels.ModellingModels;
+using NLog;
+
 namespace TradingBrain.Models
 {
     public static class clsCommonFunctions
     {
-        public static void AddStatusMessage(string message)
+        public static void AddStatusMessage(string message,string level = "INFO")
         {
-            Console.WriteLine(message);
+            Logger tbLog = LogManager.GetCurrentClassLogger();
+            //Console.WriteLine(message);
+            switch (level)
+            {
+                case "ERROR":
+                    tbLog.Error(message);
+                    break;
+
+                case "DEBUG":
+                    tbLog.Debug(message);
+                    break;
+
+                case "WARNING":
+                    tbLog.Warn(message);
+                    break;
+
+                default:
+                    tbLog.Info(message);
+                    break;
+
+            }
+       
+     
         }
         public static async Task<Database?> Get_Database()
         {
@@ -681,5 +706,74 @@ namespace TradingBrain.Models
             log.Log_App = logApp;
             await log.Save();
         }
+
+        public static async Task<TradingBrainSettings> GetTradingBrainSettings(Database the_db, string epicName, string accountId)
+        {
+            // find the data
+            var ret = new TradingBrainSettings();
+            try
+            {
+                Container container = the_db.GetContainer("TradingBrainSettings");
+                Container container_opt = the_db.GetContainer("OptimizeRunData");
+
+                var parameterizedQuery = new QueryDefinition(
+                    query: "SELECT top 1 * FROM c WHERE c.epicName = @epicname AND (c.accountId = @accountId or c.accountId = '')  Order by c.timestamp DESC"
+
+                //query: "SELECT M.modelLogs FROM c JOIN (SELECT VALUE m FROM m IN c.runVars WHERE m.var1 = @Var1) as m WHERE c.modelRunID = @ModelRunID  Order by c.runVars.modelLogs.seqNo ASC"
+                ).WithParameter("@epicname", epicName)
+                .WithParameter("@accountId", accountId);
+
+                using FeedIterator<TradingBrainSettings> filteredFeed = container.GetItemQueryIterator<TradingBrainSettings>(
+                    queryDefinition: parameterizedQuery
+                );
+
+
+                while (filteredFeed.HasMoreResults)
+                {
+                    FeedResponse<TradingBrainSettings> response = await filteredFeed.ReadNextAsync();
+                    var logs = response.Resource;
+                    // Iterate query results
+                    foreach (var item in logs)
+                    {
+                        ret = item;
+                    }
+                }
+
+                if (ret.runDetails.getLatestVars)
+                {
+                    clsCommonFunctions.AddStatusMessage("Getting latest vars (if necessary)","INFO");
+                    // now get the latest optimized data
+                    OptimizeRunData opt = new OptimizeRunData();
+                    opt = await OptimizeRunData.GetOptimizeRunDataLatest(the_db, container_opt, epicName, ret.runDetails.numCandles);
+                    if (opt.inputs.Count > 0)
+                    {
+                        ret.runDetails.inputs = opt.inputs;
+                        await ret.SaveDocument(the_db);
+                    }
+                }
+
+            }
+            catch (CosmosException de)
+            {
+                Log log = new Log();
+                log.Log_Message = de.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "GetTradingBrainSettings";
+                await log.Save();
+
+
+            }
+            catch (Exception e)
+            {
+                Log log = new Log();
+                log.Log_Message = e.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "GetTradingBrainSettings";
+                await log.Save();
+            }
+
+            return (ret);
+        }
+
     }
 }

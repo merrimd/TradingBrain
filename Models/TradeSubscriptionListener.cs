@@ -32,31 +32,31 @@ namespace TradingBrain.Models
 
         void SubscriptionListener.onClearSnapshot(string itemName, int itemPos)
         {
-            Console.WriteLine("Trade - On cleasrsnapshot called");
+            clsCommonFunctions.AddStatusMessage("Trade - On cleasrsnapshot called","INFO");
             // ...
         }
 
         void SubscriptionListener.onCommandSecondLevelItemLostUpdates(int lostUpdates, string key)
         {
-            Console.WriteLine("Trade - On commandsecondlevelitemlostupdates called");
+            clsCommonFunctions.AddStatusMessage("Trade - On commandsecondlevelitemlostupdates called", "INFO");
             // ...
         }
 
         void SubscriptionListener.onCommandSecondLevelSubscriptionError(int code, string message, string key)
         {
-            Console.WriteLine("Trade - On commandsecondlevelsubscriptionerror called");
+            clsCommonFunctions.AddStatusMessage("Trade - On commandsecondlevelsubscriptionerror called", "ERROR");
             // ...
         }
 
         void SubscriptionListener.onEndOfSnapshot(string itemName, int itemPos)
         {
-            Console.WriteLine("Trade - On endofsnaphot called");
+            clsCommonFunctions.AddStatusMessage("Trade - On endofsnaphot called", "INFO");
             // ...
         }
 
         void SubscriptionListener.onItemLostUpdates(string itemName, int itemPos, int lostUpdates)
         {
-            Console.WriteLine("Trade - On Itemlostupdates called");
+            clsCommonFunctions.AddStatusMessage("Trade - On Itemlostupdates called", "INFO");
             // ...
         }
 
@@ -70,37 +70,37 @@ namespace TradingBrain.Models
 
         void SubscriptionListener.onListenEnd(Subscription subscription)
         {
-            Console.WriteLine("Trade - On Listen end called");
+            clsCommonFunctions.AddStatusMessage("Trade - On Listen end called", "INFO");
             // ...
         }
 
         void SubscriptionListener.onListenStart(Subscription subscription)
         {
-            Console.WriteLine("Trade - On Listen start called");
+            clsCommonFunctions.AddStatusMessage("Trade - On Listen start called", "INFO");
             // ...
         }
 
         void SubscriptionListener.onSubscription()
         {
-            Console.WriteLine("Trade - On subscription called");
+            clsCommonFunctions.AddStatusMessage("Trade - On subscription called", "INFO");
             // ...
         }
 
         void SubscriptionListener.onSubscriptionError(int code, string message)
         {
-            Console.WriteLine("Trade - On subscriptionError called : " + code + " - " + message);
+            clsCommonFunctions.AddStatusMessage("Trade - On subscriptionError called : " + code + " - " + message, "ERROR");
             // ...
         }
 
         void SubscriptionListener.onUnsubscription()
         {
-            Console.WriteLine("Trade - On unsubscription called");
+            clsCommonFunctions.AddStatusMessage("Trade - On unsubscription called", "INFO");
             // ...
         }
 
         void SubscriptionListener.onRealMaxFrequency(string frequency)
         {
-            Console.WriteLine("Trade - On realmaxfrequency called");
+            clsCommonFunctions.AddStatusMessage("Trade - On realmaxfrequency called", "INFO");
             // ...
         }
 

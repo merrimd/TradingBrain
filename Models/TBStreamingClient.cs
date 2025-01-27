@@ -20,7 +20,7 @@ using Lightstreamer.DotNet.Client;
 using Newtonsoft.Json;
 using System.CodeDom;
 using Microsoft.AspNetCore.Components.Forms;
-
+using TradingBrain.Models;
 namespace TradingBrain.Models
 {
 
@@ -56,19 +56,19 @@ namespace TradingBrain.Models
                 updateDelegate = lsUpdateDelegate;
                 statusChangeDelegate = lsStatusChangeDelegate;
                 FirstConfirmUpdate = true;
-                var config = new NLog.Config.LoggingConfiguration();
+                //var config = new NLog.Config.LoggingConfiguration();
 
-                var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
-                var logfile = new NLog.Targets.FileTarget("logfile") { FileName = filename };
-                var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
+                //var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
+                //var logfile = new NLog.Targets.FileTarget("logfile") { FileName = filename };
+                //var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
 
-                // config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
-                config.AddRule(LogLevel.Warn, LogLevel.Fatal, logconsole);
-                config.AddRule(LogLevel.Trace, LogLevel.Fatal, logfile);
+ 
+                //config.AddRule(LogLevel.Warn, LogLevel.Fatal, logconsole);
+                //config.AddRule(LogLevel.Trace, LogLevel.Fatal, logfile);
 
-                NLog.LogManager.Configuration = config;
-
-                LightstreamerClient.setLoggerProvider(new Log4NetLoggerProviderWrapper());
+                //NLog.LogManager.Configuration = config;
+                
+                //LightstreamerClient.setLoggerProvider(new Log4NetLoggerProviderWrapper());
 
                 //LightstreamerClient.setLoggerProvider(new );
                 bool connectionEstablished = false;
@@ -90,10 +90,10 @@ namespace TradingBrain.Models
             }
 
         }
-        public static void AddStatusMessage(string message)
-        {
-            Console.WriteLine(message);
-        }
+        //public static void AddStatusMessage(string message)
+        //{
+        //    clsCommonFunctions.AddStatusMessage(message);
+        //}
 
         public async void ConnectToRest()
         {
@@ -131,25 +131,25 @@ namespace TradingBrain.Models
 
                         Accounts.Add(igAccount);
 
-                        AddStatusMessage("Account:" + igAccount.ClientId + " " + account.accountName);
+                        clsCommonFunctions.AddStatusMessage("Account:" + igAccount.ClientId + " " + account.accountName,"INFO");
                     }
 
                     LoggedIn = true;
 
-                    AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId);
+                    clsCommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
 
                     _thisApp.context = _thisApp.igRestApiClient.GetConversationContext();
 
                 }
                 else
                 {
-                    AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
-                      response.StatusCode);
+                    clsCommonFunctions.AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
+                      response.StatusCode, "ERROR");
                 }
             }
             catch(Exception e)
             {
-                Console.WriteLine("ConnectToRest failed - " + e.ToString);
+                clsCommonFunctions.AddStatusMessage("ConnectToRest failed - " + e.ToString,"ERROR");
                 
             }
         }
@@ -189,16 +189,16 @@ namespace TradingBrain.Models
 
                         Accounts.Add(igAccount);
 
-                        AddStatusMessage("Account:" + igAccount.ClientId + " " + account.accountName);
+                        clsCommonFunctions.AddStatusMessage("Account:" + igAccount.ClientId + " " + account.accountName, "INFO");
                     }
 
                     LoggedIn = true;
 
-                    AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId);
+                    clsCommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
 
                     _thisApp.context = _thisApp.igRestApiClient.GetConversationContext();
 
-                    AddStatusMessage("establishing datastream connection");
+                    clsCommonFunctions.AddStatusMessage("establishing datastream connection", "INFO");
 
                     if ((_thisApp.context != null) && (response.Response.lightstreamerEndpoint != null) &&
                         (_thisApp.context.apiKey != null) && (_thisApp.context.xSecurityToken != null) && (_thisApp.context.cst != null))
@@ -217,7 +217,7 @@ namespace TradingBrain.Models
                         }
                         catch (Exception ex)
                         {
-                            AddStatusMessage(ex.Message);
+                            clsCommonFunctions.AddStatusMessage(ex.Message, "ERROR");
                         }
                     }
 
@@ -227,8 +227,8 @@ namespace TradingBrain.Models
                 }
                 else
                 {
-                    AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
-                                        response.StatusCode);
+                    clsCommonFunctions.AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
+                                        response.StatusCode,"ERROR");
                     Log log = new Log(_thisApp.the_app_db);
                     log.Log_Message = "Failed to login. HttpResponse StatusCode = " + response.StatusCode;
                     log.Log_Type = "Error";
@@ -345,7 +345,7 @@ namespace TradingBrain.Models
                 return;
             try { 
 
-            Console.WriteLine("Status changed to " + status + " (" + cStatus + ")");
+            clsCommonFunctions.AddStatusMessage("Status changed to " + status + " (" + cStatus + ")", "INFO");
             if (cStatus == 0)
             {
                 if (Interlocked.CompareExchange(ref this.reset, 0, 1) == 1)
@@ -439,11 +439,11 @@ namespace TradingBrain.Models
         {
 
             // Deal with Trade updates here
-            Console.WriteLine("Trade update received: ph={0}, this.phase={1}, FirstConfirmUpdate={2}", ph, this.phase,this.FirstConfirmUpdate);
+            clsCommonFunctions.AddStatusMessage($"Trade update received: ph={ph}, this.phase={this.phase}, FirstConfirmUpdate={this.FirstConfirmUpdate}", "INFO");
 
             if (ph != this.phase)
             {
-                Console.WriteLine("Trade not updated as ph <> this.phase");
+                clsCommonFunctions.AddStatusMessage("Trade not updated as ph <> this.phase", "INFO");
                 return;
             }
             try
@@ -452,7 +452,7 @@ namespace TradingBrain.Models
                 {
                     var sb = new StringBuilder();
                     sb.AppendLine("Trade Subscription Update");
-                    Console.WriteLine("Trade Subscription Update");
+                    clsCommonFunctions.AddStatusMessage("Trade Subscription Update", "INFO");
                     try
                     {
                   
@@ -462,17 +462,17 @@ namespace TradingBrain.Models
 
                         if (!(String.IsNullOrEmpty(opu)))
                         {
-                            //Console.WriteLine("Trade update - OPU" + opu);
+                            //clsCommonFunctions.AddStatusMessage("Trade update - OPU" + opu);
                             await UpdateTs(itemPos, update.ItemName, update, opu, TradeSubscriptionType.Opu);
                         }
                         if (!(String.IsNullOrEmpty(wou)))
                         {
-                            //Console.WriteLine("Trade update - WOU" + wou);
+                            //clsCommonFunctions.AddStatusMessage("Trade update - WOU" + wou);
                             await UpdateTs(itemPos, update.ItemName, update, wou, TradeSubscriptionType.Wou);
                         }
                         if (!(String.IsNullOrEmpty(confirms)))
                         {
-                            //Console.WriteLine("Trade update - CONFIRMS" + confirms);
+                            //clsCommonFunctions.AddStatusMessage("Trade update - CONFIRMS" + confirms);
                            await UpdateTs(itemPos, update.ItemName, update, confirms, TradeSubscriptionType.Confirm);
                         }
 
@@ -495,7 +495,7 @@ namespace TradingBrain.Models
             }
 
 
-            Console.WriteLine("Trade - " + itemPos);
+            clsCommonFunctions.AddStatusMessage("Trade - " + itemPos, "INFO");
 
         }
 
@@ -543,7 +543,7 @@ namespace TradingBrain.Models
                             tsm.TradeType = "CONFIRM";
                             break;
                     }
-                    Console.WriteLine("Trade update " + tsm.TradeType + " - " + inputData);
+                    clsCommonFunctions.AddStatusMessage("Trade update " + tsm.TradeType + " - " + inputData, "INFO");
                     // log the message
                     clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
 
@@ -645,7 +645,7 @@ namespace TradingBrain.Models
                                     List<recip> recips = new List<recip>();
                                     recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
                                     recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
-                                    string subject = "NEW TRADE STARTED - " + region;
+                                    string subject = "NEW TRADE STARTED - " + _thisApp.currentTrade.epic;
                                     string text = "A new trade has started in the " + region + " environment</br></br>";
                                     text += "<ul>";
                                     text += "<li>Trade ID : " + _thisApp.currentTrade.dealId + "</li>";
@@ -663,7 +663,7 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                Console.WriteLine("CONFIRM deal failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
+                                clsCommonFunctions.AddStatusMessage("CONFIRM deal failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
                                 TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "CONFIRM deal failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
                                 _thisApp.model.sellShort = false;
                                 _thisApp.model.sellLong = false;
@@ -680,7 +680,7 @@ namespace TradingBrain.Models
                         else
                         {
 
-                            Console.WriteLine("CONFIRM failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
+                            clsCommonFunctions.AddStatusMessage("CONFIRM failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
                             TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "CONFIRM failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason],_thisApp.the_app_db);
                             // manage failed deals here. Maybe retry once or twice if necessary. Should log error as well I guess.
                             //if (tsm.Direction == "BUY")
@@ -722,7 +722,7 @@ namespace TradingBrain.Models
                             // Deal has been updated, so save the new data and move on.
                             if (tsm.DealStatus == "ACCEPTED")
                             {
-                                Console.WriteLine("Updating  - " + tsm.DealId + " - Cuurent Deal = " + _thisApp.currentTrade.dealId);
+                                clsCommonFunctions.AddStatusMessage("Updating  - " + tsm.DealId + " - Current Deal = " + _thisApp.currentTrade.dealId, "INFO");
                                 //Only update if it is the current trade that is affected (in case we have 2 trades running at the same time)
                                 if (tsm.DealId == _thisApp.currentTrade.dealId)
                                 {
@@ -795,7 +795,7 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                Console.WriteLine("UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
+                                clsCommonFunctions.AddStatusMessage("UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
                                 TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason],_thisApp.the_app_db);
                             }
                         }
@@ -810,7 +810,7 @@ namespace TradingBrain.Models
                                 //_thisApp.currentTrade.dealReference = tsm.DealReference;
                                 //_thisApp.currentTrade.dealId = tsm.DealId;
 
-                                Console.WriteLine("Deleting  - " + tsm.DealId + " - Cuurent Deal = " + _thisApp.currentTrade.dealId);
+                                clsCommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + _thisApp.currentTrade.dealId, "INFO");
                                 //Only delete if it is the current trade that is affected (in case we have 2 trades running at the same time)
                                 if (tsm.DealId == _thisApp.currentTrade.dealId)
                                 {
@@ -839,10 +839,10 @@ namespace TradingBrain.Models
                                     _thisApp.model.stopPriceOld = 0;// _thisApp.model.stopPrice;
 
                                     _thisApp.model.thisModel.currentTrade.tradeEnded = dtNow;
-                                    Console.WriteLine("tsm.Direction = " + tsm.Direction);
+                                    clsCommonFunctions.AddStatusMessage("tsm.Direction = " + tsm.Direction, "INFO");
                                     if (tsm.Direction == "BUY")
                                     {
-                                        Console.WriteLine("deleting buy");
+                                        clsCommonFunctions.AddStatusMessage("deleting buy", "INFO");
                                         _thisApp.model.thisModel.currentTrade.sellPrice = Convert.ToDecimal(_thisApp.currentTrade.level);
                                         _thisApp.model.thisModel.currentTrade.sellDate = dtNow;
                                         _thisApp.model.thisModel.currentTrade.tradeValue = (_thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice) * (decimal)_thisApp.currentTrade.size;
@@ -863,7 +863,7 @@ namespace TradingBrain.Models
                                     }
                                     else
                                     {
-                                        Console.WriteLine("deleting sell");
+                                        clsCommonFunctions.AddStatusMessage("deleting sell", "INFO");
                                         _thisApp.model.thisModel.currentTrade.buyPrice = Convert.ToDecimal(_thisApp.currentTrade.level);
                                         _thisApp.model.thisModel.currentTrade.purchaseDate = dtNow;
                                         _thisApp.model.thisModel.currentTrade.tradeValue = (_thisApp.model.thisModel.currentTrade.sellPrice - _thisApp.model.thisModel.currentTrade.buyPrice) * (decimal)_thisApp.currentTrade.size;
@@ -898,7 +898,7 @@ namespace TradingBrain.Models
                                         //_thisApp.model.modelVar.carriedForwardLoss = 0;
                                         _thisApp.model.modelVar.carriedForwardLoss = _thisApp.model.modelVar.carriedForwardLoss - (double)Math.Abs(_thisApp.model.thisModel.currentTrade.tradeValue);
                                         if (_thisApp.model.modelVar.carriedForwardLoss < 0) { _thisApp.model.modelVar.carriedForwardLoss = 0; }
-
+                                        _thisApp.model.modelVar.currentGain += (double)_thisApp.model.thisModel.currentTrade.tradeValue;
                                     }
                                     if (_thisApp.model.modelVar.strategyProfit > _thisApp.model.modelVar.maxStrategyProfit) { _thisApp.model.modelVar.maxStrategyProfit = _thisApp.model.modelVar.strategyProfit; }
 
@@ -917,9 +917,9 @@ namespace TradingBrain.Models
                                     _thisApp.model.thisModel.currentTrade.tbReason = tsm.Status;
                                     _thisApp.model.thisModel.modelTrades.Add(_thisApp.model.thisModel.currentTrade);
 
-                                    Console.WriteLine("Saving trade");
+                                    clsCommonFunctions.AddStatusMessage("Saving trade", "INFO");
                                     await _thisApp.model.thisModel.currentTrade.SaveDocument(_thisApp.trade_container);
-                                    Console.WriteLine("Trade saved");
+                                    clsCommonFunctions.AddStatusMessage("Trade saved", "INFO");
 
                                     //Send email
                                     string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
@@ -929,7 +929,7 @@ namespace TradingBrain.Models
                                         List<recip> recips = new List<recip>();
                                         recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
                                         recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
-                                        string subject = "TRADE ENDED - " + region;
+                                        string subject = "TRADE ENDED - " + _thisApp.currentTrade.epic;
                                         string text = "The trade has ended in the " + region + " environment</br></br>";
                                         text += "<ul>";
                                         text += "<li>Trade ID : " + _thisApp.currentTrade.dealId + "</li>";
@@ -955,7 +955,7 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                Console.WriteLine("DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason]);
+                                clsCommonFunctions.AddStatusMessage("DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
                                 TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason],_thisApp.the_app_db);
                             }
 

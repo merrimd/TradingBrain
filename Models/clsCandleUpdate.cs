@@ -1,4 +1,5 @@
-﻿using Microsoft.Azure.Cosmos;
+﻿using IGModels;
+using Microsoft.Azure.Cosmos;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -71,11 +72,11 @@ namespace TradingBrain.Models
                 }
                 catch (CosmosException de)
                 {
-                    Console.WriteLine(de.ToString());
+                    clsCommonFunctions.AddStatusMessage(de.ToString(),"ERROR");
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e.ToString());
+                    clsCommonFunctions.AddStatusMessage(e.ToString(),"ERROR");
                 }
 
 

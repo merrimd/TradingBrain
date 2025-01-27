@@ -111,14 +111,14 @@ namespace TradingBrain.Models
             }
             catch (CosmosException de)
             {
-                Console.WriteLine("error:" + de.ToString());
+                clsCommonFunctions.AddStatusMessage("error:" + de.ToString(),"ERROR");
             }
             catch (Exception e)
             {
-                Console.WriteLine("error:" + e.Message);
+                clsCommonFunctions.AddStatusMessage("error:" + e.Message,"ERROR");
             }
 
-            Console.WriteLine("Done");
+            clsCommonFunctions.AddStatusMessage("Trade db record updated","INFO");
 
             return ret;
         }

@@ -84,7 +84,7 @@ namespace TradingBrain.Models
                 }
                 catch (CosmosException de)
                 {
-                    Console.WriteLine(de.ToString());
+                    clsCommonFunctions.AddStatusMessage(de.ToString(), "ERROR");
                     var log = new Log();
                     log.Log_Message = de.ToString();
                     log.Log_Type = "Error";
@@ -94,7 +94,7 @@ namespace TradingBrain.Models
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e.ToString());
+                    clsCommonFunctions.AddStatusMessage(e.ToString(), "ERROR");
                     var log = new Log();
                     log.Log_Message = e.ToString();
                     log.Log_Type = "Error";
@@ -146,17 +146,17 @@ namespace TradingBrain.Models
             }
             catch (CosmosException de)
             {
-                Console.WriteLine(de.ToString());
+                clsCommonFunctions.AddStatusMessage(de.ToString(), "ERROR");
                 var log = new Log();
                 log.Log_Message = de.ToString();
-                log.Log_Type = "Error";
+                log.Log_Type = "Error"; 
                 log.Log_App = "clsChartUpdate/DoesThisTickExist";
                 log.Epic = this.Epic;
                 await log.Save();
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.ToString());
+                clsCommonFunctions.AddStatusMessage(e.ToString(), "ERROR");
                 var log = new Log();
                 log.Log_Message = e.ToString();
                 log.Log_Type = "Error";
