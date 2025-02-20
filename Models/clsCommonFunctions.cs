@@ -15,12 +15,13 @@ using System.Web;
 
 using IGModels.ModellingModels;
 using NLog;
+using static TradingBrain.Models.clsCommonFunctions;
 
 namespace TradingBrain.Models
 {
     public static class clsCommonFunctions
     {
-        public static void AddStatusMessage(string message,string level = "INFO")
+        public static void AddStatusMessage(string message, string level = "INFO")
         {
             Logger tbLog = LogManager.GetCurrentClassLogger();
             //Console.WriteLine(message);
@@ -43,8 +44,8 @@ namespace TradingBrain.Models
                     break;
 
             }
-       
-     
+
+
         }
         public static async Task<Database?> Get_Database()
         {
@@ -628,7 +629,8 @@ namespace TradingBrain.Models
 
         public static async void SendBroadcast(string messageType, string messageValue, Database the_app_db)
         {
-            try { 
+            try
+            {
                 string url = "";
                 var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
                 if (igWebApiConnectionConfig != null)
@@ -661,7 +663,7 @@ namespace TradingBrain.Models
                 await log.Save();
             }
         }
-        public static async void SendMessage(string userid,string messageType, string messageValue,Database the_app_db)
+        public static async void SendMessage(string userid, string messageType, string messageValue, Database the_app_db)
         {
             try
             {
@@ -688,7 +690,7 @@ namespace TradingBrain.Models
                 HttpResponseMessage response = client.PostAsync(url, content).Result;
                 string results = response.Content.ReadAsStringAsync().Result;
             }
-            catch ( Exception e)
+            catch (Exception e)
             {
                 Log log = new Log(the_app_db);
                 log.Log_Message = e.ToString();
@@ -698,7 +700,7 @@ namespace TradingBrain.Models
             }
 
         }
-        public static async void SaveLog(string logType, string logApp, string logMessage,Database the_db)
+        public static async void SaveLog(string logType, string logApp, string logMessage, Database the_db)
         {
             Log log = new Log(the_db);
             log.Log_Message = logMessage;
@@ -741,7 +743,7 @@ namespace TradingBrain.Models
 
                 if (ret.runDetails.getLatestVars)
                 {
-                    clsCommonFunctions.AddStatusMessage("Getting latest vars (if necessary)","INFO");
+                    clsCommonFunctions.AddStatusMessage("Getting latest vars (if necessary)", "INFO");
                     // now get the latest optimized data
                     OptimizeRunData opt = new OptimizeRunData();
                     opt = await OptimizeRunData.GetOptimizeRunDataLatest(the_db, container_opt, epicName, ret.runDetails.numCandles);
@@ -774,6 +776,70 @@ namespace TradingBrain.Models
 
             return (ret);
         }
+        public class OrderValues
+        {
+            public double quantity { get; set; }
+            public double stopDistance { get; set; }
+            public decimal level { get; set; }
+            public decimal targetPrice { get; set; }
 
+            public OrderValues()
+            {
+                quantity = 0;
+                stopDistance = 0;
+                level = 0;
+                targetPrice = 0;
+            }
+
+            public void SetOrderValues(string direction, MainApp thisApp)
+            {
+                double quantity = Math.Min(thisApp.model.thisModel.currentTrade.quantity * thisApp.model.modelVar.suppQuantityMultiplier, thisApp.model.modelVar.maxQuantity);
+                modelInstanceInputs thisInput = IGModels.clsCommonFunctions.GetInputsFromSpread(thisApp.model.thisModel.inputs, thisApp.model.candles.currentCandle.candleData);
+                double targetVar = thisInput.targetVarInput / 100 + 1;
+                double targetVarShort = thisInput.targetVarInputShort / 100 + 1;
+                decimal targetPrice = 0;
+                double suppStopPercentage = thisApp.model.modelVar.suppStopPercentage;
+                if (suppStopPercentage == 0) { suppStopPercentage = 1; }
+
+                // Now set up the order for the supp trade
+
+                //Calculate the open level and stop limits
+                decimal dealPrice = 0;
+                double targetUnits = 0;
+                double suppTargetUnits = 0;
+                decimal newLevel = 0;
+                double newStop = 0;
+
+                if (direction.ToUpper() == "BUY")
+                {
+                    dealPrice = thisApp.model.thisModel.currentTrade.buyPrice;
+                    targetPrice = thisApp.model.thisModel.currentTrade.buyPrice + Math.Abs((decimal)targetVar * (decimal)thisApp.model.candles.currentCandle.mATypicalLongTypical - (decimal)thisApp.model.candles.currentCandle.mATypicalLongTypical);
+                    targetUnits = (double)(targetPrice - dealPrice);
+                    suppTargetUnits = targetUnits * 0.9;
+                    newLevel = dealPrice + (decimal)suppTargetUnits;
+                }
+                else
+                {
+                    dealPrice = thisApp.model.thisModel.currentTrade.sellPrice;
+                    targetPrice = thisApp.model.thisModel.currentTrade.sellPrice - Math.Abs((decimal)targetVarShort * (decimal)thisApp.model.candles.currentCandle.mATypicalShortTypical - (decimal)thisApp.model.candles.currentCandle.mATypicalShortTypical);
+                    targetUnits = (double)(dealPrice - targetPrice);
+                    suppTargetUnits = targetUnits * 0.9;
+                    newLevel = dealPrice - (decimal)suppTargetUnits;
+                }
+
+                newStop = targetUnits - (targetUnits * suppStopPercentage) - (targetUnits - suppTargetUnits);
+
+                this.quantity = quantity;
+                this.stopDistance = Math.Round(newStop, 1);
+                this.level = Math.Round(newLevel,1);
+                this.targetPrice = Math.Round(targetPrice,1);
+
+                if (thisApp.model.doSuppTrades)
+                {
+                    clsCommonFunctions.AddStatusMessage($"order values - dealPrice={this.level}, targetPrice= {targetPrice}, targetUnits = {targetUnits}, suppTargetUnits = {suppTargetUnits}, newLevel = {newLevel}, stop level {newStop}, suppStopPercentage {suppStopPercentage}", "DEBUG");
+                }
+            }
+        }
     }
+
 }

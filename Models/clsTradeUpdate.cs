@@ -5,11 +5,114 @@ using Microsoft.Azure.Cosmos;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace TradingBrain.Models
 {
+    public class TradeSubUpdate : LsTradeSubscriptionData
+    {
+        public string id { get; set; }
+        public DateTime timestamp { get; set; }
+        public string statusVal { get; set; }
+        public string directionVal { get; set; }
+        public string dealStatusVal { get; set; }
+        public string updateType { get; set; }
+        public string reasonDescription { get; set; }
+        public TradeSubUpdate()
+        {
+            id = Guid.NewGuid().ToString();
+            timestamp = DateTime.MinValue;
+            statusVal = "";
+            directionVal = "";
+            dealStatusVal = "";
+            updateType = "";
+            reasonDescription = "";
+
+        }
+        public async Task<bool> SaveDocument(Database the_db)
+        {
+            bool ret = true;
+
+            Container container = the_db.GetContainer("TradingBrainSubUpdates");
+
+            try
+            {
+                ItemResponse<TradeSubUpdate> SaveResponse = await container.UpsertItemAsync<TradeSubUpdate>(this);
+                clsCommonFunctions.AddStatusMessage("Trade db record updated", "INFO");
+            }
+            catch (CosmosException de)
+            {
+                Console.WriteLine(de.ToString());
+                var log = new Log();
+                log.Log_Message = de.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "TradeSubUpdate/SaveDocument";
+
+                await log.Save();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+                var log = new Log();
+                log.Log_Message = e.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "TradeSubUpdate/SaveDocument";
+
+                await log.Save();
+            }
+
+
+
+            return ret;
+        }
+        public async Task<bool> Add(Database the_db)
+        {
+            bool ret = true;
+            if (string.IsNullOrEmpty(this.id))
+            {
+                this.id = System.Guid.NewGuid().ToString();
+            }
+
+            try
+            {
+
+                // DatabaseResponse db = await the_db.ReadAsync();
+                Container container = the_db.GetContainer("TradingBrainSubUpdates");
+
+
+                this.id = System.Guid.NewGuid().ToString();
+                ItemResponse<TradeSubUpdate> SaveResponse = await container.CreateItemAsync<TradeSubUpdate>(this, new PartitionKey(this.id));
+                clsCommonFunctions.AddStatusMessage("Trade db record updated", "INFO");
+            }
+            catch (CosmosException de)
+            {
+                Console.WriteLine(de.ToString());
+                var log = new Log();
+                log.Log_Message = de.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "TradeSubUpdate/Add";
+
+                await log.Save();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+                var log = new Log();
+                log.Log_Message = e.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "TradeSubUpdate/Add";
+
+                await log.Save();
+            }
+            return ret;
+
+
+
+        }
+    }
+
     public class clsTradeUpdate
 
     {
@@ -75,8 +178,9 @@ namespace TradingBrain.Models
         public bool? guaranteedStop { get; set; }
         public DateTime lastUpdated { get; set; }
         public string accountId { get; set; }
+        public string channel { get; set; }
 
-    public string modelRunID { get; set; }
+        public string modelRunID { get; set; }
 
         public clsTradeUpdate()
         {
@@ -99,143 +203,30 @@ namespace TradingBrain.Models
             this.lastUpdated = DateTime.MinValue;
             this.modelRunID = "";
             this.accountId = "";
-    }
+            this.channel = "";
+        }
         public async Task<bool> SaveDocument(Container container)
         {
             bool ret = true;
 
- 
+
             try
             {
                 ItemResponse<clsTradeUpdate> SaveResponse = await container.UpsertItemAsync<clsTradeUpdate>(this);
             }
             catch (CosmosException de)
             {
-                clsCommonFunctions.AddStatusMessage("error:" + de.ToString(),"ERROR");
+                clsCommonFunctions.AddStatusMessage("error:" + de.ToString(), "ERROR");
             }
             catch (Exception e)
             {
-                clsCommonFunctions.AddStatusMessage("error:" + e.Message,"ERROR");
+                clsCommonFunctions.AddStatusMessage("error:" + e.Message, "ERROR");
             }
 
-            clsCommonFunctions.AddStatusMessage("Trade db record updated","INFO");
+            clsCommonFunctions.AddStatusMessage("Trade db record updated", "INFO");
 
             return ret;
         }
-
-        //public async Task<bool> Add(Database the_db, Container container)
-        //{
-        //    bool ret = true;
-        //    if (string.IsNullOrEmpty(this.id))
-        //    {
-        //        this.id = System.Guid.NewGuid().ToString();
-        //    }
-
-        //    this.SyncStatus = 0;
-        //    bool blnLoop = true;
-        //    while (blnLoop)
-        //    {
-        //        try
-        //        {
-
-        //            if (the_db != null)
-        //            {
-        //                // DatabaseResponse db = await the_db.ReadAsync();
-        //                //Container container = the_db.GetContainer("Candles");
-
-        //                bool exist = await DoesThisTickExist(the_db, container);
-        //                if (!exist)
-        //                {
-        //                    this.id = System.Guid.NewGuid().ToString();
-        //                    ItemResponse<clsChartUpdate> SaveResponse = await container.CreateItemAsync<clsChartUpdate>(this, new PartitionKey(this.id));
-        //                }
-        //                blnLoop = false;
-        //            }
-        //        }
-        //        catch (CosmosException de)
-        //        {
-        //            Console.WriteLine(de.ToString());
-        //            var log = new Log();
-        //            log.Log_Message = de.ToString();
-        //            log.Log_Type = "Error";
-        //            log.Log_App = "clsChartUpdate/Add";
-        //            log.Epic = this.Epic;
-        //            await log.Save();
-        //        }
-        //        catch (Exception e)
-        //        {
-        //            Console.WriteLine(e.ToString());
-        //            var log = new Log();
-        //            log.Log_Message = e.ToString();
-        //            log.Log_Type = "Error";
-        //            log.Log_App = "clsChartUpdate/Add";
-        //            log.Epic = this.Epic;
-        //            await log.Save();
-        //        }
-        //    }
-
-
-        //    return (ret);
-        //}
-        //public async Task<bool> DoesThisTickExist(Database the_db, Container container)
-        //{
-        //    bool ret = false;
-
-        //    try
-        //    {
-        //        if (the_db != null)
-        //        {
-
-
-        //            var parameterizedQuery = new QueryDefinition(
-        //                query: "SELECT * FROM c WHERE c.Epic= @epicName and c.UTM = @UTM"
-        //            )
-        //            .WithParameter("@epicName", this.Epic)
-        //            .WithParameter("@UTM", this.UTM);
-
-        //            using FeedIterator<clsChartUpdate> filteredFeed = container.GetItemQueryIterator<clsChartUpdate>(
-        //                queryDefinition: parameterizedQuery
-        //            );
-
-        //            while (filteredFeed.HasMoreResults)
-        //            {
-        //                FeedResponse<clsChartUpdate> response = await filteredFeed.ReadNextAsync();
-
-        //                // Iterate query results
-        //                foreach (clsChartUpdate item in response)
-        //                {
-        //                    if (item.Epic == this.Epic && this.Bid == item.Bid)
-        //                    {
-        //                        ret = true;
-        //                    }
-
-        //                }
-        //            }
-        //        }
-
-        //    }
-        //    catch (CosmosException de)
-        //    {
-        //        Console.WriteLine(de.ToString());
-        //        var log = new Log();
-        //        log.Log_Message = de.ToString();
-        //        log.Log_Type = "Error";
-        //        log.Log_App = "clsChartUpdate/DoesThisTickExist";
-        //        log.Epic = this.Epic;
-        //        await log.Save();
-        //    }
-        //    catch (Exception e)
-        //    {
-        //        Console.WriteLine(e.ToString());
-        //        var log = new Log();
-        //        log.Log_Message = e.ToString();
-        //        log.Log_Type = "Error";
-        //        log.Log_App = "clsChartUpdate/DoesThisTickExist";
-        //        log.Epic = this.Epic;
-        //        await log.Save();
-        //    }
-        //    return ret;
-        //}
 
     }
 }
