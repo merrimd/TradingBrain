@@ -232,8 +232,8 @@ namespace TradingBrain.Models
                 //TradingBrainSettings firstTB =  clsCommonFunctions.GetTradingBrainSettings(this.the_db, this.epicName);
 
                 model.index = 30;
-                model.doLongs = true;
-                model.doShorts = true;
+                //model.doLongs = true;
+                //model.doShorts = true;
                 model.logModel = true;
 
                 model.thisModel = new modelInstance();
@@ -253,6 +253,8 @@ namespace TradingBrain.Models
                 currentStatus.status = "running";
                 currentStatus.epicName = this.epicName;
                 currentStatus.doSuppTrades = model.doSuppTrades;
+                currentStatus.doLongs = model.doLongs;
+                currentStatus.doShorts = model.doShorts;
 
                 object v = ConfigurationManager.GetSection("appSettings");
                 if (v != null)
@@ -807,9 +809,19 @@ namespace TradingBrain.Models
                         }
                         //watch.Stop();
                         //clsCommonFunctions.AddStatusMessage(DateTime.Now.ToString("o") + " - GetSettings - Time taken = " + watch.ElapsedMilliseconds);
-
+                        
+                        //Determine if we are to do long and or short trades
+                        model.doLongs = tb.doLongs;
+                        model.doShorts = tb.doShorts;
                         model.doSuppTrades = tb.doSuppTrades;
+                        //tb.lastRunVars.doLongsVar = tb.doLongs;
+                        //tb.lastRunVars.doShortsVar = tb.doShorts;
+                        //tb.lastRunVars.doSuppTradesVar = tb.doSuppTrades;
+
                         clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG");
+                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG");
+                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG");
+
                         model.thisModel.inputs = this.tb.runDetails.inputs.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
                         model.thisModel.matchProTrend = false;
@@ -1279,6 +1291,9 @@ namespace TradingBrain.Models
                                 currentStatus.suppQuantityMultiplier = modelVar.suppQuantityMultiplier;
                                 currentStatus.suppStopPercentage = modelVar.suppStopPercentage;
                             currentStatus.doSuppTrades = model.doSuppTrades;
+                            currentStatus.doShorts = model.doShorts;
+                            currentStatus.doLongs = model.doLongs;
+
                                 //currentStatus.epicName = this.epicName;
                                 //send log to the website
                                 model.modelLogs.logs[0].epicName = this.epicName;
@@ -1509,8 +1524,8 @@ namespace TradingBrain.Models
                         clsCommonFunctions.AddStatusMessage("ChangeQuantity request received", "INFO");
                         if (obj.messageValue != "")
                         {
-                            ModelVars newVars = new ModelVars();
-                            newVars = JsonConvert.DeserializeObject<ModelVars>(obj.messageValue);
+                            ModelVarsChange newVars = new ModelVarsChange();
+                            newVars = JsonConvert.DeserializeObject<ModelVarsChange>(obj.messageValue);
 
                             if (newVars.baseQuantity > 0)
                             {
@@ -1601,9 +1616,22 @@ namespace TradingBrain.Models
                             }
 
                             clsCommonFunctions.AddStatusMessage("New doSuppTrades to use = " + newVars.doSuppTradesVar, "INFO");
+                           // tb.lastRunVars.doSuppTradesVar = newVars.doSuppTradesVar;
                             model.doSuppTrades = newVars.doSuppTradesVar;
                             currentStatus.doSuppTrades = newVars.doSuppTradesVar;
                             tb.doSuppTrades = newVars.doSuppTradesVar;
+
+                            clsCommonFunctions.AddStatusMessage("New doLongs to use = " + newVars.doLongsVar, "INFO");
+                           // tb.lastRunVars.doLongsVar = newVars.doLongsVar;
+                            model.doLongs = newVars.doLongsVar;
+                            currentStatus.doLongs = newVars.doLongsVar;
+                            tb.doLongs = newVars.doLongsVar;
+
+                            clsCommonFunctions.AddStatusMessage("New doShorts to use = " + newVars.doShortsVar, "INFO");
+                           // tb.lastRunVars.doShortsVar = newVars.doShortsVar;
+                            model.doShorts = newVars.doShortsVar;
+                            currentStatus.doShorts = newVars.doShortsVar;
+                            tb.doShorts = newVars.doShortsVar;
 
                             // Save the last run vars into the TB settings table
                             Task<bool> res = tb.SaveDocument(the_app_db);

@@ -1873,7 +1873,7 @@ namespace TradingBrain.Models
                                             {
                                                 clsEmail obj = new clsEmail();
                                                 List<recip> recips = new List<recip>();
-                                                recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
+                                                //recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
                                                 recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
                                                 string subject = "TRADE ENDED - " + _thisApp.currentTrade.epic;
                                                 string text = "The trade has ended in the " + region + " environment</br></br>";
@@ -2035,7 +2035,7 @@ namespace TradingBrain.Models
                                             {
                                                 clsEmail obj = new clsEmail();
                                                 List<recip> recips = new List<recip>();
-                                                recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
+                                                //recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
                                                 recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
                                                 string subject = "SUPPLEMENTARY TRADE ENDED - " + _thisApp.suppTrade.epic;
                                                 string text = "The trade has ended in the " + region + " environment</br></br>";
@@ -2201,7 +2201,7 @@ namespace TradingBrain.Models
 
                                                     clsEmail obj = new clsEmail();
                                                     List<recip> recips = new List<recip>();
-                                                    recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
+                                                    //recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
                                                     recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
                                                     string subject = "SUPPLEMENTARY TRADE STARTED - " + _thisApp.suppTrade.epic;
                                                     string text = "A new supplementary trade has started in the " + region + " environment</br></br>";
@@ -2409,7 +2409,7 @@ namespace TradingBrain.Models
 
                                             clsEmail obj = new clsEmail();
                                             List<recip> recips = new List<recip>();
-                                            recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
+                                            //recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
                                             recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
                                             string subject = "NEW TRADE STARTED - " + _thisApp.currentTrade.epic;
                                             string text = "A new trade has started in the " + region + " environment</br></br>";
