@@ -117,10 +117,37 @@ namespace TradingBrain.Models
         {
             MainApp? app = null;
 
+            string epic = "IX.D.NASDAQ.CASH.IP";
+            string strategy = "SMA";
+            string resolution = "";
+
+            // See if an epic has been passed in. if not then default to NASDAQ
+            if (Environment.GetCommandLineArgs().Length >= 2)
+            {
+                epic = Environment.GetCommandLineArgs()[1].ToUpper();
+            }
+
+
+            // See if a strategy and resolution has been passed in, otherwise use default. //
+
+            if (Environment.GetCommandLineArgs().Length >= 4)
+            {
+                strategy = Environment.GetCommandLineArgs()[2].ToUpper();
+                resolution = Environment.GetCommandLineArgs()[3].ToUpper();
+            }
+
+            // Set up the logging //
+
             var config = new NLog.Config.LoggingConfiguration();
 
             var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
-            var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App.${shortdate}.txt", MaxArchiveDays=31, KeepFileOpen=false, Layout = "${longdate}|${level:uppercase=true}|${message}|${exception:format=toString}" };
+
+            string nme = strategy;
+            if (strategy == "RSI")
+            {
+                nme  += "_" + resolution;
+            }
+            var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App." + nme + ".${shortdate}.txt", MaxArchiveDays=31, KeepFileOpen=false, Layout = "${longdate}|${level:uppercase=true}|${message}|${exception:format=toString}" };
             var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
             logconsole.Layout = "${longdate}|${level:uppercase=true}|${logger}|${message}|${exception:format=toString}";
 
@@ -130,23 +157,11 @@ namespace TradingBrain.Models
             NLog.LogManager.Configuration = config;
             Logger tbLog = LogManager.GetCurrentClassLogger();
 
-            //Serilog.Log.Logger = new LoggerConfiguration()
-            //.WriteTo.Console()               // Log to the console
-            //.WriteTo.File("c:/TBlogs/log.txt", rollingInterval: RollingInterval.Day,shared: true) // Log to a rolling file
-            //.MinimumLevel.Debug()
-            //.CreateLogger();
 
-            string epic = "IX.D.NASDAQ.CASH.IP";
 
-            // See if an epic has been passed in. if not then default to NASDAQ
-            if (Environment.GetCommandLineArgs().Length >= 2)
-            {
-                epic = Environment.GetCommandLineArgs()[1];
-            }
-
-            tbLog.Info("------------------------------------------------");
-            tbLog.Info($"-- TradingBrain started : {epic} --");
-            tbLog.Info("------------------------------------------------");
+            tbLog.Info("-------------------------------------------------------------");
+            tbLog.Info($"-- TradingBrain started - strategy: {strategy + " " + resolution} : {epic} --");
+            tbLog.Info("-------------------------------------------------------------");
 
             tbLog.Info("Connecting to database....");
 
@@ -161,6 +176,7 @@ namespace TradingBrain.Models
                 Container container;
                 Container chart_container;
                 Container trade_container;
+
                 switch (epic)
                 {
                     case "IX.D.NIKKEI.DAILY.IP":
@@ -176,12 +192,17 @@ namespace TradingBrain.Models
                         trade_container = the_app_db.GetContainer("TradingBrainTrades");
                         break;
                 }
-
                 SetupDB(epic);
+                if (strategy == "RSI")
+                {
+                    minute_container = the_db.GetContainer("Candles_RSI");
+                }
+
+
 
                 tbLog.Info("Initialising app");
 
-                app = new MainApp(the_db,the_app_db, container, chart_container, epic,minute_container,TicksContainer,trade_container );
+                app = new MainApp(the_db,the_app_db, container, chart_container, epic,minute_container,TicksContainer,trade_container,strategy, resolution );
 
 
                 if (app != null)
@@ -194,60 +215,6 @@ namespace TradingBrain.Models
                 tbLog.Info("Exiting...");
 
                 Environment.Exit(0);
-
-
-
-                // test the timer function
-                //    if (1 == 2)
-                //{
-                //    t = new System.Timers.Timer();
-                //    t.AutoReset = false;
-                //    t.Elapsed += new System.Timers.ElapsedEventHandler(t_Elapsed);
-                //    t.Interval = GetInterval();
-                //    t.Start();
-                //    Console.ReadLine();
-                //}
-
-
-                //    string epic = "IX.D.NASDAQ.CASH.IP";
-
-                //    if (Environment.GetCommandLineArgs().Length == 2)
-                //    {
-                //        epic = Environment.GetCommandLineArgs()[1];
-                //    }
-
-                //    Console.WriteLine(DateTime.Now + " - Connecting to database....");
-
-                //    bool blnOK = await SetupDB(epic);
-
-                //    if (the_db != null)
-                //    {
-                //        Console.WriteLine(DateTime.Now + " - Getting Settings...");
-                //        Settings settings = await clsCommonFunctions.Get_Settings(the_db);
-
-                //        DateTime dtNow = DateTime.UtcNow;
-
-                //        DateTime currentTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour, dtNow.Minute, 0).AddMinutes(-1);
-
-                //        Console.WriteLine(DateTime.Now + " - Creating Candle...");
-                //        var watch = new System.Diagnostics.Stopwatch();
-                //        watch.Start();
-                //        int var1 = 10;
-                //        int var2 = 15; 
-                //        int var3 = 30; 
-                //        int var13 = 6;
-
-                //        ModelMinuteCandle thisCandle = await CreateLiveCandle(the_db, var1, var2,var3,var13, currentTime, epic);
-                //        watch.Stop();
-                //        Console.WriteLine("CreateLiveCandle  Time taken = " + watch.ElapsedMilliseconds);
-                //        Console.WriteLine(DateTime.Now + " - Candle created");
-
-                //        Console.ReadLine();
-                //        var i = 1;
-                //    }
-
-
-                // }
 
                 static void Exiting(Exception exception, MainApp app)
                 {
@@ -267,6 +234,9 @@ namespace TradingBrain.Models
                     }
                 }
 
+
+
+
                 static double GetInterval()
                 {
                     DateTime now = DateTime.Now;
@@ -281,7 +251,7 @@ namespace TradingBrain.Models
                     t.Start();
                 }
 
-
+ 
             }
         }
 

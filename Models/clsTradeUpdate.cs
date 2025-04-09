@@ -40,7 +40,7 @@ namespace TradingBrain.Models
             try
             {
                 ItemResponse<TradeSubUpdate> SaveResponse = await container.UpsertItemAsync<TradeSubUpdate>(this);
-                clsCommonFunctions.AddStatusMessage("Trade db record updated", "INFO");
+                //clsCommonFunctions.AddStatusMessage("Trade db record updated", "INFO");
             }
             catch (CosmosException de)
             {
@@ -84,7 +84,7 @@ namespace TradingBrain.Models
 
                 this.id = System.Guid.NewGuid().ToString();
                 ItemResponse<TradeSubUpdate> SaveResponse = await container.CreateItemAsync<TradeSubUpdate>(this, new PartitionKey(this.id));
-                clsCommonFunctions.AddStatusMessage("Trade db record updated", "INFO");
+                //clsCommonFunctions.AddStatusMessage("Trade db record updated", "INFO");
             }
             catch (CosmosException de)
             {
@@ -223,7 +223,7 @@ namespace TradingBrain.Models
                 clsCommonFunctions.AddStatusMessage("error:" + e.Message, "ERROR");
             }
 
-            clsCommonFunctions.AddStatusMessage("Trade db record updated", "INFO");
+            //clsCommonFunctions.AddStatusMessage("Trade db record updated", "INFO");
 
             return ret;
         }

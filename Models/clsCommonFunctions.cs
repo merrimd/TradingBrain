@@ -709,7 +709,7 @@ namespace TradingBrain.Models
             await log.Save();
         }
 
-        public static async Task<TradingBrainSettings> GetTradingBrainSettings(Database the_db, string epicName, string accountId)
+        public static async Task<TradingBrainSettings> GetTradingBrainSettings(Database the_db, string epicName, string accountId,string strategy = "SMA", string resolution = "")
         {
             // find the data
             var ret = new TradingBrainSettings();
@@ -719,10 +719,12 @@ namespace TradingBrain.Models
                 Container container_opt = the_db.GetContainer("OptimizeRunData");
 
                 var parameterizedQuery = new QueryDefinition(
-                    query: "SELECT top 1 * FROM c WHERE c.epicName = @epicname AND (c.accountId = @accountId or c.accountId = '')  Order by c.timestamp DESC"
+                    query: "SELECT top 1 * FROM c WHERE c.epicName = @epicname AND (c.accountId = @accountId or c.accountId = '') AND c.strategy = @strategy AND c.resolution = @resolution Order by c.timestamp DESC"
 
                 //query: "SELECT M.modelLogs FROM c JOIN (SELECT VALUE m FROM m IN c.runVars WHERE m.var1 = @Var1) as m WHERE c.modelRunID = @ModelRunID  Order by c.runVars.modelLogs.seqNo ASC"
                 ).WithParameter("@epicname", epicName)
+                .WithParameter("@strategy", strategy)
+                .WithParameter("@resolution", resolution)
                 .WithParameter("@accountId", accountId);
 
                 using FeedIterator<TradingBrainSettings> filteredFeed = container.GetItemQueryIterator<TradingBrainSettings>(
@@ -746,10 +748,15 @@ namespace TradingBrain.Models
                     clsCommonFunctions.AddStatusMessage("Getting latest vars (if necessary)", "INFO");
                     // now get the latest optimized data
                     OptimizeRunData opt = new OptimizeRunData();
-                    opt = await OptimizeRunData.GetOptimizeRunDataLatest(the_db, container_opt, epicName, ret.runDetails.numCandles);
+                    opt = await OptimizeRunData.GetOptimizeRunDataLatest(the_db, container_opt, epicName, ret.runDetails.numCandles, strategy, resolution);
                     if (opt.inputs.Count > 0)
                     {
                         ret.runDetails.inputs = opt.inputs;
+                        await ret.SaveDocument(the_db);
+                    }
+                    if (opt.inputs_RSI.Count > 0)
+                    {
+                        ret.runDetails.inputs_RSI = opt.inputs_RSI;
                         await ret.SaveDocument(the_db);
                     }
                 }

@@ -9,6 +9,9 @@
 
   <ItemGroup>
     <Compile Remove="Common\IGStreamingAPI.cs" />
+    <Compile Remove="Common\PropertyChanged.cs" />
+    <Compile Remove="Common\SmartDispatcher.cs" />
+    <Compile Remove="Models\IgPublicApiData.cs" />
     <Compile Remove="Models\MainApp.cs" />
   </ItemGroup>
 
@@ -31,6 +34,10 @@
     <Reference Include="DotNetClient_N2">
       <HintPath>..\IGStreamingAppDTM\IGWebApiClient\bin\Debug\DotNetClient_N2.dll</HintPath>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Common\" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,5 @@
 ﻿using System;
-using TradingBrain.Common;
+using IGWebApiClient.Common;
 
 namespace TradingBrain.Models
 {
