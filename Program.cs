@@ -147,7 +147,7 @@ namespace TradingBrain.Models
             {
                 nme  += "_" + resolution;
             }
-            var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App." + nme + ".${shortdate}.txt", MaxArchiveDays=31, KeepFileOpen=false, Layout = "${longdate}|${level:uppercase=true}|${message}|${exception:format=toString}" };
+            var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App." + epic + "." + nme + ".${shortdate}.txt", MaxArchiveDays=31, KeepFileOpen=false, Layout = "${longdate}|${level:uppercase=true}|${message}|${exception:format=toString}" };
             var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
             logconsole.Layout = "${longdate}|${level:uppercase=true}|${logger}|${message}|${exception:format=toString}";
 

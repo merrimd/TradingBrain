@@ -55,6 +55,7 @@ using log4net.Core;
 using Azure.Storage;
 using static TradingBrain.Models.clsCommonFunctions;
 using Skender.Stock.Indicators;
+using IGModels.RSI_Models;
 
 
 //using System.ComponentModel;
@@ -746,19 +747,24 @@ namespace TradingBrain.Models
             }
             else
             {
-                if (res.Length == 1 && res[0] == "HOUR")
+                if (res[0] == "HOUR")
                 {
                     resUnit = "HOUR";
                     resNum = 1;
                 }
-                else
-                {
-                    if (res.Length == 2)
-                    {
-                        resUnit = res[0];
-                        resNum = Convert.ToInt16(res[1]);
-                    }
-                }
+                //if (res.Length == 1 && res[0] == "HOUR")
+                //{
+                //    resUnit = "HOUR";
+                //    resNum = 1;
+                //}
+                //else
+                //{
+                //    if (res.Length == 2)
+                //    {
+                //        resUnit = res[0];
+                //        resNum = Convert.ToInt16(res[1]);
+                //    }
+                //}
             }
             switch ( resUnit)
             {
@@ -793,11 +799,28 @@ namespace TradingBrain.Models
 
             if (model.region == "test")
             {
-                nextRun = nextRun.AddSeconds(30);
+                //if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
+                //{
+                //    nextRun = nextRun.AddSeconds(45);
+                //}
+                //else
+                //{
+                    nextRun = nextRun.AddSeconds(30);
+                //}
+            }
+            else
+            {
+                // Make the hour_2, hour_3 and hour_4 resolutions run 15 seconds later to ensure all the candles have been created.
+                if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
+                {
+                    nextRun = nextRun.AddSeconds(15);
+                }
             }
 
+
+
             // Calculate the precise interval in milliseconds
-            double interval = (nextRun - now).TotalMilliseconds  ;
+            double interval = (nextRun - now).TotalMilliseconds;
 
             clsCommonFunctions.AddStatusMessage($"Next run scheduled at: {nextRun:yyyy-MM-dd HH:mm:ss.fff}");
             return interval;
@@ -894,23 +917,29 @@ namespace TradingBrain.Models
                                 tb.lastRunVars.currentGain = model.modelVar.currentGain;
 
                                 // check to see if the trade just finished lost at max quantity, if so then we need to reset the vars
-                                clsCommonFunctions.AddStatusMessage($"checking if reset required - lastTradeMaxQuantity = {lastTradeMaxQuantity}", "DEBUG");
-                                if (lastTradeMaxQuantity)
-                                {
-                                    clsCommonFunctions.AddStatusMessage($"old lastRunVars - currentGain = {tb.lastRunVars.currentGain}, carriedForwardLoss = {tb.lastRunVars.carriedForwardLoss}, quantity = {tb.lastRunVars.quantity}, counter = {tb.lastRunVars.counter}, maxQuantity={tb.lastRunVars.maxQuantity}", "DEBUG");
-                                    tb.lastRunVars.currentGain = Math.Max(tb.lastRunVars.currentGain - model.modelVar.carriedForwardLoss, 0);
-                                    tb.lastRunVars.carriedForwardLoss = 0;
-                                    tb.lastRunVars.quantity = tb.lastRunVars.minQuantity;
-                                    tb.lastRunVars.counter = 0;
-                                    tb.lastRunVars.maxQuantity = tb.lastRunVars.minQuantity * tb.lastRunVars.maxQuantityMultiplier;
-                                    model.modelVar.currentGain = tb.lastRunVars.currentGain;
-                                    model.modelVar.carriedForwardLoss = tb.lastRunVars.carriedForwardLoss;
-                                    model.modelVar.quantity = tb.lastRunVars.quantity;
-                                    model.modelVar.counter = tb.lastRunVars.counter;
-                                    model.modelVar.maxQuantity = tb.lastRunVars.maxQuantity;
 
-                                    clsCommonFunctions.AddStatusMessage($"new lastRunVars - currentGain = {tb.lastRunVars.currentGain}, carriedForwardLoss = {tb.lastRunVars.carriedForwardLoss}, quantity = {tb.lastRunVars.quantity}, counter = {tb.lastRunVars.counter}, maxQuantity={tb.lastRunVars.maxQuantity}", "DEBUG");
-                                }
+                                // Removed for new plan to allow it to stay at max quantity until it gets out of its pickle
+
+                                //clsCommonFunctions.AddStatusMessage($"checking if reset required - lastTradeMaxQuantity = {lastTradeMaxQuantity}", "DEBUG");
+                                //if (lastTradeMaxQuantity)
+                                //{
+                                //    clsCommonFunctions.AddStatusMessage($"old lastRunVars - currentGain = {tb.lastRunVars.currentGain}, carriedForwardLoss = {tb.lastRunVars.carriedForwardLoss}, quantity = {tb.lastRunVars.quantity}, counter = {tb.lastRunVars.counter}, maxQuantity={tb.lastRunVars.maxQuantity}", "DEBUG");
+                                //    tb.lastRunVars.currentGain = Math.Max(tb.lastRunVars.currentGain - model.modelVar.carriedForwardLoss, 0);
+                                //    tb.lastRunVars.carriedForwardLoss = 0;
+                                //    tb.lastRunVars.quantity = tb.lastRunVars.minQuantity;
+                                //    tb.lastRunVars.counter = 0;
+                                //    tb.lastRunVars.maxQuantity = tb.lastRunVars.minQuantity * tb.lastRunVars.maxQuantityMultiplier;
+                                //    model.modelVar.currentGain = tb.lastRunVars.currentGain;
+                                //    model.modelVar.carriedForwardLoss = tb.lastRunVars.carriedForwardLoss;
+                                //    model.modelVar.quantity = tb.lastRunVars.quantity;
+                                //    model.modelVar.counter = tb.lastRunVars.counter;
+                                //    model.modelVar.maxQuantity = tb.lastRunVars.maxQuantity;
+
+                                //    clsCommonFunctions.AddStatusMessage($"new lastRunVars - currentGain = {tb.lastRunVars.currentGain}, carriedForwardLoss = {tb.lastRunVars.carriedForwardLoss}, quantity = {tb.lastRunVars.quantity}, counter = {tb.lastRunVars.counter}, maxQuantity={tb.lastRunVars.maxQuantity}", "DEBUG");
+                                //}
+
+
+
                                 await tb.SaveDocument(the_app_db);
 
                                 clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG");
@@ -1540,8 +1569,9 @@ namespace TradingBrain.Models
             ///////////////////////////////
             ///
 
-      
-            
+
+            int resMod = 0;
+
             bool liveMode = true;
             bool marketOpen = false;
 
@@ -1565,12 +1595,19 @@ namespace TradingBrain.Models
            // _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, 04, 0, 0) ;
 
             DateTime _endTime = _startTime.AddMinutes(min).AddMilliseconds(-1);
-            
+
+           
+            if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
+            {
+                int i = 0;
+                i = Convert.ToInt16(resolution.Split("_")[1].ToString());
+                resMod = _startTime.Hour % i;
+            }
             
             //paused = true;
 
 
-            if (!paused || paused && model.onMarket || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0 )
+            if (!paused || paused && model.onMarket || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
             {
                 // Check if the market is currently open. If it is not then skip till next time.
                 //marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow);
@@ -1589,6 +1626,8 @@ namespace TradingBrain.Models
                     clsCommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO");
                     clsCommonFunctions.AddStatusMessage(" ------------------", "INFO");
                     clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG");
+                    clsCommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG");
+
                     var watch = new System.Diagnostics.Stopwatch();
                     var bigWatch = new System.Diagnostics.Stopwatch();
                     bigWatch.Start();
@@ -1597,7 +1636,7 @@ namespace TradingBrain.Models
                         //watch.Start();
 
 
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy,this.resolution);
+                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
 
                         clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG");
 
@@ -1730,6 +1769,11 @@ namespace TradingBrain.Models
 
                             bool createMinRecord = liveMode;
                             if (model.region == "test") { createMinRecord = false; }
+
+                            // Don't create a new candle for HOUR_2, HOUR_3 or HOUR_4 as it would have been created when HOUR was sorted.
+                            // This means that for these candles, we need to run TB a little bit later than the HOUR candle to ensure all candles are created.
+                            if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4") { createMinRecord = false; }
+
                             RSI_LoadPrices obj = new RSI_LoadPrices();
                             model.quotes.currentCandle = obj.LoadPrices(the_db, minute_container, epicName, resolution, _endTime, createMinRecord, igRestApiClient);
 
@@ -1739,13 +1783,13 @@ namespace TradingBrain.Models
 
                             //Console.WriteLine(DateTime.Now.ToString("G") + "Getting rsi quotes from DB.......");
                             clsCommonFunctions.AddStatusMessage("Getting RSI Quotes from DB");
-                            List<Quote> rsiQuotes = new List<Quote>();
+                            List<modQuote> rsiQuotes = new List<modQuote>();
                             //DateTime startTime = DateTime.MinValue;
-                            List<Quote> indCandles = await RSI_LoadPrices.GetPriceData(the_db, epicName, resolution, _startTime, _endTime, true);
+                            List<modQuote> indCandles = await RSI_LoadPrices.GetPriceData(the_db, epicName, resolution,resMod, _startTime, _endTime, true);
 
 
 
-                            int indIndex = indCandles.BinarySearch(new Quote { Date = _startTime }, new QuoteComparer());
+                            int indIndex = indCandles.BinarySearch(new modQuote { Date = _startTime }, new QuoteComparer());
 
 
 
