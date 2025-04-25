@@ -16,6 +16,7 @@ using System.Web;
 using IGModels.ModellingModels;
 using NLog;
 using static TradingBrain.Models.clsCommonFunctions;
+using Org.BouncyCastle.Pqc.Crypto.Lms;
 
 namespace TradingBrain.Models
 {
@@ -23,6 +24,33 @@ namespace TradingBrain.Models
     {
         public static void AddStatusMessage(string message, string level = "INFO")
         {
+            Logger tbLog = LogManager.GetCurrentClassLogger();
+            //Console.WriteLine(message);
+            switch (level)
+            {
+                case "ERROR":
+                    tbLog.Error(message);
+                    break;
+
+                case "DEBUG":
+                    tbLog.Debug(message);
+                    break;
+
+                case "WARNING":
+                    tbLog.Warn(message);
+                    break;
+
+                default:
+                    tbLog.Info(message);
+                    break;
+
+            }
+
+
+        }
+        public static void AddStatusMessage(string message, string level ,string logName)
+        {
+            //Logger tbLog = LogManager.GetLogger(logName);
             Logger tbLog = LogManager.GetCurrentClassLogger();
             //Console.WriteLine(message);
             switch (level)
@@ -110,7 +138,12 @@ namespace TradingBrain.Models
         public static void DiscardTask(this Task ignored)
         {
         }
-
+        public static string GetLogName(string epic, string strategy, string resolution)
+        {
+            string ret = epic + "." + strategy;
+            if (resolution != "") { ret += "_" + resolution; }
+            return ret;
+        }
         public static string EncryptText(string ClearText, string Key, string IV)
         {
             byte[] bytKey = Encoding.UTF8.GetBytes(Key);
@@ -713,6 +746,13 @@ namespace TradingBrain.Models
         {
             // find the data
             var ret = new TradingBrainSettings();
+
+            string logName = epicName + "." + strategy;
+            if (strategy == "RSI")
+            {
+                logName += "_" + resolution;
+            }
+
             try
             {
                 Container container = the_db.GetContainer("TradingBrainSettings");
@@ -745,7 +785,10 @@ namespace TradingBrain.Models
 
                 if (ret.runDetails.getLatestVars)
                 {
-                    clsCommonFunctions.AddStatusMessage("Getting latest vars (if necessary)", "INFO");
+
+
+
+                    clsCommonFunctions.AddStatusMessage("Getting latest vars (if necessary)", "INFO",logName);
                     // now get the latest optimized data
                     OptimizeRunData opt = new OptimizeRunData();
                     opt = await OptimizeRunData.GetOptimizeRunDataLatest(the_db, container_opt, epicName, ret.runDetails.numCandles, strategy, resolution);
