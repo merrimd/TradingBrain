@@ -251,7 +251,17 @@ namespace TradingBrain.Models
             //{
             //    wk.PostEvent(new PrintMessageEvent("Posted"));
             //}
-            Console.ReadLine();
+
+            clsCommonFunctions.AddStatusMessage("Starting lightstreamer in a new thread", "INFO");
+ 
+
+            int i = await WaitForChanges();
+
+            //Console.ReadLine();
+
+
+
+
             //Task tsk =  Task.Run(() => CreateTBThread(epic,strategy,resolution,igContainer));
             //parallelTasks.Add(tsk);
 
@@ -404,7 +414,38 @@ namespace TradingBrain.Models
 
             //}
         }
+        public static async Task<int> WaitForChanges()
+        {
+            int ret = 1;
+            try
+            {
+                DateTime dtStart = DateTime.UtcNow;
+                DateTime dtMax = dtStart.AddSeconds(20);
 
+                while (DateTime.UtcNow < dtMax || 1 == 1)
+                {
+                    //System.Threading.Thread.Sleep(1000);
+                    await Task.Delay(1000);
+                    DateTime dtNow = DateTime.UtcNow;
+                    //clsCommonFunctions.AddStatusMessage(dtNow.ToString("o") + " Sleeping....");
+                }
+
+                // Unsubscriber. Commented out for now but may need to add later.
+
+                //UnsubscribeFromWatchlistInstruments();
+                //UnsubscribefromTradeSubscription();
+            }
+            catch (Exception e)
+            {
+                Log log = new Log(the_app_db);
+                log.Log_Message = e.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "WaitForChanges";
+                await log.Save();
+            }
+            return ret;
+
+        }
         static async Task CreateTBThread(string epic, string strategy, string resolution,IGContainer igContainer)
         {
             System.Timers.Timer t;

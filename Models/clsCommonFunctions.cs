@@ -17,23 +17,26 @@ using IGModels.ModellingModels;
 using NLog;
 using static TradingBrain.Models.clsCommonFunctions;
 using Org.BouncyCastle.Pqc.Crypto.Lms;
+using System.Net.Http;
+using Lightstreamer.DotNet.Client;
 
 namespace TradingBrain.Models
 {
-    public static class clsCommonFunctions
+    public  static class clsCommonFunctions
     {
-        public static void AddStatusMessage(string message, string level = "INFO")
+        public async static void AddStatusMessage(string message, string level = "INFO")
         {
             Logger tbLog = LogManager.GetCurrentClassLogger();
             //Console.WriteLine(message);
             switch (level)
             {
+                
                 case "ERROR":
-                    tbLog.Error(message);
+                     tbLog.Error(message);
                     break;
 
                 case "DEBUG":
-                    tbLog.Debug(message);
+                     tbLog.Debug(message);
                     break;
 
                 case "WARNING":
@@ -662,6 +665,8 @@ namespace TradingBrain.Models
 
         public static async void SendBroadcast(string messageType, string messageValue, Database the_app_db)
         {
+            HttpClient client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(3);
             try
             {
                 string url = "";
@@ -678,14 +683,42 @@ namespace TradingBrain.Models
                 newMsg.messageType = messageType;
                 newMsg.messageValue = messageValue;
 
-                HttpClient client = new HttpClient();
+
                 url = url + "/broadcast";
 
                 string msg = JsonConvert.SerializeObject(newMsg);
                 HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
 
-                HttpResponseMessage response = client.PostAsync(url, content).Result;
-                string results = response.Content.ReadAsStringAsync().Result;
+                HttpResponseMessage response = await client.PostAsync(url, content);
+                string results = await response.Content.ReadAsStringAsync();
+            }
+            catch (TaskCanceledException)
+            {
+                //Could have been caused by cancellation or timeout if you used one.  
+                //If that was the case, rethrow.  
+                //cancellationToken.ThrowIfCancellationRequested();  
+
+                //HttpClient throws TaskCanceledException when the request times out. That's dumb.  
+                //Throw TimeoutException instead and say how long we waited.  
+                string time;
+                if (client.Timeout.TotalHours > 1)
+                {
+                    time = $"{client.Timeout.TotalHours:N1} hours";
+                }
+                else if (client.Timeout.TotalMinutes > 1)
+                {
+                    time = $"{client.Timeout.TotalMinutes:N1} minutes";
+                }
+                else if (client.Timeout.TotalSeconds > 1)
+                {
+                    time = $"{client.Timeout.TotalSeconds:N1} seconds";
+                }
+                else
+                {
+                    time = $"{client.Timeout.TotalMilliseconds:N0} milliseconds";
+                }
+                clsCommonFunctions.AddStatusMessage("Message timed out.");
+                //throw new TimeoutException($"No response after waiting {time}.");
             }
             catch (Exception e)
             {
@@ -746,12 +779,14 @@ namespace TradingBrain.Models
         {
             // find the data
             var ret = new TradingBrainSettings();
+   
 
             string logName = epicName + "." + strategy;
             if (strategy == "RSI")
             {
                 logName += "_" + resolution;
             }
+
 
             try
             {
@@ -789,6 +824,9 @@ namespace TradingBrain.Models
 
 
                     clsCommonFunctions.AddStatusMessage("Getting latest vars (if necessary)", "INFO",logName);
+
+
+
                     // now get the latest optimized data
                     OptimizeRunData opt = new OptimizeRunData();
                     opt = await OptimizeRunData.GetOptimizeRunDataLatest(the_db, container_opt, epicName, ret.runDetails.numCandles, strategy, resolution);

@@ -72,16 +72,18 @@ namespace TradingBrain.Models
         public string logName = "";
         public EventWorker(EventParams pams )
         {
-            _thread = new Thread(Run)
+            //_thread = new Thread(Run)
+            _thread = new Thread(() => Run(pams))
+
             {
                 IsBackground = true,
                 Name = pams.epic + "|" + pams.strategy + "|" + pams.resolution
             };
-             _thread.Start(pams);
+             _thread.Start();
             logName = clsCommonFunctions.GetLogName(pams.epic, pams.strategy, pams.resolution);
             //threads.Add(_thread);
         }
-        private void Run(object pams)
+        private void Run(EventParams pams)
         {
             //Microsoft.Azure.Cosmos.Container? EpicContainer;
             //Microsoft.Azure.Cosmos.Container? hourly_container;
@@ -398,11 +400,17 @@ namespace TradingBrain.Models
 
                                     _thisApp.model.thisModel.currentTrade.SaveDocument(_thisApp.trade_container);
 
+                                    // Save the TBAudit
+                                    IGModels.clsCommonFunctions.SaveTradeAudit(_thisApp.the_app_db, _thisApp.model.thisModel.currentTrade, (double)_thisApp.currentTrade.level, tsm.TradeType);
+
                                     // Save the last run vars into the TB settings table
                                     _thisApp.tb.lastRunVars = _thisApp.model.modelVar.DeepCopy();
                                     _thisApp.tb.SaveDocument(_thisApp.the_app_db);
 
                                     clsCommonFunctions.SendBroadcast("DealUpdated", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade), _thisApp.the_app_db);
+
+                                    tradeSubUpdate.Add(_thisApp.the_app_db);
+
                                     //_thisApp.model.stopPriceOld = _thisApp.model.stopPrice;
                                 }
                                 else
@@ -455,9 +463,10 @@ namespace TradingBrain.Models
                             {
                                 clsCommonFunctions.AddStatusMessage("UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
                                 TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
+                                tradeSubUpdate.Add(_thisApp.the_app_db);
                             }
 
-                            tradeSubUpdate.Add(_thisApp.the_app_db);
+                            //tradeSubUpdate.Add(_thisApp.the_app_db);
                         }
                         else if (tsm.Status == "DELETED")
                         {
@@ -573,6 +582,9 @@ namespace TradingBrain.Models
 
                                         if (_thisApp.model.modelVar.strategyProfit > _thisApp.model.modelVar.maxStrategyProfit) { _thisApp.model.modelVar.maxStrategyProfit = _thisApp.model.modelVar.strategyProfit; }
 
+                                        // Save tbAudit
+                                        IGModels.clsCommonFunctions.SaveTradeAudit(_thisApp.the_app_db, _thisApp.model.thisModel.currentTrade, (double)_thisApp.currentTrade.level, tsm.TradeType);
+
                                         // Save the last run vars into the TB settings table
                                         _thisApp.tb.lastRunVars = _thisApp.model.modelVar.DeepCopy();
                                         _thisApp.tb.SaveDocument(_thisApp.the_app_db);
@@ -592,6 +604,9 @@ namespace TradingBrain.Models
                                         clsCommonFunctions.AddStatusMessage("Saving trade", "INFO");
                                         _thisApp.model.thisModel.currentTrade.SaveDocument(_thisApp.trade_container);
                                         clsCommonFunctions.AddStatusMessage("Trade saved", "INFO");
+
+
+                                        tradeSubUpdate.Add(_thisApp.the_app_db);
 
                                         if (_thisApp.model.thisModel.currentTrade.attachedOrder != null)
                                         {
@@ -616,28 +631,28 @@ namespace TradingBrain.Models
                                         //Send email
                                         try
                                         {
-                                            string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
-                                            if (region == "LIVE")
-                                            {
-                                                clsEmail obj = new clsEmail();
-                                                List<recip> recips = new List<recip>();
-                                                //recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
-                                                recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
-                                                string subject = "TRADE ENDED - " + _thisApp.currentTrade.epic;
-                                                string text = "The trade has ended in the " + region + " environment</br></br>";
-                                                text += "<ul>";
-                                                text += "<li>Trade ID : " + _thisApp.currentTrade.dealId + "</li>";
-                                                text += "<li>Epic : " + _thisApp.currentTrade.epic + "</li>";
-                                                text += "<li>Date : " + _thisApp.currentTrade.lastUpdated + "</li>";
-                                                text += "<li>Type : " + _thisApp.model.thisModel.currentTrade.longShort + "</li>";
-                                                text += "<li>Trade value : " + _thisApp.model.thisModel.currentTrade.tradeValue + "</li>";
-                                                text += "<li>Size : " + _thisApp.currentTrade.size + "</li>";
-                                                text += "<li>Price : " + _thisApp.currentTrade.level + "</li>";
-                                                text += "<li>Stop Level : " + _thisApp.currentTrade.stopLevel + "</li>";
-                                                text += "<li>NG count : " + _thisApp.modelVar.counter + "</li>";
-                                                text += "</ul>";
-                                                obj.sendEmail(recips, subject, text);
-                                            }
+                                            //string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
+                                            //if (region == "LIVE")
+                                            //{
+                                            //    clsEmail obj = new clsEmail();
+                                            //    List<recip> recips = new List<recip>();
+                                            //    //recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
+                                            //    recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
+                                            //    string subject = "TRADE ENDED - " + _thisApp.currentTrade.epic;
+                                            //    string text = "The trade has ended in the " + region + " environment</br></br>";
+                                            //    text += "<ul>";
+                                            //    text += "<li>Trade ID : " + _thisApp.currentTrade.dealId + "</li>";
+                                            //    text += "<li>Epic : " + _thisApp.currentTrade.epic + "</li>";
+                                            //    text += "<li>Date : " + _thisApp.currentTrade.lastUpdated + "</li>";
+                                            //    text += "<li>Type : " + _thisApp.model.thisModel.currentTrade.longShort + "</li>";
+                                            //    text += "<li>Trade value : " + _thisApp.model.thisModel.currentTrade.tradeValue + "</li>";
+                                            //    text += "<li>Size : " + _thisApp.currentTrade.size + "</li>";
+                                            //    text += "<li>Price : " + _thisApp.currentTrade.level + "</li>";
+                                            //    text += "<li>Stop Level : " + _thisApp.currentTrade.stopLevel + "</li>";
+                                            //    text += "<li>NG count : " + _thisApp.modelVar.counter + "</li>";
+                                            //    text += "</ul>";
+                                            //    obj.sendEmail(recips, subject, text);
+                                            //}
                                         }
                                         catch (Exception ex)
                                         {
@@ -826,8 +841,9 @@ namespace TradingBrain.Models
                             {
                                 clsCommonFunctions.AddStatusMessage("DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
                                 TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
+                                tradeSubUpdate.Add(_thisApp.the_app_db);
                             }
-                            tradeSubUpdate.Add(_thisApp.the_app_db);
+                            //tradeSubUpdate.Add(_thisApp.the_app_db);
 
                         }
                         else if (tsm.Status == "OPEN")
@@ -933,13 +949,13 @@ namespace TradingBrain.Models
                                                 {
                                                     _thisApp.model.thisModel.currentTrade.stopLossValue = Math.Abs(Convert.ToDouble(_thisApp.suppTrade.stopLevel) - (double)_thisApp.model.thisModel.currentTrade.buyPrice);
                                                     _thisApp.model.thisModel.currentTrade.attachedOrder.stopLevel = (decimal)_thisApp.suppTrade.stopLevel;
-                                                    _thisApp.EditDeal((double)_thisApp.suppTrade.stopLevel, _thisApp.model.thisModel.currentTrade.tbDealId);
+                                                    _thisApp.EditDeal((double)_thisApp.suppTrade.stopLevel, _thisApp.model.thisModel.currentTrade.tbDealId, _thisApp.model.thisModel.currentTrade.stopLossValue);
                                                 }
                                                 else
                                                 {
                                                     _thisApp.model.thisModel.currentTrade.stopLossValue = Math.Abs(Convert.ToDouble(_thisApp.suppTrade.stopLevel) - (double)_thisApp.model.thisModel.currentTrade.sellPrice);
                                                     _thisApp.model.thisModel.currentTrade.attachedOrder.stopLevel = (decimal)_thisApp.suppTrade.stopLevel;
-                                                    _thisApp.EditDeal((double)_thisApp.suppTrade.stopLevel, _thisApp.model.thisModel.currentTrade.tbDealId);
+                                                    _thisApp.EditDeal((double)_thisApp.suppTrade.stopLevel, _thisApp.model.thisModel.currentTrade.tbDealId, _thisApp.model.thisModel.currentTrade.stopLossValue);
 
                                                 }
                                                 _thisApp.model.stopPrice = _thisApp.model.thisModel.currentTrade.stopLossValue;
@@ -1120,31 +1136,37 @@ namespace TradingBrain.Models
 
                                         _thisApp.model.thisModel.currentTrade.Add(_thisApp.the_app_db, _thisApp.trade_container);
 
+                                        // Save tbAudit
+                                        IGModels.clsCommonFunctions.SaveTradeAudit(_thisApp.the_app_db, _thisApp.model.thisModel.currentTrade, (double)_thisApp.currentTrade.level, tsm.TradeType);
+
+
+                                        tradeSubUpdate.Add(_thisApp.the_app_db);
+
                                         //Send email
                                         string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
                                         try
                                         {
-                                            if (region == "LIVE")
-                                            {
+                                            //if (region == "LIVE")
+                                            //{
 
-                                                clsEmail obj = new clsEmail();
-                                                List<recip> recips = new List<recip>();
-                                                recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
-                                                string subject = "NEW TRADE STARTED - " + _thisApp.currentTrade.epic;
-                                                string text = "A new trade has started in the " + region + " environment</br></br>";
-                                                text += "<ul>";
-                                                text += "<li>Trade ID : " + _thisApp.currentTrade.dealId + "</li>";
-                                                text += "<li>Epic : " + _thisApp.currentTrade.epic + "</li>";
-                                                text += "<li>Date : " + _thisApp.currentTrade.lastUpdated + "</li>";
-                                                text += "<li>Type : " + _thisApp.model.thisModel.currentTrade.longShort + "</li>";
-                                                text += "<li>Size : " + _thisApp.currentTrade.size + "</li>";
-                                                text += "<li>Price : " + _thisApp.currentTrade.level + "</li>";
-                                                text += "<li>Stop Level : " + _thisApp.currentTrade.stopLevel + "</li>";
-                                                text += "<li>NG count : " + _thisApp.modelVar.counter + "</li>";
-                                                text += "</ul>";
+                                            //    clsEmail obj = new clsEmail();
+                                            //    List<recip> recips = new List<recip>();
+                                            //    recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
+                                            //    string subject = "NEW TRADE STARTED - " + _thisApp.currentTrade.epic;
+                                            //    string text = "A new trade has started in the " + region + " environment</br></br>";
+                                            //    text += "<ul>";
+                                            //    text += "<li>Trade ID : " + _thisApp.currentTrade.dealId + "</li>";
+                                            //    text += "<li>Epic : " + _thisApp.currentTrade.epic + "</li>";
+                                            //    text += "<li>Date : " + _thisApp.currentTrade.lastUpdated + "</li>";
+                                            //    text += "<li>Type : " + _thisApp.model.thisModel.currentTrade.longShort + "</li>";
+                                            //    text += "<li>Size : " + _thisApp.currentTrade.size + "</li>";
+                                            //    text += "<li>Price : " + _thisApp.currentTrade.level + "</li>";
+                                            //    text += "<li>Stop Level : " + _thisApp.currentTrade.stopLevel + "</li>";
+                                            //    text += "<li>NG count : " + _thisApp.modelVar.counter + "</li>";
+                                            //    text += "</ul>";
 
-                                                obj.sendEmail(recips, subject, text);
-                                            }
+                                            //    obj.sendEmail(recips, subject, text);
+                                            //}
                                         }
                                         catch (Exception ex)
                                         {
@@ -1163,8 +1185,9 @@ namespace TradingBrain.Models
                             {
                                 clsCommonFunctions.AddStatusMessage("OPEN failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
                                 TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
+                                tradeSubUpdate.Add(_thisApp.the_app_db);
                             }
-                            tradeSubUpdate.Add(_thisApp.the_app_db);
+                            //tradeSubUpdate.Add(_thisApp.the_app_db);
                         }
                     }
                 }
