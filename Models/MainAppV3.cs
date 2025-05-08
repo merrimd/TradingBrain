@@ -453,7 +453,7 @@ namespace TradingBrain.Models
                 pos.orderType = "MARKET";
                 pos.guaranteedStop = false;
 
-                if (this.strategy == "SMA2")
+                if (this.strategy == "SMA2" || this.strategy == "RSI")
                 {
                     // If this is the SMA2 strategy, then we need to set the stop as a trailing stop (a stop that rises when the trade rises)
                     pos.trailingStop = true;
@@ -580,7 +580,7 @@ namespace TradingBrain.Models
 
                 pos.stopLevel = Convert.ToDecimal(stopLoss);
                 //this.model.modelVar.breakEvenVar
-                if (this.strategy == "SMA2")
+                if (this.strategy == "SMA2" || this.strategy == "SMA2")
                 {
                     // Still keep the trailing stop even when it hits BEven
                     //if (this.model.modelVar.breakEvenVar == 1)
