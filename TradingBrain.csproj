@@ -13,6 +13,7 @@
     <Compile Remove="Common\SmartDispatcher.cs" />
     <Compile Remove="Models\IgPublicApiData.cs" />
     <Compile Remove="Models\MainApp.cs" />
+    <Compile Remove="Models\MainAppV2.cs" />
   </ItemGroup>
 
   <ItemGroup>

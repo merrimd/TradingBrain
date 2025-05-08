@@ -43,12 +43,14 @@ namespace TradingBrain.Models
     }
     public class updateMessage
     {
+        public string updateType { get; set; }
         public string updateData { get; set; }
         public string itemName { get; set; }
         public updateMessage()
         {
             updateData = "";
             itemName = "";
+            updateType = "";
         }
     }
     public class PrintOPUMessageEvent : IWorkerEvent
@@ -314,7 +316,7 @@ namespace TradingBrain.Models
         {
 
         }
-        public void OPUUpdate(string inputData,string itemName)
+        public async void OPUUpdate(string inputData,string itemName)
         {
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
 
@@ -371,7 +373,7 @@ namespace TradingBrain.Models
                                     clsCommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
                                     clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
                                     clsCommonFunctions.AddStatusMessage("Updating  - " + tsm.DealId + " - Current Deal = " + _thisApp.currentTrade.dealId, "INFO");
-                                    _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
+                                    await _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
                                     _thisApp.model.thisModel.currentTrade.candleSold = null;
                                     _thisApp.model.thisModel.currentTrade.candleBought = null;
                                     _thisApp.currentTrade.dealReference = tsm.DealReference;
@@ -409,7 +411,7 @@ namespace TradingBrain.Models
 
                                     clsCommonFunctions.SendBroadcast("DealUpdated", JsonConvert.SerializeObject(_thisApp.model.thisModel.currentTrade), _thisApp.the_app_db);
 
-                                    tradeSubUpdate.Add(_thisApp.the_app_db);
+                                    await tradeSubUpdate.Add(_thisApp.the_app_db);
 
                                     //_thisApp.model.stopPriceOld = _thisApp.model.stopPrice;
                                 }
@@ -420,7 +422,7 @@ namespace TradingBrain.Models
                                         if (tsm.DealId == _thisApp.suppTrade.dealId)
                                         {
                                             clsCommonFunctions.AddStatusMessage("Updating supp trade  - " + tsm.DealId + " - Current Deal = " + _thisApp.suppTrade.dealId, "INFO");
-                                            _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
+                                            await _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
                                             _thisApp.model.thisModel.suppTrade.candleSold = null;
                                             _thisApp.model.thisModel.suppTrade.candleBought = null;
                                             _thisApp.suppTrade.dealReference = tsm.DealReference;
@@ -463,7 +465,7 @@ namespace TradingBrain.Models
                             {
                                 clsCommonFunctions.AddStatusMessage("UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
                                 TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
-                                tradeSubUpdate.Add(_thisApp.the_app_db);
+                                await tradeSubUpdate.Add(_thisApp.the_app_db);
                             }
 
                             //tradeSubUpdate.Add(_thisApp.the_app_db);
@@ -482,7 +484,7 @@ namespace TradingBrain.Models
                                         clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
                                         clsCommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + _thisApp.currentTrade.dealId, "INFO");
                                         DateTime dtNow = DateTime.UtcNow;
-                                        _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
+                                        await _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
                                         _thisApp.model.thisModel.currentTrade.candleSold = null;
                                         _thisApp.model.thisModel.currentTrade.candleBought = null;
 
@@ -606,7 +608,7 @@ namespace TradingBrain.Models
                                         clsCommonFunctions.AddStatusMessage("Trade saved", "INFO");
 
 
-                                        tradeSubUpdate.Add(_thisApp.the_app_db);
+                                        await tradeSubUpdate.Add(_thisApp.the_app_db);
 
                                         if (_thisApp.model.thisModel.currentTrade.attachedOrder != null)
                                         {
@@ -661,7 +663,7 @@ namespace TradingBrain.Models
                                             log.Log_Type = "Error";
                                             log.Log_App = "UpdateTsOPU";
                                             log.Epic = "";
-                                            log.Save();
+                                            await log.Save();
                                         }
                                         _thisApp.model.thisModel.currentTrade = null;
                                         _thisApp.currentTrade = null;
@@ -676,7 +678,7 @@ namespace TradingBrain.Models
                                     {
                                         clsCommonFunctions.AddStatusMessage("Deleting supp trade - " + tsm.DealId + " - Current Deal = " + _thisApp.suppTrade.dealId, "INFO");
                                         DateTime dtNow = DateTime.UtcNow;
-                                        _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
+                                        await _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
 
                                         _thisApp.suppTrade.lastUpdated = dtNow;
                                         _thisApp.suppTrade.status = tsm.Status;
@@ -824,7 +826,7 @@ namespace TradingBrain.Models
                                             log.Log_Type = "Error";
                                             log.Log_App = "UpdateTsOPU";
                                             log.Epic = "";
-                                            log.Save();
+                                            await log.Save();
                                         }
                                         //_thisApp.model.thisModel.currentTrade = null;
                                         //_thisApp.currentTrade = null;
@@ -841,7 +843,7 @@ namespace TradingBrain.Models
                             {
                                 clsCommonFunctions.AddStatusMessage("DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
                                 TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
-                                tradeSubUpdate.Add(_thisApp.the_app_db);
+                                await tradeSubUpdate.Add(_thisApp.the_app_db);
                             }
                             //tradeSubUpdate.Add(_thisApp.the_app_db);
 
@@ -998,7 +1000,7 @@ namespace TradingBrain.Models
                                                     log.Log_Type = "Error";
                                                     log.Log_App = "UpdateTsOPU";
                                                     log.Epic = "";
-                                                    log.Save();
+                                                    await log.Save();
                                                 }
                                                 //else
                                                 //{
@@ -1140,7 +1142,7 @@ namespace TradingBrain.Models
                                         IGModels.clsCommonFunctions.SaveTradeAudit(_thisApp.the_app_db, _thisApp.model.thisModel.currentTrade, (double)_thisApp.currentTrade.level, tsm.TradeType);
 
 
-                                        tradeSubUpdate.Add(_thisApp.the_app_db);
+                                        await tradeSubUpdate.Add(_thisApp.the_app_db);
 
                                         //Send email
                                         string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
@@ -1175,7 +1177,7 @@ namespace TradingBrain.Models
                                             log.Log_Type = "Error";
                                             log.Log_App = "UpdateTsOPU";
                                             log.Epic = "";
-                                            log.Save();
+                                            await log.Save();
                                         }
 
                                     }
@@ -1185,7 +1187,7 @@ namespace TradingBrain.Models
                             {
                                 clsCommonFunctions.AddStatusMessage("OPEN failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
                                 TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
-                                tradeSubUpdate.Add(_thisApp.the_app_db);
+                                await tradeSubUpdate.Add(_thisApp.the_app_db);
                             }
                             //tradeSubUpdate.Add(_thisApp.the_app_db);
                         }
@@ -1197,7 +1199,7 @@ namespace TradingBrain.Models
             }
         }
 
-        public void CONFIRMUpdate( string inputData,string itemName)
+        public async void CONFIRMUpdate( string inputData,string itemName)
         {
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
 
@@ -1253,7 +1255,7 @@ namespace TradingBrain.Models
 
                         if (reqTrade != null)
                         {
-                            tradeSubUpdate.Add(_thisApp.the_app_db);
+                            await tradeSubUpdate.Add(_thisApp.the_app_db);
 
                             reqTrade.dealStatus = tsm.DealStatus;
 
@@ -1317,7 +1319,7 @@ namespace TradingBrain.Models
                 log.Log_Type = "Error";
                 log.Log_App = "UpdateTsCONFIRM";
                 log.Epic = "";
-                log.Save();
+                await log.Save();
             }
         }
         //public async static Task<bool> SetupDB()

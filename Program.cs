@@ -32,6 +32,9 @@ using static TradingBrain.Models.TBStreamingClient;
 using System.Drawing.Text;
 using System.Collections.Concurrent;
 using Org.BouncyCastle.Pqc.Crypto.Lms;
+using MimeKit.Encodings;
+using Org.BouncyCastle.Tsp;
+using System.Timers;
 
 namespace TradingBrain.Models
 {
@@ -46,6 +49,7 @@ namespace TradingBrain.Models
         public static Database? the_db;
         public static Database? the_app_db;
 
+        public static List<MainApp> workerList = new List<MainApp>();
 
         public TBStreamingClient tbClient;
         private bool isDirty = false;
@@ -57,7 +61,7 @@ namespace TradingBrain.Models
         public IgRestApiClient? igRestApiClient;
 
         public delegate void StopDelegate();
-
+        public static string region = "";
         public async static Task<bool> SetupDB()
         {
             bool ret = true;
@@ -124,7 +128,7 @@ namespace TradingBrain.Models
             return ret;
 
         }
- 
+        //public System.Timers.Timer ti = new System.Timers.Timer();
         static async Task Main(string[] args)
         {
             //var parallelTasks = new List<Task>();
@@ -192,7 +196,7 @@ namespace TradingBrain.Models
                 if (igWebApiConnectionConfig != null)
                 {
 
-
+                    region = igWebApiConnectionConfig["region"] ?? "test";
                     string settingEpics = igWebApiConnectionConfig["epics"] ?? "IX.D.NASDAQ.CASH.IP|SMA";
 
                     if (settingEpics != "IX.D.NASDAQ.CASH.IP|SMA")
@@ -232,188 +236,265 @@ namespace TradingBrain.Models
 
 
             // Create tasks 
-            List<EventWorker> workerList = new List<EventWorker>();
+            //List<EventWorker> workerList = new List<EventWorker>();
+            //foreach (tbEpics tbepic in epcs)
+            //{
+            //    string jobId = clsCommonFunctions.GetLogName(tbepic.epic, tbepic.strategy, tbepic.resolution);
+            //    MappedDiagnosticsLogicalContext.Set("jobId", jobId);
+            //    workerList.Add(new EventWorker(new EventParams(tbepic.epic, tbepic.strategy,tbepic.resolution, igContainer)));
+
+            //}
+            //igContainer.workerList = workerList;
+            ILogger tbLog;
+
+         
             foreach (tbEpics tbepic in epcs)
             {
                 string jobId = clsCommonFunctions.GetLogName(tbepic.epic, tbepic.strategy, tbepic.resolution);
                 MappedDiagnosticsLogicalContext.Set("jobId", jobId);
-                workerList.Add(new EventWorker(new EventParams(tbepic.epic, tbepic.strategy,tbepic.resolution, igContainer)));
+
+                tbLog = LogManager.GetLogger(jobId);
+
+                tbLog.Info("-------------------------------------------------------------");
+                tbLog.Info($"-- TradingBrain started - strategy: {tbepic.strategy + " " + tbepic.resolution} : {tbepic.epic} --");
+                tbLog.Info("-------------------------------------------------------------");
+
+                tbLog.Info("Connecting to database....");
+
+                Database? the_db = IGModels.clsCommonFunctions.Get_Database(tbepic.epic).Result;
+                Database? the_app_db = IGModels.clsCommonFunctions.Get_App_Database(tbepic.epic).Result;
+
+
+                if (the_db != null)
+                {
+
+
+                    Container container = null;
+                    Container chart_container = null;
+                    Container trade_container = null;
+                    Container minute_container = null;
+                    Container TicksContainer = null;
+                    switch (tbepic.epic)
+                    {
+                        case "IX.D.NIKKEI.DAILY.IP":
+                            container = the_db.GetContainer("CandleUpdate");
+                            chart_container = the_db.GetContainer("CandleTicks_NIKKEI");
+                            TicksContainer = the_db.GetContainer("CandleTicks_NIKKEI");
+                            trade_container = the_app_db.GetContainer("TradingBrainTrades");
+
+                            break;
+
+                        default:
+                            container = the_db.GetContainer("CandleUpdate");
+                            chart_container = the_db.GetContainer("CandleTicks");
+                            TicksContainer = the_db.GetContainer("CandleTicks");
+                            trade_container = the_app_db.GetContainer("TradingBrainTrades");
+                            break;
+                    }
+
+                    //SetupDB(pms.epic);
+
+                    if (tbepic.strategy == "RSI")
+                    {
+                        minute_container = the_db.GetContainer("Candles_RSI");
+                    }
+                    else
+                    {
+                        if (tbepic.epic == "IX.D.NIKKEI.DAILY.IP")
+                        {
+                            minute_container = the_db.GetContainer("MinuteCandle_NIKKEI");
+                        }
+                        else
+                        {
+                            minute_container = the_db.GetContainer("MinuteCandle");
+                        }
+                    }
+                    tbLog.Info("Initialising app");
+
+                    workerList.Add(new MainApp(the_db, the_app_db, container, chart_container, tbepic.epic, minute_container, TicksContainer, trade_container, igContainer, tbepic.strategy, tbepic.resolution));
+                    /* workerList.Add(new EventWorker(new EventParams(tbepic.epic, tbepic.strategy, tbepic.resolution, igContainer)))*/
+                    ;
+
+                }
+                igContainer.workerList = workerList;
 
             }
-            //    workerList.Add(new EventWorker(new EventParams("IX.D.NASDAQ.CASH.IP", "SMA", "", igContainer)));
-            //workerList.Add(new EventWorker(new EventParams("IX.D.NIKKEI.DAILY.IP", "SMA", "", igContainer)));
+            System.Timers.Timer ti = new System.Timers.Timer();
+            ti.AutoReset = false;
 
-            igContainer.workerList = workerList;
+            if (epcs[0].strategy == "RSI")
+            {
+                ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
+                ti.Interval = GetIntervalWithResolution("HOUR");
+                //ti.Interval = 1000;
+            }
+            else
+            {
 
-            //workerList.Add(worker);
+                ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
+                ti.Interval = GetInterval();
+            }
 
-            //foreach(EventWorker wk in workerList)
-            //{
-            //    wk.PostEvent(new PrintMessageEvent("Posted"));
-            //}
+            ti.Start();
 
-            clsCommonFunctions.AddStatusMessage("Starting lightstreamer in a new thread", "INFO");
- 
 
             int i = await WaitForChanges();
 
-            //Console.ReadLine();
 
-
-
-
-            //Task tsk =  Task.Run(() => CreateTBThread(epic,strategy,resolution,igContainer));
-            //parallelTasks.Add(tsk);
-
-            //Task tsk2 = Task.Run(() => CreateTBThread("IX.D.NIKKEI.DAILY.IP", "SMA", "",igContainer));
-            //parallelTasks.Add(tsk2);
-
-
-            //try
-            //{
-            //    await Task.WhenAll(parallelTasks);
-            //}
-            //catch (Exception ex)
-            //{
-            //    var e = ex;
-            //}
-
-            //MainApp? app = null;
-
-            //string epic = "IX.D.NASDAQ.CASH.IP";
-            //string strategy = "SMA";
-            //string resolution = "";
-
-            //// See if an epic has been passed in. if not then default to NASDAQ
-            //if (Environment.GetCommandLineArgs().Length >= 2)
-            //{
-            //    epic = Environment.GetCommandLineArgs()[1].ToUpper();
-            //}
-
-
-            //// See if a strategy and resolution has been passed in, otherwise use default. //
-
-            //if (Environment.GetCommandLineArgs().Length >= 4)
-            //{
-            //    strategy = Environment.GetCommandLineArgs()[2].ToUpper();
-            //    resolution = Environment.GetCommandLineArgs()[3].ToUpper();
-            //}
-
-            //// Set up the logging //
-
-            //var config = new NLog.Config.LoggingConfiguration();
-
-            //var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
-
-            //string nme = strategy;
-            //if (strategy == "RSI")
-            //{
-            //    nme  += "_" + resolution;
-            //}
-            //var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App." + epic + "." + nme + ".${shortdate}.txt", MaxArchiveDays=31, KeepFileOpen=false, Layout = "${longdate}|${level:uppercase=true}|${message}|${exception:format=toString}" };
-            //var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
-            //logconsole.Layout = "${longdate}|${level:uppercase=true}|${logger}|${message}|${exception:format=toString}";
-
-            //config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
-            //config.AddRule(LogLevel.Debug, LogLevel.Fatal, logfile);
-
-            //NLog.LogManager.Configuration = config;
-            //Logger tbLog = LogManager.GetCurrentClassLogger();
-
-
-
-            //tbLog.Info("-------------------------------------------------------------");
-            //tbLog.Info($"-- TradingBrain started - strategy: {strategy + " " + resolution} : {epic} --");
-            //tbLog.Info("-------------------------------------------------------------");
-
-            //tbLog.Info("Connecting to database....");
-
-            //Database? the_db = await IGModels.clsCommonFunctions.Get_Database(epic);
-            //Database? the_app_db = await IGModels.clsCommonFunctions.Get_App_Database(epic);
-
-
-            //if (the_db != null)
-            //{
-
-
-            //    Container container;
-            //    Container chart_container;
-            //    Container trade_container;
-
-            //    switch (epic)
-            //    {
-            //        case "IX.D.NIKKEI.DAILY.IP":
-            //            container = the_db.GetContainer("CandleUpdate");
-            //            chart_container = the_db.GetContainer("CandleTicks_NIKKEI"); 
-            //            trade_container = the_app_db.GetContainer("TradingBrainTrades");
-
-            //            break;
-
-            //        default:
-            //            container = the_db.GetContainer("CandleUpdate");
-            //            chart_container = the_db.GetContainer("CandleTicks"); 
-            //            trade_container = the_app_db.GetContainer("TradingBrainTrades");
-            //            break;
-            //    }
-            //    SetupDB(epic);
-            //    if (strategy == "RSI")
-            //    {
-            //        minute_container = the_db.GetContainer("Candles_RSI");
-            //    }
-
-
-
-            //    tbLog.Info("Initialising app");
-
-            //    app = new MainApp(the_db,the_app_db, container, chart_container, epic,minute_container,TicksContainer,trade_container,strategy, resolution );
-
-
-            //    if (app != null)
-            //    {
-            //        tbLog.Info("Waiting for changes...");
-
-            //        int i = await app.WaitForChanges();
-            //    }
-
-            //    tbLog.Info("Exiting...");
-
-            //    Environment.Exit(0);
-
-            //    static void Exiting(Exception exception, MainApp app)
-            //    {
-            //        //Put common cleanup code here (or at the end of the method)
-            //        if (app != null)
-            //        {
-            //        }
-
-            //        if (exception == null)
-            //        {
-            //            clsCommonFunctions.AddStatusMessage("normal proc exit","INFO");
-            //        }
-            //        else
-            //        {
-            //            clsCommonFunctions.AddStatusMessage("unhandled exception: " + exception.GetType().Name,"ERROR");
-            //        }
-            //    }
-
-
-
-
-            //    static double GetInterval()
-            //    {
-            //        DateTime now = DateTime.Now;
-            //        return ((now.Second > 30 ? 120 : 60) - now.Second) * 1000 - now.Millisecond;
-            //    }
-
-            //    static void t_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-            //    {
-            //        t.Interval = GetInterval();
-            //        t.Start();
-            //    }
-
-
-            //}
         }
+
+        public static async void RunMainAppCode(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            var parallelTasks = new List<Task<runRet>>();
+            var t = (System.Timers.Timer)sender;
+            string strat = "";
+            foreach (MainApp app in workerList)
+            {
+                app.GetPositions();
+                if (app.strategy == "RSI")
+                {
+                    Task<runRet> task = Task.Run(() => app.RunCode_RSI(sender, e));
+                    parallelTasks.Add(task);
+
+                }
+                else
+                {                   
+                    Task<runRet> task = Task.Run(() => app.RunCode(sender, e));
+                    parallelTasks.Add(task);
+                 
+                }
+                if (strat == "") { strat = app.strategy; }
+            }
+            try
+            {
+                await Task.WhenAll(parallelTasks);
+            }
+            catch (Exception ex)
+            {
+                var exc = ex;
+            }
+            if (workerList[0].strategy == "RSI")
+            {
+                t.Interval = GetIntervalWithResolution("HOUR");
+            }
+            else
+            {
+                t.Interval = GetInterval();
+            }
+            t.Start();
+        }
+
+       public static double GetIntervalWithResolution(string resolution)
+        {
+            DateTime now = DateTime.Now;
+            DateTime nextRun = DateTime.MinValue;
+            int testOffset = 0;
+            if (region == "test")
+            {
+                testOffset = 5;
+            }
+            string resUnit = "MINUTE";
+            int resNum = 1;
+            string[] res = resolution.Split('_');
+            if (res.Length == 1 && res[0] == "DAY")
+            {
+                resUnit = "DAY";
+                resNum = 1;
+            }
+            else
+            {
+                if (res[0] == "HOUR")
+                {
+                    resUnit = "HOUR";
+                    resNum = 1;
+                }
+                //if (res.Length == 1 && res[0] == "HOUR")
+                //{
+                //    resUnit = "HOUR";
+                //    resNum = 1;
+                //}
+                //else
+                //{
+                //    if (res.Length == 2)
+                //    {
+                //        resUnit = res[0];
+                //        resNum = Convert.ToInt16(res[1]);
+                //    }
+                //}
+            }
+            switch (resUnit)
+            {
+                case "MINUTE":
+                    if (resNum == 2)
+                    {
+                        nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, 0).AddMinutes(2 - (now.Minute % 2)); // Next minute
+                    }
+                    else
+                    {
+                        if (now.Minute < 30)
+                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0); // Next half-hour
+                        else
+                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0).AddHours(1); // Next hour
+                    }
+                    break;
+
+                case "HOUR":
+                    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0).AddHours(resNum - (now.Hour % resNum)); // Next x hour
+                    break;
+
+                case "DAY":
+                    nextRun = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, 0).AddDays(resNum - (now.Day % resNum)); // Next x day
+                    break;
+
+            }
+            // Determine the next execution time: next hour or next half-hour
+            //if (now.Minute < 30)
+            //    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0); // Next half-hour
+            //else
+            //    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour + 1, 0, 0, 0); // Next hour
+
+            if (region == "test")
+            {
+                //if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
+                //{
+                //    nextRun = nextRun.AddSeconds(45);
+                //}
+                //else
+                //{
+                nextRun = nextRun.AddSeconds(30);
+                //}
+            }
+            else
+            {
+                // Make the hour_2, hour_3 and hour_4 resolutions run 15 seconds later to ensure all the candles have been created.
+                if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
+                {
+                    nextRun = nextRun.AddSeconds(15);
+                }
+            }
+
+
+
+            // Calculate the precise interval in milliseconds
+            double interval = (nextRun - now).TotalMilliseconds;
+
+            clsCommonFunctions.AddStatusMessage($"Next run scheduled at: {nextRun:yyyy-MM-dd HH:mm:ss.fff}");
+            return interval;
+
+        }
+        public static double GetInterval()
+        {
+            DateTime now = DateTime.Now;
+
+            // testOffset will move it to 10 seconds past the minute to ensure it doesn't interfere with live
+            int testOffset = 0;
+            if (region == "test")
+            {
+                testOffset = 20;
+            }
+            return ((now.Second > 30 ? 120 : 60) - now.Second + testOffset) * 1000 - now.Millisecond;
+        }
+
         public static async Task<int> WaitForChanges()
         {
             int ret = 1;
@@ -527,7 +608,7 @@ namespace TradingBrain.Models
                         trade_container = the_app_db.GetContainer("TradingBrainTrades");
                         break;
                 }
-                SetupDB(epic);
+                await SetupDB(epic);
                 if (strategy == "RSI")
                 {
                     minute_container = the_db.GetContainer("Candles_RSI");
