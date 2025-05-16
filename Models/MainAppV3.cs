@@ -997,7 +997,7 @@ namespace TradingBrain.Models
                             // _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour, dtNow.Minute, 0).AddMinutes(-1);
 
                             bool createMinRecord = liveMode;
-                            if (model.region == "test") { createMinRecord = false; }
+                            if (model.region == "test" || strategy == "SMA2") { createMinRecord = false; }
                             //clsCommonFunctions.AddStatusMessage($"Checking B ", "INFO", logName);
                             model.candles.currentCandle = await CreateLiveCandle(the_db, thisInput.var1, thisInput.var3, thisInput.var2, thisInput.var13, _startTime, epicName, minute_container, TicksContainer, false, createMinRecord, the_app_db, model.exchangeClosedDates);
                             //clsCommonFunctions.AddStatusMessage($"Checking C ", "INFO", logName);
@@ -1539,11 +1539,11 @@ namespace TradingBrain.Models
             switch (msg.updateType)
             {
                 case "UPDATE":
-                Console.WriteLine($"Update Message: {msg.itemName} - {msg.updateData}");
+                AddStatusMessage($"Update Message: {msg.itemName} - {msg.updateData}","INFO");
                     OPUUpdate(msg.updateData, msg.itemName);
                     break;
                 case "CONFIRM":
-                    Console.WriteLine($"Confirm Message: {msg.itemName} - {msg.updateData}");
+                    AddStatusMessage($"Confirm Message: {msg.itemName} - {msg.updateData}","INFO");
                     CONFIRMUpdate(msg.updateData, msg.itemName);
                     break;
 
@@ -2669,24 +2669,24 @@ namespace TradingBrain.Models
                                 //tb.lastRunVars.numCandlesOnMarket = model.modelVar.numCandlesOnMarket;
 
                                 // check to see if the trade just finished lost at max quantity, if so then we need to reset the vars
-                                clsCommonFunctions.AddStatusMessage($"checking if reset required - lastTradeMaxQuantity = {lastTradeMaxQuantity}", "DEBUG", logName);
-                                if (lastTradeMaxQuantity)
-                                {
-                                    clsCommonFunctions.AddStatusMessage($"old lastRunVars - currentGain = {tb.lastRunVars.currentGain}, carriedForwardLoss = {tb.lastRunVars.carriedForwardLoss}, quantity = {tb.lastRunVars.quantity}, counter = {tb.lastRunVars.counter}, maxQuantity={tb.lastRunVars.maxQuantity}", "DEBUG", logName);
-                                    tb.lastRunVars.currentGain = Math.Max(tb.lastRunVars.currentGain - model.modelVar.carriedForwardLoss, 0);
-                                    tb.lastRunVars.carriedForwardLoss = 0;
-                                    tb.lastRunVars.quantity = tb.lastRunVars.minQuantity;
-                                    tb.lastRunVars.counter = 0;
-                                    tb.lastRunVars.maxQuantity = tb.lastRunVars.minQuantity * tb.lastRunVars.maxQuantityMultiplier;
-                                    model.modelVar.currentGain = tb.lastRunVars.currentGain;
-                                    model.modelVar.carriedForwardLoss = tb.lastRunVars.carriedForwardLoss;
-                                    model.modelVar.quantity = tb.lastRunVars.quantity;
-                                    model.modelVar.counter = tb.lastRunVars.counter;
-                                    model.modelVar.maxQuantity = tb.lastRunVars.maxQuantity;
+                                //clsCommonFunctions.AddStatusMessage($"checking if reset required - lastTradeMaxQuantity = {lastTradeMaxQuantity}", "DEBUG", logName);
+                                //if (lastTradeMaxQuantity)
+                                //{
+                                //    clsCommonFunctions.AddStatusMessage($"old lastRunVars - currentGain = {tb.lastRunVars.currentGain}, carriedForwardLoss = {tb.lastRunVars.carriedForwardLoss}, quantity = {tb.lastRunVars.quantity}, counter = {tb.lastRunVars.counter}, maxQuantity={tb.lastRunVars.maxQuantity}", "DEBUG", logName);
+                                //    tb.lastRunVars.currentGain = Math.Max(tb.lastRunVars.currentGain - model.modelVar.carriedForwardLoss, 0);
+                                //    tb.lastRunVars.carriedForwardLoss = 0;
+                                //    tb.lastRunVars.quantity = tb.lastRunVars.minQuantity;
+                                //    tb.lastRunVars.counter = 0;
+                                //    tb.lastRunVars.maxQuantity = tb.lastRunVars.minQuantity * tb.lastRunVars.maxQuantityMultiplier;
+                                //    model.modelVar.currentGain = tb.lastRunVars.currentGain;
+                                //    model.modelVar.carriedForwardLoss = tb.lastRunVars.carriedForwardLoss;
+                                //    model.modelVar.quantity = tb.lastRunVars.quantity;
+                                //    model.modelVar.counter = tb.lastRunVars.counter;
+                                //    model.modelVar.maxQuantity = tb.lastRunVars.maxQuantity;
 
-                                    clsCommonFunctions.AddStatusMessage($"new lastRunVars - currentGain = {tb.lastRunVars.currentGain}, carriedForwardLoss = {tb.lastRunVars.carriedForwardLoss}, quantity = {tb.lastRunVars.quantity}, counter = {tb.lastRunVars.counter}, maxQuantity={tb.lastRunVars.maxQuantity}", "DEBUG", logName);
-                                }
-                                await tb.SaveDocument(the_app_db);
+                                //    clsCommonFunctions.AddStatusMessage($"new lastRunVars - currentGain = {tb.lastRunVars.currentGain}, carriedForwardLoss = {tb.lastRunVars.carriedForwardLoss}, quantity = {tb.lastRunVars.quantity}, counter = {tb.lastRunVars.counter}, maxQuantity={tb.lastRunVars.maxQuantity}", "DEBUG", logName);
+                                //}
+                                //await tb.SaveDocument(the_app_db);
 
                                 clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
@@ -2839,7 +2839,7 @@ namespace TradingBrain.Models
                                 clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
                                 clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
                                 clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle.StdDev} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle.StdDev}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle.StdDev}", "DEBUG", logName);
-
+                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
 
                                 //model.RunProTrendCodeV2(model.candles);
@@ -2847,7 +2847,7 @@ namespace TradingBrain.Models
 
                                 clsCommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
                                 //clsCommonFunctions.AddStatusMessage($"values after  run ctd... - doSuppTrades={model.doSuppTrades}, onSuppTrade={model.onSuppTrade}", "DEBUG");
-
+                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
 
                                 clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
                                 clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
@@ -2922,25 +2922,31 @@ namespace TradingBrain.Models
 
                                     if (model.longOnmarket)
                                     {
-                                        clsCommonFunctions.AddStatusMessage($"[LONG] Check if buyprice ({model.thisModel.currentTrade.buyPrice}) - stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
 
-                                        if ((IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)) && (IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.stopLossValue) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)))
-                                        {
+                                        //Don't touch the stop level as it should be done by trailing stops instead
 
-
-
-                                            //EditDeal(Math.Abs( model.thisModel.currentTrade.stopLossValue), this.currentTrade.dealId);
-                                            decimal? currentStopLevel = this.currentTrade.stopLevel;
+                                        //Also, if we put this back in, the edit deal function is not sending the limit level (target) so it is being overwritten.
 
 
-                                            this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.buyPrice - (decimal)model.thisModel.currentTrade.stopLossValue;
-                                            clsCommonFunctions.AddStatusMessage($"EditLong Long activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal ", the_app_db);
-                                            EditDeal((double)model.thisModel.currentTrade.buyPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue);
+                                        //clsCommonFunctions.AddStatusMessage($"[LONG] Check if buyprice ({model.thisModel.currentTrade.buyPrice}) - stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
+
+                                        //if ((IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)) && (IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.stopLossValue) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)))
+                                        //{
 
 
 
-                                        }
+                                        //    //EditDeal(Math.Abs( model.thisModel.currentTrade.stopLossValue), this.currentTrade.dealId);
+                                        //    decimal? currentStopLevel = this.currentTrade.stopLevel;
+
+
+                                        //    this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.buyPrice - (decimal)model.thisModel.currentTrade.stopLossValue;
+                                        //    clsCommonFunctions.AddStatusMessage($"EditLong Long activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                        //    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal ", the_app_db);
+                                        //    EditDeal((double)model.thisModel.currentTrade.buyPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue);
+
+
+
+                                        //}
                                     }
 
 
@@ -3184,6 +3190,7 @@ namespace TradingBrain.Models
                         break;
 
                     case "Status":
+                        //AddStatusMessage($"status sent - {currentStatus.epicName}-{currentStatus.strategy}", "INFO");
                         clsCommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus), the_app_db);
                         break;
 

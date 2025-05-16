@@ -35,6 +35,7 @@ using Org.BouncyCastle.Pqc.Crypto.Lms;
 using MimeKit.Encodings;
 using Org.BouncyCastle.Tsp;
 using System.Timers;
+using System.Runtime.CompilerServices;
 
 namespace TradingBrain.Models
 {
@@ -332,7 +333,7 @@ namespace TradingBrain.Models
             {
 
                 ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
-                ti.Interval = GetInterval();
+                ti.Interval = GetInterval(epcs[0].strategy);
             }
 
             ti.Start();
@@ -379,7 +380,7 @@ namespace TradingBrain.Models
             }
             else
             {
-                t.Interval = GetInterval();
+                t.Interval = GetInterval(strat);
             }
             t.Start();
         }
@@ -466,11 +467,12 @@ namespace TradingBrain.Models
             }
             else
             {
+                nextRun = nextRun.AddSeconds(15);
                 // Make the hour_2, hour_3 and hour_4 resolutions run 15 seconds later to ensure all the candles have been created.
-                if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
-                {
-                    nextRun = nextRun.AddSeconds(15);
-                }
+                //if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
+                //{
+                //    nextRun = nextRun.AddSeconds(15);
+                //}
             }
 
 
@@ -482,7 +484,7 @@ namespace TradingBrain.Models
             return interval;
 
         }
-        public static double GetInterval()
+        public static double GetInterval(string strat = "")
         {
             DateTime now = DateTime.Now;
 
@@ -492,6 +494,16 @@ namespace TradingBrain.Models
             {
                 testOffset = 20;
             }
+            if (strat == "SMA2")
+            {
+                testOffset = 5;
+            }
+
+            if (strat == "RSI")
+            {
+                testOffset = 15;
+            }
+
             return ((now.Second > 30 ? 120 : 60) - now.Second + testOffset) * 1000 - now.Millisecond;
         }
 
