@@ -2959,7 +2959,7 @@ namespace TradingBrain.Models
                                 }
                                 try
                                 {
-                                    if (model.thisModel.currentTrade != null)
+                                    if (model.thisModel.currentTrade != null && model.thisModel.currentTrade.purchaseDate != DateTime.MinValue)
                                     {
                                         model.thisModel.currentTrade.numCandlesOnMarket = model.modelVar.numCandlesOnMarket;
 
