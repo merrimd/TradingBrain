@@ -193,7 +193,7 @@ namespace TradingBrain.Models
 
                 //SetupDB(pms.epic);
 
-                if (pms.strategy == "RSI")
+                if (pms.strategy == "RSI" || pms.strategy == "REI")
                 {
                     minute_container = the_db.GetContainer("Candles_RSI");
                 }
@@ -1123,7 +1123,7 @@ namespace TradingBrain.Models
                                             _thisApp.model.thisModel.currentTrade.targetPrice = orderValues.targetPrice;
                                         }
 
-                                        if (_thisApp.strategy == "RSI")
+                                        if (_thisApp.strategy == "RSI" || _thisApp.strategy == "REI")
                                         {
                                             _thisApp.currentTrade.limitLevel = Convert.ToDecimal(tsm.Limitlevel);
                                             _thisApp.model.thisModel.currentTrade.targetPrice = Convert.ToDecimal(tsm.Limitlevel);

@@ -295,7 +295,7 @@ namespace TradingBrain.Models
 
                     //SetupDB(pms.epic);
 
-                    if (tbepic.strategy == "RSI")
+                    if (tbepic.strategy == "RSI" || tbepic.strategy == "REI")
                     {
                         minute_container = the_db.GetContainer("Candles_RSI");
                     }
@@ -323,7 +323,7 @@ namespace TradingBrain.Models
             System.Timers.Timer ti = new System.Timers.Timer();
             ti.AutoReset = false;
 
-            if (epcs[0].strategy == "RSI")
+            if (epcs[0].strategy == "RSI" || epcs[0].strategy == "REI") 
             {
                 ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
                 ti.Interval = GetIntervalWithResolution("HOUR");
@@ -352,17 +352,23 @@ namespace TradingBrain.Models
             foreach (MainApp app in workerList)
             {
                 app.GetPositions();
-                if (app.strategy == "RSI")
-                {
-                    Task<runRet> task = Task.Run(() => app.RunCode_RSI(sender, e));
-                    parallelTasks.Add(task);
+                Task<runRet> task;
+                switch (app.strategy){
+                    case "RSI":
+                        task = Task.Run(() => app.RunCode_RSI(sender, e));
+                        parallelTasks.Add(task);
+                        break;
 
-                }
-                else
-                {                   
-                    Task<runRet> task = Task.Run(() => app.RunCode(sender, e));
-                    parallelTasks.Add(task);
-                 
+                    case "REI":
+                        task = Task.Run(() => app.RunCode_REI(sender, e));
+                        parallelTasks.Add(task);
+                        break;
+
+                    default:
+                        task = Task.Run(() => app.RunCode(sender, e));
+                        parallelTasks.Add(task);
+                        break;
+
                 }
                 if (strat == "") { strat = app.strategy; }
             }
@@ -374,7 +380,7 @@ namespace TradingBrain.Models
             {
                 var exc = ex;
             }
-            if (workerList[0].strategy == "RSI")
+            if (workerList[0].strategy == "RSI" || workerList[0].strategy == "REI")
             {
                 t.Interval = GetIntervalWithResolution("HOUR");
             }
@@ -503,7 +509,10 @@ namespace TradingBrain.Models
             {
                 testOffset = 15;
             }
-
+            if (strat == "REI")
+            {
+                testOffset = 25;
+            }
             return ((now.Second > 30 ? 120 : 60) - now.Second + testOffset) * 1000 - now.Millisecond;
         }
 
@@ -571,7 +580,7 @@ namespace TradingBrain.Models
             var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
 
             string nme = strategy;
-            if (strategy == "RSI")
+            if (strategy == "RSI" || strategy == "REI")
             {
                 nme += "_" + resolution;
             }
@@ -621,7 +630,7 @@ namespace TradingBrain.Models
                         break;
                 }
                 await SetupDB(epic);
-                if (strategy == "RSI")
+                if (strategy == "RSI" || strategy == "REI")
                 {
                     minute_container = the_db.GetContainer("Candles_RSI");
                 }

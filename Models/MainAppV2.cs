@@ -259,35 +259,39 @@ namespace TradingBrain.Models
                 {
                     currentStatus.inputs_RSI = tb.runDetails.inputs_RSI;
                     currentStatus.hoursToTrade = tb.lastRunVars.hoursToTrade;
+                }else if (this.strategy == "REI")
+                {
+                    currentStatus.inputs_REI = tb.runDetails.inputs_REI;
+                    currentStatus.hoursToTrade = tb.lastRunVars.hoursToTrade;
                 }
-                //object v = ConfigurationManager.GetSection("appSettings");
-                //if (v != null)
-                //{
-                //    NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
+                    //object v = ConfigurationManager.GetSection("appSettings");
+                    //if (v != null)
+                    //{
+                    //    NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
 
-                //    if (igWebApiConnectionConfig != null)
-                //    {
-                //        //string region = igWebApiConnectionConfig["region"] ?? "test";
-                //        //igAccountId = igWebApiConnectionConfig["accountId." + region] ?? "";
-                //        string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
-                //        clsCommonFunctions.AddStatusMessage(env, "INFO");
-                //        SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
+                    //    if (igWebApiConnectionConfig != null)
+                    //    {
+                    //        //string region = igWebApiConnectionConfig["region"] ?? "test";
+                    //        //igAccountId = igWebApiConnectionConfig["accountId." + region] ?? "";
+                    //        string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
+                    //        clsCommonFunctions.AddStatusMessage(env, "INFO");
+                    //        SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
 
-                //        igRestApiClient = new IgRestApiClient(env, smartDispatcher);
+                    //        igRestApiClient = new IgRestApiClient(env, smartDispatcher);
 
-                //        // keep this bit
-                //        string[] epics = { epic };
-                //        this.EpicList = clsCommonFunctions.GetEpicList(epics);
+                    //        // keep this bit
+                    //        string[] epics = { epic };
+                    //        this.EpicList = clsCommonFunctions.GetEpicList(epics);
 
-                //        // Start the lightstreamer bits in a new thread
+                    //        // Start the lightstreamer bits in a new thread
 
-                //        clsCommonFunctions.AddStatusMessage("Starting lightstreamer in a new thread", "INFO");
-                //        Thread t = new Thread(new ThreadStart(StartLightstreamer));
-                //        t.Start();
+                    //        clsCommonFunctions.AddStatusMessage("Starting lightstreamer in a new thread", "INFO");
+                    //        Thread t = new Thread(new ThreadStart(StartLightstreamer));
+                    //        t.Start();
 
 
-                //Broadcast message that we are running
-                currentStatus.status = "running";
+                    //Broadcast message that we are running
+                    currentStatus.status = "running";
                 currentStatus.strategy = this.strategy;
                 currentStatus.resolution = this.resolution;
                 Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
@@ -299,7 +303,7 @@ namespace TradingBrain.Models
 
                 this.ti.AutoReset = false;
 
-                if (strategy == "RSI")
+                if (strategy == "RSI" || strategy == "REI")
                 {
                     this.ti.Elapsed += new System.Timers.ElapsedEventHandler(RunCode_RSI);
                     this.ti.Interval = GetIntervalWithResolution(resolution);

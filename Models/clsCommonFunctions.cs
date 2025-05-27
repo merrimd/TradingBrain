@@ -782,7 +782,7 @@ namespace TradingBrain.Models
    
 
             string logName = epicName + "." + strategy;
-            if (strategy == "RSI")
+            if (strategy == "RSI" || strategy == "REI")
             {
                 logName += "_" + resolution;
             }
