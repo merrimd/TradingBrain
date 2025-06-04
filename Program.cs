@@ -295,7 +295,7 @@ namespace TradingBrain.Models
 
                     //SetupDB(pms.epic);
 
-                    if (tbepic.strategy == "RSI" || tbepic.strategy == "REI")
+                    if (tbepic.strategy == "RSI" || tbepic.strategy == "REI" || tbepic.strategy == "RSI-ATR")
                     {
                         minute_container = the_db.GetContainer("Candles_RSI");
                     }
@@ -323,7 +323,7 @@ namespace TradingBrain.Models
             System.Timers.Timer ti = new System.Timers.Timer();
             ti.AutoReset = false;
 
-            if (epcs[0].strategy == "RSI" || epcs[0].strategy == "REI") 
+            if (epcs[0].strategy == "RSI" || epcs[0].strategy == "REI" || epcs[0].strategy == "RSI-ATR") 
             {
                 ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
                 ti.Interval = GetIntervalWithResolution("HOUR");
@@ -358,7 +358,10 @@ namespace TradingBrain.Models
                         task = Task.Run(() => app.RunCode_RSI(sender, e));
                         parallelTasks.Add(task);
                         break;
-
+                    case "RSI-ATR":
+                        task = Task.Run(() => app.RunCode_RSI_ATR(sender, e));
+                        parallelTasks.Add(task);
+                        break;
                     case "REI":
                         task = Task.Run(() => app.RunCode_REI(sender, e));
                         parallelTasks.Add(task);
@@ -380,7 +383,7 @@ namespace TradingBrain.Models
             {
                 var exc = ex;
             }
-            if (workerList[0].strategy == "RSI" || workerList[0].strategy == "REI")
+            if (workerList[0].strategy == "RSI" || workerList[0].strategy == "REI" || workerList[0].strategy == "RSI-ATR")
             {
                 t.Interval = GetIntervalWithResolution("HOUR");
             }
@@ -509,7 +512,7 @@ namespace TradingBrain.Models
             {
                 testOffset = 15;
             }
-            if (strat == "REI")
+            if (strat == "REI" || strat == "RSI-ATR")
             {
                 testOffset = 25;
             }
