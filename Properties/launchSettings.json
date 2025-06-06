@@ -2,7 +2,7 @@
   "profiles": {
     "TradingBrain": {
       "commandName": "Project",
-      "commandLineArgs": "IX.D.NASDAQ.CASH.IP SMA"
+      "commandLineArgs": "IX.D.CAC.DAILY.IP RSI-CUML HOUR"
     }
   }
 }

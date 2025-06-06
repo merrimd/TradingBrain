@@ -295,7 +295,7 @@ namespace TradingBrain.Models
 
                     //SetupDB(pms.epic);
 
-                    if (tbepic.strategy == "RSI" || tbepic.strategy == "REI" || tbepic.strategy == "RSI-ATR")
+                    if (tbepic.strategy == "RSI" || tbepic.strategy == "REI" || tbepic.strategy == "RSI-ATR" || tbepic.strategy == "RSI-CUML")
                     {
                         minute_container = the_db.GetContainer("Candles_RSI");
                     }
@@ -323,7 +323,7 @@ namespace TradingBrain.Models
             System.Timers.Timer ti = new System.Timers.Timer();
             ti.AutoReset = false;
 
-            if (epcs[0].strategy == "RSI" || epcs[0].strategy == "REI" || epcs[0].strategy == "RSI-ATR") 
+            if (epcs[0].strategy == "RSI" || epcs[0].strategy == "REI" || epcs[0].strategy == "RSI-ATR" || epcs[0].strategy == "RSI-CUML") 
             {
                 ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
                 ti.Interval = GetIntervalWithResolution("HOUR");
@@ -362,6 +362,10 @@ namespace TradingBrain.Models
                         task = Task.Run(() => app.RunCode_RSI_ATR(sender, e));
                         parallelTasks.Add(task);
                         break;
+                    case "RSI-CUML":
+                        task = Task.Run(() => app.RunCode_RSI_CUML(sender, e));
+                        parallelTasks.Add(task);
+                        break;
                     case "REI":
                         task = Task.Run(() => app.RunCode_REI(sender, e));
                         parallelTasks.Add(task);
@@ -383,7 +387,7 @@ namespace TradingBrain.Models
             {
                 var exc = ex;
             }
-            if (workerList[0].strategy == "RSI" || workerList[0].strategy == "REI" || workerList[0].strategy == "RSI-ATR")
+            if (workerList[0].strategy == "RSI" || workerList[0].strategy == "REI" || workerList[0].strategy == "RSI-ATR" || workerList[0].strategy == "RSI-CUML")
             {
                 t.Interval = GetIntervalWithResolution("HOUR");
             }
@@ -512,7 +516,7 @@ namespace TradingBrain.Models
             {
                 testOffset = 15;
             }
-            if (strat == "REI" || strat == "RSI-ATR")
+            if (strat == "REI" || strat == "RSI-ATR" || strat == "RSI-CUML")
             {
                 testOffset = 25;
             }
