@@ -45,7 +45,7 @@ namespace TradingBrain.Models
         public static Microsoft.Azure.Cosmos.Container? hourly_container;
         public static Microsoft.Azure.Cosmos.Container? minute_container;
         public static Microsoft.Azure.Cosmos.Container? TicksContainer;
-        public static Microsoft.Azure.Cosmos.Container? candlesContainer;
+        //public static Microsoft.Azure.Cosmos.Container? candlesContainer;
         public static Microsoft.Azure.Cosmos.Container? trade_container;
         public static Database? the_db;
         public static Database? the_app_db;
@@ -78,7 +78,7 @@ namespace TradingBrain.Models
                     hourly_container = the_db.GetContainer("HourlyCandle");
                     minute_container = the_db.GetContainer("MinuteCandle");
                     TicksContainer = the_db.GetContainer("CandleTicks");
-                    candlesContainer = the_db.GetContainer("Candles");
+                    //candlesContainer = the_db.GetContainer("Candles");
                     trade_container = the_app_db.GetContainer("TradingBrainTrades");
 
                 }
@@ -117,7 +117,7 @@ namespace TradingBrain.Models
                         trade_container = the_app_db.GetContainer("TradingBrainTrades");
                     }
 
-                    candlesContainer = the_db.GetContainer("Candles");
+                    //candlesContainer = the_db.GetContainer("Candles");
 
 
                 }
@@ -187,11 +187,14 @@ namespace TradingBrain.Models
 
             List<tbEpics> epcs = new List<tbEpics>();
 
+
+            //igContainer.tbClient.ConnectToRest();
+
              object v = ConfigurationManager.GetSection("appSettings");
             if (v != null)
             {
 
-
+                
                 NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
 
                 if (igWebApiConnectionConfig != null)
@@ -295,7 +298,11 @@ namespace TradingBrain.Models
 
                     //SetupDB(pms.epic);
 
-                    if (tbepic.strategy == "RSI" || tbepic.strategy == "REI" || tbepic.strategy == "RSI-ATR" || tbepic.strategy == "RSI-CUML")
+                    if (tbepic.strategy == "RSI" || 
+                        tbepic.strategy == "REI" || 
+                        tbepic.strategy == "RSI-ATR" || 
+                        tbepic.strategy == "RSI-CUML" || 
+                        tbepic.strategy == "CASEYC")
                     {
                         minute_container = the_db.GetContainer("Candles_RSI");
                     }
@@ -323,7 +330,11 @@ namespace TradingBrain.Models
             System.Timers.Timer ti = new System.Timers.Timer();
             ti.AutoReset = false;
 
-            if (epcs[0].strategy == "RSI" || epcs[0].strategy == "REI" || epcs[0].strategy == "RSI-ATR" || epcs[0].strategy == "RSI-CUML") 
+            if (epcs[0].strategy == "RSI" || 
+                epcs[0].strategy == "REI" || 
+                epcs[0].strategy == "RSI-ATR" || 
+                epcs[0].strategy == "RSI-CUML" || 
+                epcs[0].strategy == "CASEYC") 
             {
                 ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
                 ti.Interval = GetIntervalWithResolution("HOUR");
@@ -366,6 +377,10 @@ namespace TradingBrain.Models
                         task = Task.Run(() => app.RunCode_RSI_CUML(sender, e));
                         parallelTasks.Add(task);
                         break;
+                    case "CASEYC":
+                        task = Task.Run(() => app.RunCode_CASEYC(sender, e));
+                        parallelTasks.Add(task);
+                        break;
                     case "REI":
                         task = Task.Run(() => app.RunCode_REI(sender, e));
                         parallelTasks.Add(task);
@@ -387,7 +402,11 @@ namespace TradingBrain.Models
             {
                 var exc = ex;
             }
-            if (workerList[0].strategy == "RSI" || workerList[0].strategy == "REI" || workerList[0].strategy == "RSI-ATR" || workerList[0].strategy == "RSI-CUML")
+            if (workerList[0].strategy == "RSI" || 
+                workerList[0].strategy == "REI" || 
+                workerList[0].strategy == "RSI-ATR" || 
+                workerList[0].strategy == "RSI-CUML" || 
+                workerList[0].strategy == "CASEYC")
             {
                 t.Interval = GetIntervalWithResolution("HOUR");
             }
@@ -480,7 +499,7 @@ namespace TradingBrain.Models
             }
             else
             {
-                nextRun = nextRun.AddSeconds(15);
+                nextRun = nextRun.AddSeconds(75);
                 // Make the hour_2, hour_3 and hour_4 resolutions run 15 seconds later to ensure all the candles have been created.
                 //if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
                 //{

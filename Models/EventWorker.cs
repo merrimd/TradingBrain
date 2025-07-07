@@ -193,7 +193,11 @@ namespace TradingBrain.Models
 
                 //SetupDB(pms.epic);
 
-                if (pms.strategy == "RSI" || pms.strategy == "REI" || pms.strategy == "RSI-ATR" || pms.strategy == "RSI-CUML")
+                if (pms.strategy == "RSI" || 
+                    pms.strategy == "REI" || 
+                    pms.strategy == "RSI-ATR" ||
+                    pms.strategy == "RSI-CUML" ||
+                    pms.strategy == "CASEYC")
                 {
                     minute_container = the_db.GetContainer("Candles_RSI");
                 }
@@ -1123,7 +1127,11 @@ namespace TradingBrain.Models
                                             _thisApp.model.thisModel.currentTrade.targetPrice = orderValues.targetPrice;
                                         }
 
-                                        if (_thisApp.strategy == "RSI" || _thisApp.strategy == "REI" || _thisApp.strategy == "RSI-ATR" || _thisApp.strategy == "RSI-CUML")
+                                        if (_thisApp.strategy == "RSI" || 
+                                            _thisApp.strategy == "REI" || 
+                                            _thisApp.strategy == "RSI-ATR" || 
+                                            _thisApp.strategy == "RSI-CUML" || 
+                                            _thisApp.strategy == "CASEYC")
                                         {
                                             _thisApp.currentTrade.limitLevel = Convert.ToDecimal(tsm.Limitlevel);
                                             _thisApp.model.thisModel.currentTrade.targetPrice = Convert.ToDecimal(tsm.Limitlevel);

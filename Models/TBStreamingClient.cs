@@ -1,37 +1,38 @@
 ﻿using com.lightstreamer.client;
+using dto.endpoint.accountswitch;
+using dto.endpoint.auth.session.v2;
+using IGModels;
+using IGWebApiClient;
+using IGWebApiClient.Common;
+using IGWebApiClient.Models;
+using Lightstreamer.DotNet.Client;
+using Lightstreamer.DotNet.Client.Test;
 using Lightstreamer.DotNet.Logging.Log; 
+using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Identity.Client;
+using Newtonsoft.Json;
+using NLog;
 using System;
+using System.CodeDom;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Configuration;
+using System.Diagnostics.Eventing.Reader;
 using System.Linq;
+using System.Net.NetworkInformation;
+using System.Runtime.InteropServices.JavaScript;
+using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
-using Lightstreamer.DotNet.Client.Test;
-using System.Runtime.InteropServices.JavaScript;
-using System.Net.NetworkInformation;
-using IGWebApiClient;
-using IGWebApiClient.Models;
-
-using dto.endpoint.auth.session.v2;
-using IGWebApiClient.Common;
-using System.Collections.ObjectModel;
-using NLog;
-using System.Collections.Specialized;
-using System.Configuration;
-using IGModels;
-using Lightstreamer.DotNet.Client;
-using Newtonsoft.Json;
-using System.CodeDom;
-using Microsoft.AspNetCore.Components.Forms;
+using System.Timers;
 using TradingBrain.Models;
-using System.Diagnostics.Eventing.Reader;
-using System.ComponentModel;
-using Microsoft.Azure.Cosmos;
-using Container = Microsoft.Azure.Cosmos.Container;
-using static TradingBrain.Models.clsCommonFunctions;
-using dto.endpoint.accountswitch;
-using Microsoft.Identity.Client;
 using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
-using System.Security.Principal;
+using static TradingBrain.Models.clsCommonFunctions;
+using Container = Microsoft.Azure.Cosmos.Container;
+using LogLevel = NLog.LogLevel;
 namespace TradingBrain.Models
 {
 
@@ -74,15 +75,14 @@ namespace TradingBrain.Models
                 //var logfile = new NLog.Targets.FileTarget("logfile") { FileName = filename };
                 //var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
 
- 
+
                 //config.AddRule(LogLevel.Warn, LogLevel.Fatal, logconsole);
                 //config.AddRule(LogLevel.Trace, LogLevel.Fatal, logfile);
 
                 //NLog.LogManager.Configuration = config;
-                
+
                 //LightstreamerClient.setLoggerProvider(new Log4NetLoggerProviderWrapper());
 
-                //LightstreamerClient.setLoggerProvider(new );
                 bool connectionEstablished = false;
 
                 SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
@@ -278,6 +278,14 @@ namespace TradingBrain.Models
                     }
 
 
+                    // Run a timer for every 10 mins to keep the connection alive.
+
+                    // set a timeout to run this again in 30 mins. this will keep the session active.
+                    clsCommonFunctions.AddStatusMessage("Setting a timer so we can re run the AccountDetails after 10 mins to stop it expiring.", "INFO" );
+                    System.Timers.Timer timer = new System.Timers.Timer(600000); // 10 mins
+                    timer.Elapsed += OnTimedEvent;
+                    timer.AutoReset = true; // Run only once
+                    timer.Enabled = true;
                     //get any current positions
 
                     //DTM
@@ -308,6 +316,25 @@ namespace TradingBrain.Models
 
 
 
+        }
+        public void OnTimedEvent(object source, ElapsedEventArgs e)
+        {
+            clsCommonFunctions.AddStatusMessage("Calling the AccountDetails API to ensure token doesn't expire", "INFO");
+            try
+            {
+                IgResponse<dto.endpoint.accountbalance.AccountDetailsResponse> ret = _igContainer.igRestApiClient.accountBalance().Result;
+                if (ret != null)
+                {
+                    clsCommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO");
+
+                    if (ret.StatusCode.ToString() == "Forbidden")
+                    {
+                        // re connect to API
+
+                    }
+                }
+            }
+            catch (Exception ex) { }
         }
         private int phase = 0;
 
@@ -1029,7 +1056,8 @@ namespace TradingBrain.Models
                 //    new string[12] { "stock_name", "last_price", "time", "pct_change", "bid_quantity", "bid", "ask", "ask_quantity", "min", "max", "ref_price", "open_price" });
                 //subscription.DataAdapter = "QUOTE_ADAPTER";
                 subscription.RequestedSnapshot = "no";
-
+                //subscription.RequestedMaxFrequency = "unfiltered";
+                //subscription.RequestedBufferSize = "50";
                 subscription.addListener(new TradeSubscriptionListener(this, this.phase));
                 client.subscribe(subscription);
             }
