@@ -363,6 +363,7 @@ namespace TradingBrain.Models
             foreach (MainApp app in workerList)
             {
                 app.GetPositions();
+
                 Task<runRet> task;
                 switch (app.strategy){
                     case "RSI":

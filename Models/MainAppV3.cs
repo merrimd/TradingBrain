@@ -888,23 +888,23 @@ namespace TradingBrain.Models
                         {
                             try
                             {
-                                clsCommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                //clsCommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                                 double nettPosition = lastTradeValue + lastTradeSuppValue;
-                                clsCommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
+                                //clsCommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
 
                                 if (nettPosition <= 0)
                                 {
-                                    model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss + (double)Math.Abs(nettPosition);
+                                    //model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss + (double)Math.Abs(nettPosition);
                                 }
                                 else
                                 {
-                                    model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss - (double)Math.Abs(nettPosition);
-                                    if (model.modelVar.carriedForwardLoss < 0) { model.modelVar.carriedForwardLoss = 0; }
-                                    model.modelVar.currentGain += Math.Max(nettPosition - model.modelVar.carriedForwardLoss, 0);
+                                    //model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss - (double)Math.Abs(nettPosition);
+                                    //if (model.modelVar.carriedForwardLoss < 0) { model.modelVar.carriedForwardLoss = 0; }
+                                    //model.modelVar.currentGain += Math.Max(nettPosition - model.modelVar.carriedForwardLoss, 0);
                                 }
 
-                                tb.lastRunVars.carriedForwardLoss = model.modelVar.carriedForwardLoss;
-                                tb.lastRunVars.currentGain = model.modelVar.currentGain;
+                                //tb.lastRunVars.carriedForwardLoss = model.modelVar.carriedForwardLoss;
+                                //tb.lastRunVars.currentGain = model.modelVar.currentGain;
 
                                 // check to see if the trade just finished lost at max quantity, if so then we need to reset the vars
 
@@ -930,7 +930,7 @@ namespace TradingBrain.Models
 
 
 
-                                await tb.SaveDocument(the_app_db);
+                                //await tb.SaveDocument(the_app_db);
 
                                 clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
@@ -4407,25 +4407,25 @@ namespace TradingBrain.Models
                         {
                             try
                             {
-                                clsCommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                //clsCommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                                 double nettPosition = lastTradeValue + lastTradeSuppValue;
-                                clsCommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
+                                //clsCommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
 
                                 if (nettPosition <= 0)
                                 {
-                                    model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss + (double)Math.Abs(nettPosition);
+                                    //model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss + (double)Math.Abs(nettPosition);
                                     model.modelVar.quantityMultiplier = 1;
                                 }
                                 else
                                 {
-                                    model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss - (double)Math.Abs(nettPosition);
-                                    if (model.modelVar.carriedForwardLoss < 0) { model.modelVar.carriedForwardLoss = 0; }
-                                    model.modelVar.currentGain += Math.Max(nettPosition - model.modelVar.carriedForwardLoss, 0);
+                                    //model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss - (double)Math.Abs(nettPosition);
+                                    //if (model.modelVar.carriedForwardLoss < 0) { model.modelVar.carriedForwardLoss = 0; }
+                                    //model.modelVar.currentGain += Math.Max(nettPosition - model.modelVar.carriedForwardLoss, 0);
                                     if (model.modelVar.quantityMultiplier == 1 && model.modelVar.carriedForwardLoss == 0) { model.modelVar.quantityMultiplier = 2; }
                                 }
 
-                                tb.lastRunVars.carriedForwardLoss = model.modelVar.carriedForwardLoss;
-                                tb.lastRunVars.currentGain = model.modelVar.currentGain;
+                                //tb.lastRunVars.carriedForwardLoss = model.modelVar.carriedForwardLoss;
+                                //tb.lastRunVars.currentGain = model.modelVar.currentGain;
                                 tb.lastRunVars.numCandlesOnMarket = 0;
                                 tb.lastRunVars.quantityMultiplier = model.modelVar.quantityMultiplier;
                                 clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
@@ -4464,7 +4464,10 @@ namespace TradingBrain.Models
                         model.modelVar.maxQuantityMultiplier = tb.lastRunVars.maxQuantityMultiplier;
                         model.modelVar.carriedForwardLoss = tb.lastRunVars.carriedForwardLoss;
                         model.modelVar.quantityMultiplier = tb.lastRunVars.quantityMultiplier;
-
+                        //model.modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+                        //modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+                        modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+                        model.modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
                         //model.modelVar = tb.lastRunVars;
 
                         model.startTime = dtNow;
@@ -4488,12 +4491,12 @@ namespace TradingBrain.Models
                         currentStatus.maxQuantityMultiplier = tb.lastRunVars.maxQuantityMultiplier;
                         currentStatus.carriedForwardLoss = tb.lastRunVars.carriedForwardLoss;
                         currentStatus.quantityMultiplier = tb.lastRunVars.quantityMultiplier;
-
+                        currentStatus.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
                         modelInstanceInputs_RSI thisInput = new modelInstanceInputs_RSI();
 
                         //bigWatch.Restart();
 
-
+                  
                         /////////////////////////////////////////////////////////
                         // using the candle time determine which inputs to use //
                         /////////////////////////////////////////////////////////
