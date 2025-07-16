@@ -786,7 +786,8 @@ namespace TradingBrain.Models
                 strategy == "REI" || 
                 strategy == "RSI-ATR" || 
                 strategy == "RSI-CUML" || 
-                strategy == "CASEYC")
+                strategy == "CASEYC" ||
+                strategy == "CASEYCSHORT")
             {
                 logName += "_" + resolution;
             }
