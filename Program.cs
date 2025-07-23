@@ -202,17 +202,19 @@ namespace TradingBrain.Models
 
                     region = igWebApiConnectionConfig["region"] ?? "test";
                     string settingEpics = igWebApiConnectionConfig["epics"] ?? "IX.D.NASDAQ.CASH.IP|SMA";
-
+                    List<string> epicList = new List<string>();
                     if (settingEpics != "IX.D.NASDAQ.CASH.IP|SMA")
                     {
                         foreach (string tmp in settingEpics.Split(",").ToList())
                         {
                             epcs.Add(new tbEpics(tmp));
+                            epicList.Add(tmp);
                         }
                     }
                     else
                     {
                         epcs.Add(new tbEpics("IX.D.NASDAQ.CASH.IP|SMA"));
+                        epicList.Add("IX.D.NASDAQ.CASH.IP|SMA");
                     }
                     string[] epics = { epcs[0].epic };
                     //string region = igWebApiConnectionConfig["region"] ?? "test";
@@ -225,7 +227,7 @@ namespace TradingBrain.Models
 
                     // keep this bit
                     //string[] epics = { epic };
-                    //igContainer.EpicList = clsCommonFunctions.GetEpicList(epics);
+                    igContainer.EpicList = clsCommonFunctions.GetEpicList(epicList.ToArray());
 
                     // Start the lightstreamer bits in a new thread
 

@@ -24,6 +24,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices.JavaScript;
+using System.Security.Cryptography.Xml;
 using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
@@ -53,6 +54,7 @@ namespace TradingBrain.Models
         public bool connectionEstablished;
         public bool FirstConfirmUpdate;
         public IGContainer _igContainer;
+        public int currentSecond = 0;
         public TBStreamingClient(
                 string pushServerUrl,
                 string forceT,
@@ -407,7 +409,7 @@ namespace TradingBrain.Models
             ph = Interlocked.Increment(ref this.phase);
             this.LogIn();
             this.Connect(ph);
-            //this.ChartSubscribe();
+            this.ChartSubscribe();
             this.TradeSubscribe(CurrentAccountId);
             this._igContainer.igAccountId = CurrentAccountId;
                 // this.subscribeChart()
@@ -467,7 +469,7 @@ namespace TradingBrain.Models
             var epic = update.ItemName.Replace("L1:", "").Replace("CHART:", "").Replace(":TICK", "");
             try
             {
-                //var wlmUpdate = update ;
+                var wlmUpdate = update ;
 
 
 
@@ -478,33 +480,43 @@ namespace TradingBrain.Models
                 //        item.counter++;
                 //    }
                 //}
+                clsChartUpdateMini currentTick = new clsChartUpdateMini();
+
+                if (wlmUpdate.getValue("BID") != "" && wlmUpdate.getValue("OFR") != "")
+                {
+                    //clsChartUpdateMini objUpdate = new clsChartUpdateMini();
+                    if (wlmUpdate.getValue("BID") != null && wlmUpdate.getValue("OFR") != null)
+                    {
+                       currentTick.Epic = epic;
+                        currentTick.Bid = Convert.ToDecimal(wlmUpdate.getValue("BID"));
+                        currentTick.Offer = Convert.ToDecimal(wlmUpdate.getValue("OFR"));
+                        //currentTick.LTP = Convert.ToDecimal(wlmUpdate.getValue("LTP"));
+                        //currentTick.LTV = Convert.ToDecimal(wlmUpdate.getValue("LTV"));
+                        //currentTick.TTV = Convert.ToDecimal(wlmUpdate.getValue("TTV"));
+                        if (wlmUpdate.getValue("UTM") != null)
+                        {
+                            currentTick.UTM = EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"));
+                        }
+                        //currentTick.DAY_OPEN_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_OPEN_MID"));
+                        //currentTick.DAY_NET_CHG_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_NET_CHG_MID"));
+                        //currentTick.DAY_PERC_CHG_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_PERC_CHG_MID"));
+                        //currentTick.DAY_HIGH = Convert.ToDecimal(wlmUpdate.getValue("DAY_HIGH"));
+                        //currentTick.DAY_LOW = Convert.ToDecimal(wlmUpdate.getValue("DAY_LOW"));
+                        int thisSecond = currentTick.UTM.Value.Second;
+                        if (thisSecond != currentSecond)
+                        {
+                           // clsCommonFunctions.SendBroadcast("PriceChange", JsonConvert.SerializeObject(currentTick), _igContainer.the_app_db);
+                            //Console.WriteLine("PriceChange: " + JsonConvert.SerializeObject(currentTick));
+                            currentSecond = thisSecond;
+                        }
+    
+                        
+                        //Console.WriteLine("PriceChange: " + JsonConvert.SerializeObject(currentTick));
+                    }
 
 
-                //if (wlmUpdate.getValue("BID") != "" && wlmUpdate.getValue("OFR") != "")
-                //{
-                //    clsChartUpdate objUpdate = new clsChartUpdate();
-                //    if (wlmUpdate.getValue("BID") != null && wlmUpdate.getValue("OFR") != null)
-                //    {
-                //        _thisApp.currentTick.Epic = epic;
-                //        _thisApp.currentTick.Bid = Convert.ToDecimal(wlmUpdate.getValue("BID"));
-                //        _thisApp.currentTick.Offer = Convert.ToDecimal(wlmUpdate.getValue("OFR"));
-                //        _thisApp.currentTick.LTP = Convert.ToDecimal(wlmUpdate.getValue("LTP"));
-                //        _thisApp.currentTick.LTV = Convert.ToDecimal(wlmUpdate.getValue("LTV"));
-                //        _thisApp.currentTick.TTV = Convert.ToDecimal(wlmUpdate.getValue("TTV"));
-                //        if (wlmUpdate.getValue("UTM") != null)
-                //        {
-                //            _thisApp.currentTick.UTM = EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"));
-                //        }
-                //        _thisApp.currentTick.DAY_OPEN_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_OPEN_MID"));
-                //        _thisApp.currentTick.DAY_NET_CHG_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_NET_CHG_MID"));
-                //        _thisApp.currentTick.DAY_PERC_CHG_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_PERC_CHG_MID"));
-                //        _thisApp.currentTick.DAY_HIGH = Convert.ToDecimal(wlmUpdate.getValue("DAY_HIGH"));
-                //        _thisApp.currentTick.DAY_LOW = Convert.ToDecimal(wlmUpdate.getValue("DAY_LOW"));
-                //    }
 
-
-
-                //}
+                }
 
 
             }
@@ -611,6 +623,9 @@ namespace TradingBrain.Models
                     msg.updateData = inputData;
                     msg.updateType = "UPDATE";
                     runRet taskRet = await wrk.iGUpdate(msg);
+
+                    clsCommonFunctions.SendBroadcast("UpdateOPU", inputData, _igContainer.the_app_db);
+                    //Console.WriteLine("UpdateOPU: " + inputData);
                 }
             }
 
@@ -814,6 +829,8 @@ namespace TradingBrain.Models
                     msg.updateData = inputData;
                     msg.updateType = "CONFIRM";
                     runRet taskRet = await wrk.iGUpdate(msg);
+                    clsCommonFunctions.SendBroadcast("UpdateConfirm", inputData, _igContainer.the_app_db);
+                    //Console.WriteLine("updateConfirm: " + inputData);
                 }
             }
             //try
@@ -965,7 +982,7 @@ namespace TradingBrain.Models
                     if (ph != this.phase)
                         return;
                     ph = Interlocked.Increment(ref this.phase);
-                    //client.addListener(new ChartConnectionListener(this, ph));
+                    client.addListener(new ChartConnectionListener(this, ph));
                     client.addListener(new TradeConnectionListener(this, ph));
                     client.connect();
                     connected = true;
@@ -1012,11 +1029,30 @@ namespace TradingBrain.Models
             try
             {
                 string chartName = "CHART:IX.D.NASDAQ.CASH.IP:TICK";
-                //if (_igContainer.epicName != "")
+
+                List<string> epics = new List<string>();
+
+                foreach(clsEpicList epic in _igContainer.EpicList)
+                {
+                    string tmpEpic = "";
+                    if (epic.Epic.Contains("|"))
+                    {
+                        List<string> tmpLst = epic.Epic.Split("|").ToList();
+                        tmpEpic = tmpLst[0];
+                    }
+                    else
+                    {
+                        tmpEpic = epic.Epic;
+                    }
+                    epics.Add("CHART:" + tmpEpic + ":TICK");
+       
+                }
+                //if (_igContainer.ep != "")
                 //{
                 //    chartName = "CHART:" + _igContainer.epicName + ":TICK";
                 //}
-                subscription = new Subscription("DISTINCT", new string[1] { chartName }, new string[11] { "BID", "OFR", "LTP", "LTV", "TTV", "UTM", "DAY_OPEN_MID", "DAY_NET_CHG_MID", "DAY_PERC_CHG_MID", "DAY_HIGH", "DAY_LOW" });
+                //subscription = new Subscription("DISTINCT", new string[1] { chartName }, new string[11] { "BID", "OFR", "LTP", "LTV", "TTV", "UTM", "DAY_OPEN_MID", "DAY_NET_CHG_MID", "DAY_PERC_CHG_MID", "DAY_HIGH", "DAY_LOW" });
+                subscription = new Subscription("DISTINCT", epics.ToArray(), new string[3] { "BID", "OFR",  "UTM" });
 
 
                 //subscription = new Subscription("MERGE", new string[30] { "item1", "item2", "item3", "item4", "item5", "item6", "item7", "item8", "item9", "item10", "item11", "item12", "item13", "item14", "item15", "item16", "item17", "item18", "item19", "item20", "item21", "item22", "item23", "item24", "item25", "item26", "item27", "item28", "item29", "item30" },

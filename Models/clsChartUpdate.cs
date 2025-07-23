@@ -168,6 +168,22 @@ namespace TradingBrain.Models
         }
 
     }
+    public class clsChartUpdateMini
+    {
+        public string Epic { get; set; }
+        public Decimal Bid { get; set; }
+        public Decimal Offer { get; set; }
+        public DateTime? UTM { get; set; }
+
+
+        public clsChartUpdateMini()
+        {
+            this.Epic = "";
+            this.Bid = new Decimal();
+            this.Offer = new Decimal();
+            this.UTM = DateTime.MinValue;
+        }
+    }
 }
 
 
