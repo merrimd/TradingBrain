@@ -271,7 +271,8 @@ namespace TradingBrain.Models
                     this.strategy == "RSI-ATR" || 
                     this.strategy == "RSI-CUML" || 
                     this.strategy == "CASEYC" ||
-                    this.strategy == "CASEYCSHORT")
+                    this.strategy == "CASEYCSHORT" ||
+                    this.strategy == "CASEYCEQUITIES")
                 {
                     currentStatus.inputs_RSI = tb.runDetails.inputs_RSI;
                     currentStatus.hoursToTrade = tb.lastRunVars.hoursToTrade;
@@ -2541,7 +2542,8 @@ namespace TradingBrain.Models
                                             this.strategy == "RSI-ATR" || 
                                             this.strategy == "RSI-CUML" || 
                                             this.strategy == "CASEYC" ||
-                                            this.strategy == "CASEYCSHORT")
+                                            this.strategy == "CASEYCSHORT" ||
+                                            this.strategy == "CASEYCEQUITIES")
                                         {
                                             this.currentTrade.limitLevel = Convert.ToDecimal(tsm.Limitlevel);
                                             this.model.thisModel.currentTrade.targetPrice = Convert.ToDecimal(tsm.Limitlevel);

@@ -305,7 +305,8 @@ namespace TradingBrain.Models
                         tbepic.strategy == "RSI-ATR" || 
                         tbepic.strategy == "RSI-CUML" || 
                         tbepic.strategy == "CASEYC" ||
-                        tbepic.strategy == "CASEYCSHORT")
+                        tbepic.strategy == "CASEYCSHORT" ||
+                        tbepic.strategy == "CASEYCEQUITIES")
                     {
                         minute_container = the_db.GetContainer("Candles_RSI");
                     }
@@ -338,7 +339,8 @@ namespace TradingBrain.Models
                 epcs[0].strategy == "RSI-ATR" || 
                 epcs[0].strategy == "RSI-CUML" || 
                 epcs[0].strategy == "CASEYC" ||
-                epcs[0].strategy == "CASEYCSHORT") 
+                epcs[0].strategy == "CASEYCSHORT" ||
+                epcs[0].strategy == "CASEYCEQUITIES") 
             {
                 ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
                 ti.Interval = GetIntervalWithResolution("HOUR");
@@ -386,6 +388,10 @@ namespace TradingBrain.Models
                         task = Task.Run(() => app.RunCode_CASEYC(sender, e));
                         parallelTasks.Add(task);
                         break;
+                    case "CASEYCEQUITIES":
+                        task = Task.Run(() => app.RunCode_CASEYC(sender, e));
+                        parallelTasks.Add(task);
+                        break;
                     case "CASEYCSHORT":
                         task = Task.Run(() => app.RunCode_CASEYCSHORT(sender, e));
                         parallelTasks.Add(task);
@@ -416,7 +422,8 @@ namespace TradingBrain.Models
                 workerList[0].strategy == "RSI-ATR" || 
                 workerList[0].strategy == "RSI-CUML" || 
                 workerList[0].strategy == "CASEYC" ||
-                workerList[0].strategy == "CASEYCSHORT")
+                workerList[0].strategy == "CASEYCSHORT" ||
+                workerList[0].strategy == "CASEYCEQUITIES")
             {
                 t.Interval = GetIntervalWithResolution("HOUR");
             }
