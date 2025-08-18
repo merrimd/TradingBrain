@@ -2,7 +2,7 @@
   "profiles": {
     "TradingBrain": {
       "commandName": "Project",
-      "commandLineArgs": "IX.D.CAC.DAILY.IP CASEYC HOUR"
+      "commandLineArgs": "IX.D.NASDAQ.CASH.IP"
     }
   }
 }

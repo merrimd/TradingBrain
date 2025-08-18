@@ -155,7 +155,7 @@ namespace TradingBrain.Models
         {
             try
             {
-                this.logName = clsCommonFunctions.GetLogName(epic, strategy, resolution);
+                this.logName = IGModels.clsCommonFunctions.GetLogName(epic, strategy, resolution);
                 MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
                 this._igContainer = igContainer;
                 this.ti = new System.Timers.Timer();
@@ -829,7 +829,7 @@ namespace TradingBrain.Models
        public async Task<runRet> RunCode(object sender, System.Timers.ElapsedEventArgs e)
         {
             runRet taskRet = new runRet();
-            this.logName = clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             bool liveMode = true;
             bool marketOpen = false;
@@ -1019,7 +1019,11 @@ namespace TradingBrain.Models
                         clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO", logName);
                         //thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadv2(tb.runDetails.inputs, thisSpread);
                         thisInput = tb.runDetails.inputs.FirstOrDefault(t => t.spread == thisSpread);
-
+                        if (thisInput == null)
+                        {
+                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}, trying spread 0" , "ERROR", logName);
+                            thisInput = tb.runDetails.inputs.FirstOrDefault(t => t.spread == 0);
+                        }
                         //clsCommonFunctions.AddStatusMessage($"Checking A ", "INFO", logName);
                         if (thisInput == null)
                         {
@@ -1652,7 +1656,7 @@ namespace TradingBrain.Models
 
             try
             {
-                this.logName = clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+                this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
                 MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
 
                 //    //var tradeSubUpdate = JsonConvert.DeserializeObject<LsTradeSubscriptionData>(inputData);
@@ -2623,7 +2627,7 @@ namespace TradingBrain.Models
         public  async void CONFIRMUpdate(string inputData, string itemName)
         {
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
-            this.logName = clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             try
             {
@@ -2774,7 +2778,7 @@ namespace TradingBrain.Models
             ///////////////////////////////
             ///
             runRet taskRet = new runRet();
-            this.logName = clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
 
@@ -3336,7 +3340,7 @@ namespace TradingBrain.Models
             ///////////////////////////////
             ///
             runRet taskRet = new runRet();
-            this.logName = clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
 
@@ -3831,7 +3835,7 @@ namespace TradingBrain.Models
             ///////////////////////////////
             ///
             runRet taskRet = new runRet();
-            this.logName = clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
 
@@ -4343,7 +4347,7 @@ namespace TradingBrain.Models
 
             AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
             runRet taskRet = new runRet();
-            this.logName = clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
 
@@ -4418,14 +4422,14 @@ namespace TradingBrain.Models
                                 if (nettPosition <= 0)
                                 {
                                     //model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss + (double)Math.Abs(nettPosition);
-                                    model.modelVar.quantityMultiplier = 1;
+                                    //model.modelVar.quantityMultiplier = 1;
                                 }
                                 else
                                 {
                                     //model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss - (double)Math.Abs(nettPosition);
                                     //if (model.modelVar.carriedForwardLoss < 0) { model.modelVar.carriedForwardLoss = 0; }
                                     //model.modelVar.currentGain += Math.Max(nettPosition - model.modelVar.carriedForwardLoss, 0);
-                                    if (model.modelVar.quantityMultiplier == 1 && model.modelVar.carriedForwardLoss == 0) { model.modelVar.quantityMultiplier = 2; }
+                                    //if (model.modelVar.quantityMultiplier == 1 && model.modelVar.carriedForwardLoss == 0) { model.modelVar.quantityMultiplier = 2; }
                                 }
 
                                 //tb.lastRunVars.carriedForwardLoss = model.modelVar.carriedForwardLoss;
@@ -4450,9 +4454,9 @@ namespace TradingBrain.Models
                         model.doLongs = tb.doLongs;
                         model.doShorts = tb.doShorts;
                         model.doSuppTrades = tb.doSuppTrades;
-
-                        // turn off nightingale
-                        model.nightingaleOn = false;
+                        
+                        // turn on nightingale
+                        model.nightingaleOn = true;
 
                         clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
                         clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
@@ -4472,6 +4476,11 @@ namespace TradingBrain.Models
                         //modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
                         modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
                         model.modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+
+                        model.modelVar.winningBetMultiple = tb.lastRunVars.winningBetMultiple;
+                        model.modelVar.maxBetMultiple = tb.lastRunVars.maxBetMultiple;
+                        model.thisModel.strategy = strategy;
+                        model.thisModel.resolution = resolution;
                         //model.modelVar = tb.lastRunVars;
 
                         model.startTime = dtNow;
@@ -4496,6 +4505,9 @@ namespace TradingBrain.Models
                         currentStatus.carriedForwardLoss = tb.lastRunVars.carriedForwardLoss;
                         currentStatus.quantityMultiplier = tb.lastRunVars.quantityMultiplier;
                         currentStatus.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+                        currentStatus.maxBetMultiple = tb.lastRunVars.maxBetMultiple;
+                        currentStatus.winningBetMultiple = tb.lastRunVars.winningBetMultiple;
+
                         modelInstanceInputs_RSI thisInput = new modelInstanceInputs_RSI();
 
                         //bigWatch.Restart();
@@ -4604,6 +4616,9 @@ namespace TradingBrain.Models
                                     //clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
                                     //clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
                                     clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"WinningBetMultiple - {model.modelVar.winningBetMultiple}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"maxBetMultiple - {model.modelVar.maxBetMultiple}", "DEBUG", logName);
+
 
                                     if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
                                     if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
@@ -4900,7 +4915,7 @@ namespace TradingBrain.Models
 
             AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
             runRet taskRet = new runRet();
-            this.logName = clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
 
@@ -5431,7 +5446,7 @@ namespace TradingBrain.Models
             ///////////////////////////////
             ///
             runRet taskRet = new runRet();
-            this.logName = clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
 
@@ -7290,7 +7305,7 @@ namespace TradingBrain.Models
                 //Container container = the_db.GetContainer("MinuteCandle");
 
                 var parameterizedQuery = new QueryDefinition(
-                    query: "SELECT top 1 c.openPrice.ask - c.openPrice.bid as spread FROM  c WHERE (c.epic = @epic or c.epic = ''  or NOT IS_DEFINED(c.epic) )  and  c.resolution = @resolution order by c.startDate DESC "
+                    query: "SELECT top 1 c.openPrice.ask - c.openPrice.bid as spread FROM  c WHERE (c.epic = @epic )  and  c.resolution = @resolution order by c.startDate DESC "
                 )
                     .WithParameter("@resolution", resolution)
                     .WithParameter("@epic",epicName)

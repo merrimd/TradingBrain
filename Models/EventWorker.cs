@@ -82,7 +82,7 @@ namespace TradingBrain.Models
                 Name = pams.epic + "|" + pams.strategy + "|" + pams.resolution
             };
              _thread.Start();
-            logName = clsCommonFunctions.GetLogName(pams.epic, pams.strategy, pams.resolution);
+            logName = IGModels.clsCommonFunctions.GetLogName(pams.epic, pams.strategy, pams.resolution);
             //threads.Add(_thread);
         }
         private void Run(EventParams pams)

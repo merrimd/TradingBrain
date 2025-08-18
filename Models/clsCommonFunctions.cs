@@ -30,13 +30,13 @@ namespace TradingBrain.Models
             //Console.WriteLine(message);
             switch (level)
             {
-                
+
                 case "ERROR":
-                     tbLog.Error(message);
+                    tbLog.Error(message);
                     break;
 
                 case "DEBUG":
-                     tbLog.Debug(message);
+                    tbLog.Debug(message);
                     break;
 
                 case "WARNING":
@@ -51,7 +51,7 @@ namespace TradingBrain.Models
 
 
         }
-        public static void AddStatusMessage(string message, string level ,string logName)
+        public static void AddStatusMessage(string message, string level, string logName)
         {
             //Logger tbLog = LogManager.GetLogger(logName);
             Logger tbLog = LogManager.GetCurrentClassLogger();
@@ -141,12 +141,7 @@ namespace TradingBrain.Models
         public static void DiscardTask(this Task ignored)
         {
         }
-        public static string GetLogName(string epic, string strategy, string resolution)
-        {
-            string ret = epic + "." + strategy;
-            if (resolution != "") { ret += "_" + resolution; }
-            return ret;
-        }
+
         public static string EncryptText(string ClearText, string Key, string IV)
         {
             byte[] bytKey = Encoding.UTF8.GetBytes(Key);

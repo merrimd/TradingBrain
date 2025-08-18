@@ -256,7 +256,7 @@ namespace TradingBrain.Models
          
             foreach (tbEpics tbepic in epcs)
             {
-                string jobId = clsCommonFunctions.GetLogName(tbepic.epic, tbepic.strategy, tbepic.resolution);
+                string jobId = IGModels.clsCommonFunctions.GetLogName(tbepic.epic, tbepic.strategy, tbepic.resolution);
                 MappedDiagnosticsLogicalContext.Set("jobId", jobId);
 
                 tbLog = LogManager.GetLogger(jobId);
@@ -497,6 +497,10 @@ namespace TradingBrain.Models
                     break;
 
             }
+
+            //Just to test
+            //nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, 0).AddMinutes(1);
+
             // Determine the next execution time: next hour or next half-hour
             //if (now.Minute < 30)
             //    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0); // Next half-hour
