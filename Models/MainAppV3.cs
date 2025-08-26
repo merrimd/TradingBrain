@@ -235,7 +235,7 @@ namespace TradingBrain.Models
 
                 // move this to the beginning of run code.
 
-                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(model.modelLogs.modelRunDate, model.exchangeClosedDates,futures).Result;   //IGModels.clsCommonFunctions.IsTradingOpen(model.modelLogs.modelRunDate);
+                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(model.modelLogs.modelRunDate, model.exchangeClosedDates,epicName,futures).Result;   //IGModels.clsCommonFunctions.IsTradingOpen(model.modelLogs.modelRunDate);
                 clsCommonFunctions.AddStatusMessage($"Market open = {marketOpen}", "INFO", logName);
 
                 clsCommonFunctions.AddStatusMessage("Model Run ID = " + modelID, "INFO", logName);
@@ -856,7 +856,7 @@ namespace TradingBrain.Models
             {
                 // Check if the market is currently open. If it is not then skip till next time.
                 //marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow);
-                marketOpen = await IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates);
+                marketOpen = await IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates,this.epicName);
                 if (marketOpen)
                 {
                     _igContainer.tbClient.FirstConfirmUpdate = false;
@@ -1056,7 +1056,7 @@ namespace TradingBrain.Models
                                 model.candles.prevCandle2 = await CreateLiveCandle(the_db, thisInput.var1, thisInput.var3, thisInput.var2, thisInput.var13, _startTime.AddMinutes(-2), epicName, minute_container, TicksContainer, false, false, the_app_db, model.exchangeClosedDates);
                             }
                             //clsCommonFunctions.AddStatusMessage($"Checking F ", "INFO", logName);
-                            DateTime getStartDate = await model.getPrevMAStartDate(model.candles.currentCandle.candleStart);
+                            DateTime getStartDate = await model.getPrevMAStartDate(model.candles.currentCandle.candleStart,model.candles.currentCandle.epicName);
                             //clsCommonFunctions.AddStatusMessage($"Checking G ", "INFO", logName);
                             IG_Epic epic = new IG_Epic(epicName);
                             clsMinuteCandle prevMa = await Get_MinuteCandle(the_db, minute_container, epic, getStartDate);
@@ -2821,7 +2821,7 @@ namespace TradingBrain.Models
             {
                 // Check if the market is currently open. If it is not then skip till next time.
                 //marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow);
-                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates).Result;
+                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates,this.epicName).Result;
                 if (marketOpen)
                 {
                     _igContainer.tbClient.FirstConfirmUpdate = false;
@@ -3376,7 +3376,7 @@ namespace TradingBrain.Models
             {
                 // Check if the market is currently open. If it is not then skip till next time.
 
-                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates).Result;
+                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates,this.epicName).Result;
                 if (marketOpen)
                 {
                     _igContainer.tbClient.FirstConfirmUpdate = false;
@@ -3871,7 +3871,7 @@ namespace TradingBrain.Models
             {
                 // Check if the market is currently open. If it is not then skip till next time.
 
-                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates,model.futures).Result;
+                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates, this.epicName, model.futures).Result;
                 if (marketOpen)
                 {
                     _igContainer.tbClient.FirstConfirmUpdate = false;
@@ -3980,7 +3980,7 @@ namespace TradingBrain.Models
                         // using the candle time determine which inputs to use //
                         /////////////////////////////////////////////////////////
                         double thisSpread = 0;
-                        if (this.epicName.Substring(0, 3) == "IX.")
+                        if (this.epicName.Substring(0, 3) == "IX." || this.epicName.Substring(0, 3) == "CS.")
                         {
                             thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
                         }
@@ -4387,7 +4387,7 @@ namespace TradingBrain.Models
             {
                 // Check if the market is currently open. If it is not then skip till next time.
                 
-                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates,this.futures).Result;
+                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates, this.epicName, this.futures).Result;
                 if (marketOpen)
                 {
                     _igContainer.tbClient.FirstConfirmUpdate = false;
@@ -4517,7 +4517,7 @@ namespace TradingBrain.Models
                         // using the candle time determine which inputs to use //
                         /////////////////////////////////////////////////////////
                         double thisSpread = 0;
-                        if (this.epicName.Substring(0, 3) == "IX.")
+                        if (this.epicName.Substring(0, 3) == "IX." || this.epicName.Substring(0, 3) == "CS.")
                         {
                              thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
                         }
@@ -4955,7 +4955,7 @@ namespace TradingBrain.Models
             {
                 // Check if the market is currently open. If it is not then skip till next time.
 
-                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates, this.futures).Result;
+                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates, this.epicName, this.futures).Result;
                 if (marketOpen)
                 {
                     _igContainer.tbClient.FirstConfirmUpdate = false;
@@ -5077,7 +5077,7 @@ namespace TradingBrain.Models
                         // using the candle time determine which inputs to use //
                         /////////////////////////////////////////////////////////
                         double thisSpread = 0;
-                        if (this.epicName.Substring(0, 3) == "IX.")
+                        if (this.epicName.Substring(0, 3) == "IX." || this.epicName.Substring(0, 3) == "CS.")
                         {
                             thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
                         }
@@ -5489,7 +5489,7 @@ namespace TradingBrain.Models
             {
                 // Check if the market is currently open. If it is not then skip till next time.
                 //marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow);
-                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates).Result;
+                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates, this.epicName).Result;
                 if (marketOpen)
                 {
                     _igContainer.tbClient.FirstConfirmUpdate = false;
@@ -5629,7 +5629,7 @@ namespace TradingBrain.Models
 
                         //double thisSpread = Math.Round(Math.Abs((double)currentTick.Offer - (double)currentTick.Bid), 1);
                         double thisSpread = 0;
-                        if (this.epicName.Substring(0,3) == "IX.")
+                        if (this.epicName.Substring(0,3) == "IX." || this.epicName.Substring(0, 3) == "CS.")
                         {
                             thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
                         }
@@ -6655,7 +6655,7 @@ namespace TradingBrain.Models
                     {
                         // Sort out the start date if it now falls during the weekend. This is so we can get the averages of candles created surrounding a weekend
                         //if (!IGModels.clsCommonFunctions.IsTradingOpen(getStartDate) && !weekendDetected)
-                        if (!await IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates))
+                        if (!await IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates,epic.Epic))
                         {
                             int daysToSubtract = 0;
                             // get the current day and then work out how many days to remove to make it friday at 21:00
@@ -6677,7 +6677,7 @@ namespace TradingBrain.Models
                         else
                         {
                             //if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate))
-                            if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates).Result)
+                            if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates,epic.Epic).Result)
                             {
                                 weekendDetected = false;
                             }
@@ -6796,7 +6796,7 @@ namespace TradingBrain.Models
 
                         // Sort out the start date if it now falls during the weekend. This is so we can get the averages of candles created surrounding a weekend
                         //if (!IGModels.clsCommonFunctions.IsTradingOpen(getStartDate) && !weekendDetected)
-                        if (!await IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates))
+                        if (!await IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates,epic.Epic))
                         {
                             int daysToSubtract = 0;
                             // get the current day and then work out how many days to remove to make it friday at 21:00
@@ -6818,7 +6818,7 @@ namespace TradingBrain.Models
                         else
                         {
                             //if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate))
-                            if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates).Result)
+                            if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates,epic.Epic).Result)
                             {
                                 weekendDetected = false;
                             }
@@ -7005,7 +7005,7 @@ namespace TradingBrain.Models
                     {
                         // Sort out the start date if it now falls during the weekend. This is so we can get the averages of candles created surrounding a weekend
                         //if (!IGModels.clsCommonFunctions.IsTradingOpen(getStartDate) && !weekendDetected)
-                        if (!IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates).Result && !weekendDetected)
+                        if (!IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates,epic.Epic).Result && !weekendDetected)
                         {
                             int daysToSubtract = 0;
                             // get the current day and then work out how many days to remove to make it friday at 21:00
@@ -7026,7 +7026,7 @@ namespace TradingBrain.Models
                         }
                         else
                         {
-                            if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates).Result)
+                            if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates,epic.Epic).Result)
                             {
                                 weekendDetected = false;
                             }
