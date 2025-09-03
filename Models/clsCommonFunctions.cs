@@ -782,6 +782,7 @@ namespace TradingBrain.Models
                 strategy == "RSI-ATR" || 
                 strategy == "RSI-CUML" || 
                 strategy == "CASEYC" ||
+                 strategy == "VWAP" ||
                 strategy == "CASEYCSHORT" ||
                 strategy == "CASEYCEQUITIES")
             {

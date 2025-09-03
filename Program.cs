@@ -306,6 +306,7 @@ namespace TradingBrain.Models
                         tbepic.strategy == "RSI-CUML" || 
                         tbepic.strategy == "CASEYC" ||
                         tbepic.strategy == "CASEYCSHORT" ||
+                        tbepic.strategy == "VWAP" ||
                         tbepic.strategy == "CASEYCEQUITIES")
                     {
                         minute_container = the_db.GetContainer("Candles_RSI");
@@ -340,6 +341,7 @@ namespace TradingBrain.Models
                 epcs[0].strategy == "RSI-CUML" || 
                 epcs[0].strategy == "CASEYC" ||
                 epcs[0].strategy == "CASEYCSHORT" ||
+                epcs[0].strategy == "VWAP" ||
                 epcs[0].strategy == "CASEYCEQUITIES") 
             {
                 ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
@@ -400,6 +402,10 @@ namespace TradingBrain.Models
                         task = Task.Run(() => app.RunCode_REI(sender, e));
                         parallelTasks.Add(task);
                         break;
+                    case "VWAP":
+                        task = Task.Run(() => app.RunCode_VWAP(sender, e));
+                        parallelTasks.Add(task);
+                        break;
 
                     default:
                         task = Task.Run(() => app.RunCode(sender, e));
@@ -422,6 +428,7 @@ namespace TradingBrain.Models
                 workerList[0].strategy == "RSI-ATR" || 
                 workerList[0].strategy == "RSI-CUML" || 
                 workerList[0].strategy == "CASEYC" ||
+                 workerList[0].strategy == "VWAP" ||
                 workerList[0].strategy == "CASEYCSHORT" ||
                 workerList[0].strategy == "CASEYCEQUITIES")
             {

@@ -198,6 +198,7 @@ namespace TradingBrain.Models
                     pms.strategy == "RSI-ATR" ||
                     pms.strategy == "RSI-CUML" ||
                     pms.strategy == "CASEYC" ||
+                     pms.strategy == "VWAP" ||
                     pms.strategy == "CASEYCSHORT" ||
                     pms.strategy == "CASEYCEQUITIES")
                 {
@@ -1134,6 +1135,7 @@ namespace TradingBrain.Models
                                             _thisApp.strategy == "RSI-ATR" || 
                                             _thisApp.strategy == "RSI-CUML" || 
                                             _thisApp.strategy == "CASEYC" ||
+                                            _thisApp.strategy == "VWAP" ||
                                             _thisApp.strategy == "CASEYCSHORT" ||
                                             _thisApp.strategy == "CASEYCEQUITIES")
                                         {
