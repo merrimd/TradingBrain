@@ -788,7 +788,10 @@ namespace TradingBrain.Models
             {
                 logName += "_" + resolution;
             }
-
+            if (strategy == "SMA")
+            {
+                resolution = "";
+            }
 
             try
             {
@@ -840,6 +843,11 @@ namespace TradingBrain.Models
                     if (opt.inputs_RSI.Count > 0)
                     {
                         ret.runDetails.inputs_RSI = opt.inputs_RSI;
+                        if (opt.averageWinValue > 0)
+                        {
+                            ret.lastRunVars.seedAvgWinningTrade = opt.averageWinValue;
+                            clsCommonFunctions.AddStatusMessage($"seedAvgWinningTrade taken from opt - {opt.averageWinValue}", "INFO", logName);
+                        }
                         await ret.SaveDocument(the_db);
                     }
                 }

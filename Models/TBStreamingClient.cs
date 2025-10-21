@@ -2,6 +2,7 @@
 using dto.endpoint.accountswitch;
 using dto.endpoint.auth.session.v2;
 using IGModels;
+using IGModels.RSI_Models;
 using IGWebApiClient;
 using IGWebApiClient.Common;
 using IGWebApiClient.Models;
@@ -13,6 +14,7 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.Identity.Client;
 using Newtonsoft.Json;
 using NLog;
+using NLog.LayoutRenderers;
 using System;
 using System.CodeDom;
 using System.Collections.Generic;
@@ -466,10 +468,118 @@ namespace TradingBrain.Models
             if (ph != this.phase)
                 return;
 
-            var epic = update.ItemName.Replace("L1:", "").Replace("CHART:", "").Replace(":TICK", "");
+            var epic = update.ItemName.Replace("L1:", "").Replace("CHART:", "").Replace(":1MINUTE", "").Replace(":TICK", "").Replace(":SECOND", "");
             try
             {
                 var wlmUpdate = update ;
+
+
+
+                if (wlmUpdate.getValue("BID") != "" && wlmUpdate.getValue("OFR") != "" && wlmUpdate.getValue("BID") != "0" && wlmUpdate.getValue("OFR") != "0" && wlmUpdate.getValue("BID") != null && wlmUpdate.getValue("OFR") != null)
+                {
+
+                    DateTime thisUTM = DateTime.MinValue;
+                    if (wlmUpdate.getValue("UTM") != null)
+                    {
+                        thisUTM = (DateTime)EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"));
+                    }
+
+                    LOepic thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epic).FirstOrDefault();
+
+                    tick thisTick = new tick();
+                    thisTick.bid = Convert.ToDecimal(wlmUpdate.getValue("BID"));
+                    thisTick.offer = Convert.ToDecimal(wlmUpdate.getValue("OFR"));
+                    thisTick.UTM = thisUTM;
+
+                    thisEpic.ticks.Add(thisTick);
+
+                    //if ( thisUTM != DateTime.MinValue && thisUTM != thisEpic.lastUTM && thisEpic.lastUpdate.UTM != DateTime.MinValue)
+                    //{
+                    //    try
+                    //    {
+
+                    //        // TODO: Convert to correct candle_rsi format
+
+                    //        AddStatusMessage($"New Minute for {epic} UTM:{thisUTM.ToString("o")} LastUTM:{thisEpic.lastUTM.ToString("o")} - bid_open:{thisEpic.lastUpdate.Bid_Open}, bid_close{thisEpic.lastUpdate.Bid_Close}");
+
+                    //        //bool r = objLastMinUpdate.Add(the_db, this.the_chart_min_container).Result;
+                    //        tbPrice rsiCandle = new tbPrice();
+                    //        rsiCandle.epic = epic;
+                    //        rsiCandle.resolution = "MINUTE";
+                    //        rsiCandle.startDate = new DateTime(thisEpic.lastUpdate.UTM.Year, thisEpic.lastUpdate.UTM.Month, thisEpic.lastUpdate.UTM.Day, thisEpic.lastUpdate.UTM.Hour, thisEpic.lastUpdate.UTM.Minute, 0, 0, DateTimeKind.Utc);
+                    //        rsiCandle.endDate = new DateTime(thisEpic.lastUpdate.UTM.Year, thisEpic.lastUpdate.UTM.Month, thisEpic.lastUpdate.UTM.Day, thisEpic.lastUpdate.UTM.Hour, thisEpic.lastUpdate.UTM.Minute, 59, 999, DateTimeKind.Utc);
+
+                    //        rsiCandle.spread = (double)(thisEpic.lastUpdate.Offer_Open - thisEpic.lastUpdate.Bid_Open);
+                    //        rsiCandle.typicalPrice.bid = (thisEpic.lastUpdate.Bid_High + thisEpic.lastUpdate.Bid_Low + thisEpic.lastUpdate.Bid_Close) / 3;
+                    //        rsiCandle.typicalPrice.ask = (thisEpic.lastUpdate.Offer_High + thisEpic.lastUpdate.Offer_Low + thisEpic.lastUpdate.Offer_Close) / 3;
+                    //        rsiCandle.openPrice = new dto.endpoint.prices.v2.Price();
+                    //        rsiCandle.closePrice = new dto.endpoint.prices.v2.Price();
+                    //        rsiCandle.highPrice = new dto.endpoint.prices.v2.Price();
+                    //        rsiCandle.lowPrice = new dto.endpoint.prices.v2.Price();
+
+                    //        rsiCandle.openPrice.bid = thisEpic.lastUpdate.Bid_Open;
+                    //        rsiCandle.openPrice.ask = thisEpic.lastUpdate.Offer_Open;
+                    //        rsiCandle.closePrice.bid = thisEpic.lastUpdate.Bid_Close;
+                    //        rsiCandle.closePrice.ask = thisEpic.lastUpdate.Offer_Close;
+                    //        rsiCandle.highPrice.bid = thisEpic.lastUpdate.Bid_High;
+                    //        rsiCandle.highPrice.ask = thisEpic.lastUpdate.Offer_High;
+                    //        rsiCandle.lowPrice.bid = thisEpic.lastUpdate.Bid_Low;
+                    //        rsiCandle.lowPrice.ask = thisEpic.lastUpdate.Offer_Low;
+                    //        rsiCandle.snapshotTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+                    //        rsiCandle.lastTradedVolume = thisEpic.lastUpdate.LTV;
+
+                    //        StandardDeviation sd = new StandardDeviation(thisEpic.closePrices);
+                    //        rsiCandle.stdDev = sd.Value;
+
+                    //        thisEpic.latestCandle = rsiCandle;
+
+                    //        //bool r = rsiCandle.Add(the_db, this.the_chart_min_container).Result;
+
+                    //        thisEpic.lastUTM = thisUTM;
+                    //        thisEpic.closePrices.Clear();
+
+                    //    }
+                    //    catch (Exception ex)
+                    //    {
+                    //        AddStatusMessage("Error saving minute data:" + ex.Message);
+                    //        //var log = new Log(this.the_db);
+                    //        //log.Log_Message = e.ToString();
+                    //        //log.Log_Type = "Error";
+                    //        //log.Log_App = "MainApp/OnMinUpdate";
+                    //        //log.Epic = epic;
+                    //        //log.Save();
+                    //    }
+
+                    //}
+
+                    //thisEpic.lastUpdate = new clsChartMinUpdate();
+                    //thisEpic.lastUpdate.Epic = epic;
+                    //thisEpic.lastUpdate.Bid_Open = Convert.ToDecimal(wlmUpdate.getValue("BID_OPEN")) ;
+                    //thisEpic.lastUpdate.Bid_Close = Convert.ToDecimal(wlmUpdate.getValue("BID_CLOSE"));
+                    //thisEpic.lastUpdate.Bid_High = Convert.ToDecimal(wlmUpdate.getValue("BID_HIGH"));
+                    //thisEpic.lastUpdate.Bid_Low = Convert.ToDecimal(wlmUpdate.getValue("BID_LOW"));
+                    //thisEpic.lastUpdate.Offer_Open = Convert.ToDecimal(wlmUpdate.getValue("OFR_OPEN"));
+                    //thisEpic.lastUpdate.Offer_Close = Convert.ToDecimal(wlmUpdate.getValue("OFR_CLOSE"));
+                    //thisEpic.lastUpdate.Offer_High = Convert.ToDecimal(wlmUpdate.getValue("OFR_HIGH"));
+                    //thisEpic.lastUpdate.Offer_Low = Convert.ToDecimal(wlmUpdate.getValue("OFR_LOW"));
+
+                    //thisEpic.lastUpdate.LTV = Convert.ToDecimal(wlmUpdate.getValue("LTV"));
+                    //if (wlmUpdate.getValue("UTM")  != "")
+                    //{
+                    //    thisEpic.lastUpdate.UTM = (DateTime)EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"));
+                    //}
+                    //thisEpic.closePrices.Add((double)(thisEpic.lastUpdate.Bid_Close + thisEpic.lastUpdate.Offer_Close / 2));
+
+
+                }
+
+
+           
+
+
+
+
+
 
 
 
@@ -480,43 +590,43 @@ namespace TradingBrain.Models
                 //        item.counter++;
                 //    }
                 //}
-                clsChartUpdateMini currentTick = new clsChartUpdateMini();
+                //clsChartUpdateMini currentTick = new clsChartUpdateMini();
 
-                if (wlmUpdate.getValue("BID") != "" && wlmUpdate.getValue("OFR") != "")
-                {
-                    //clsChartUpdateMini objUpdate = new clsChartUpdateMini();
-                    if (wlmUpdate.getValue("BID") != null && wlmUpdate.getValue("OFR") != null)
-                    {
-                       currentTick.Epic = epic;
-                        currentTick.Bid = Convert.ToDecimal(wlmUpdate.getValue("BID"));
-                        currentTick.Offer = Convert.ToDecimal(wlmUpdate.getValue("OFR"));
-                        //currentTick.LTP = Convert.ToDecimal(wlmUpdate.getValue("LTP"));
-                        //currentTick.LTV = Convert.ToDecimal(wlmUpdate.getValue("LTV"));
-                        //currentTick.TTV = Convert.ToDecimal(wlmUpdate.getValue("TTV"));
-                        if (wlmUpdate.getValue("UTM") != null)
-                        {
-                            currentTick.UTM = EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"));
-                        }
-                        //currentTick.DAY_OPEN_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_OPEN_MID"));
-                        //currentTick.DAY_NET_CHG_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_NET_CHG_MID"));
-                        //currentTick.DAY_PERC_CHG_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_PERC_CHG_MID"));
-                        //currentTick.DAY_HIGH = Convert.ToDecimal(wlmUpdate.getValue("DAY_HIGH"));
-                        //currentTick.DAY_LOW = Convert.ToDecimal(wlmUpdate.getValue("DAY_LOW"));
-                        int thisSecond = currentTick.UTM.Value.Second;
-                        if (thisSecond != currentSecond)
-                        {
-                           // clsCommonFunctions.SendBroadcast("PriceChange", JsonConvert.SerializeObject(currentTick), _igContainer.the_app_db);
-                            //Console.WriteLine("PriceChange: " + JsonConvert.SerializeObject(currentTick));
-                            currentSecond = thisSecond;
-                        }
+                //if (wlmUpdate.getValue("BID") != "" && wlmUpdate.getValue("OFR") != "")
+                //{
+                //    //clsChartUpdateMini objUpdate = new clsChartUpdateMini();
+                //    if (wlmUpdate.getValue("BID") != null && wlmUpdate.getValue("OFR") != null)
+                //    {
+                //       currentTick.Epic = epic;
+                //        currentTick.Bid = Convert.ToDecimal(wlmUpdate.getValue("BID"));
+                //        currentTick.Offer = Convert.ToDecimal(wlmUpdate.getValue("OFR"));
+                //        //currentTick.LTP = Convert.ToDecimal(wlmUpdate.getValue("LTP"));
+                //        //currentTick.LTV = Convert.ToDecimal(wlmUpdate.getValue("LTV"));
+                //        //currentTick.TTV = Convert.ToDecimal(wlmUpdate.getValue("TTV"));
+                //        if (wlmUpdate.getValue("UTM") != null)
+                //        {
+                //            currentTick.UTM = EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"));
+                //        }
+                //        //currentTick.DAY_OPEN_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_OPEN_MID"));
+                //        //currentTick.DAY_NET_CHG_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_NET_CHG_MID"));
+                //        //currentTick.DAY_PERC_CHG_MID = Convert.ToDecimal(wlmUpdate.getValue("DAY_PERC_CHG_MID"));
+                //        //currentTick.DAY_HIGH = Convert.ToDecimal(wlmUpdate.getValue("DAY_HIGH"));
+                //        //currentTick.DAY_LOW = Convert.ToDecimal(wlmUpdate.getValue("DAY_LOW"));
+                //        int thisSecond = currentTick.UTM.Value.Second;
+                //        if (thisSecond != currentSecond)
+                //        {
+                //           // clsCommonFunctions.SendBroadcast("PriceChange", JsonConvert.SerializeObject(currentTick), _igContainer.the_app_db);
+                //            //Console.WriteLine("PriceChange: " + JsonConvert.SerializeObject(currentTick));
+                //            currentSecond = thisSecond;
+                //        }
     
                         
-                        //Console.WriteLine("PriceChange: " + JsonConvert.SerializeObject(currentTick));
-                    }
+                //        //Console.WriteLine("PriceChange: " + JsonConvert.SerializeObject(currentTick));
+                //    }
 
 
 
-                }
+                //}
 
 
             }
@@ -1045,14 +1155,14 @@ namespace TradingBrain.Models
                         tmpEpic = epic.Epic;
                     }
                     epics.Add("CHART:" + tmpEpic + ":TICK");
-       
+                    _igContainer.PriceEpicList.Add(new LOepic(tmpEpic) );
                 }
                 //if (_igContainer.ep != "")
                 //{
                 //    chartName = "CHART:" + _igContainer.epicName + ":TICK";
                 //}
                 //subscription = new Subscription("DISTINCT", new string[1] { chartName }, new string[11] { "BID", "OFR", "LTP", "LTV", "TTV", "UTM", "DAY_OPEN_MID", "DAY_NET_CHG_MID", "DAY_PERC_CHG_MID", "DAY_HIGH", "DAY_LOW" });
-                subscription = new Subscription("DISTINCT", epics.ToArray(), new string[3] { "BID", "OFR",  "UTM" });
+                subscription = new Subscription("DISTINCT", epics.ToArray(), new string[3] { "UTM", "BID", "OFR"  });
 
 
                 //subscription = new Subscription("MERGE", new string[30] { "item1", "item2", "item3", "item4", "item5", "item6", "item7", "item8", "item9", "item10", "item11", "item12", "item13", "item14", "item15", "item16", "item17", "item18", "item19", "item20", "item21", "item22", "item23", "item24", "item25", "item26", "item27", "item28", "item29", "item30" },
@@ -1174,6 +1284,7 @@ namespace TradingBrain.Models
         public string CurrentAccountId { get; set; }
         public string igAccountId { get; set; }
         public List<clsEpicList> EpicList { get; set; }
+        public List<LOepic> PriceEpicList { get; set; }
         public static bool LoggedIn { get; set; }
         public TBStreamingClient tbClient { get; set; }
         private bool isDirty = false;
@@ -1191,6 +1302,7 @@ namespace TradingBrain.Models
             igAccountId = "";
             Accounts = null;
             EpicList = new List<clsEpicList>();
+            PriceEpicList = new List<LOepic>();
             LoggedIn = false;
             the_db = null;
             the_app_db = null;
@@ -1231,5 +1343,207 @@ namespace TradingBrain.Models
 
 
         }
+    }
+
+    public class LOepic
+    {
+        public string name { get; set; }
+        public clsChartMinUpdate lastUpdate { get; set; }
+        public DateTime lastUTM { get; set; }
+        public List<double> closePrices { get; set; }
+    public tbPrice latestCandle { get; set; }
+        public List<tick> ticks { get; set; }
+        public LOepic()
+        {
+            this.name = "";
+            this.lastUpdate = new clsChartMinUpdate();
+            this.lastUTM = DateTime.MinValue;
+            this.closePrices = new List<double>();
+            this.latestCandle = new tbPrice();
+            this.ticks = new List<tick>();
+        }
+
+        public LOepic(string _name)
+        {
+            this.name = _name;
+            this.lastUpdate = new clsChartMinUpdate();
+            this.lastUTM = DateTime.MinValue;
+            this.closePrices = new List<double>();
+            this.ticks = new List<tick>();
+        }
+    }
+    public class tick
+    {
+        public decimal bid { get; set; }
+        public decimal offer { get; set; }
+        public DateTime UTM { get; set; }
+        public tick()
+        {
+            bid = 0;
+            offer = 0;
+            UTM = DateTime.MinValue;
+
+        }
+        public tick(decimal _bid, decimal _offer, DateTime _UTM)
+        {
+            bid = _bid;
+            offer = _offer;
+            UTM = _UTM;
+        }
+    }
+    public class clsChartMinUpdate
+    {
+        public string Epic { get; set; }
+        public Decimal Bid_Open { get; set; }
+        public Decimal Bid_Close { get; set; }
+        public Decimal Bid_High { get; set; }
+        public Decimal Bid_Low { get; set; }
+        public Decimal Offer_Open { get; set; }
+        public Decimal Offer_Close { get; set; }
+        public Decimal Offer_High { get; set; }
+        public Decimal Offer_Low { get; set; }
+        public Decimal LTV { get; set; }
+        public DateTime UTM { get; set; }
+        public DateTime snapshotTimeUTC { get; set; }
+        public DateTime IGUpdateDateTime { get; set; }
+        public int SyncStatus { get; set; }
+        public string id { get; set; }
+
+
+
+
+        public clsChartMinUpdate()
+        {
+            this.Epic = "";
+            this.Bid_Open = new Decimal();
+            this.Bid_Close = new Decimal();
+            this.Bid_High = new Decimal();
+            this.Bid_Low = new Decimal();
+            this.Offer_Open = new Decimal();
+            this.Offer_Close = new Decimal();
+            this.Offer_High = new Decimal();
+            this.Offer_Low = new Decimal();
+            this.LTV = 0;
+            this.UTM = DateTime.MinValue;
+            this.snapshotTimeUTC = DateTime.UtcNow;
+            this.id = System.Guid.NewGuid().ToString();
+            this.SyncStatus = 0;
+            this.IGUpdateDateTime = DateTime.MinValue;
+        }
+
+        public async Task<bool> Add(Database the_db, Container container)
+        {
+            bool ret = true;
+            if (string.IsNullOrEmpty(this.id))
+            {
+                this.id = System.Guid.NewGuid().ToString();
+            }
+
+            this.SyncStatus = 0;
+            bool blnLoop = true;
+            while (blnLoop)
+            {
+                try
+                {
+
+                    if (the_db != null)
+                    {
+                        // DatabaseResponse db = await the_db.ReadAsync();
+                        //Container container = the_db.GetContainer("Candles");
+
+                        bool exist = await DoesThisTickExist(the_db, container);
+                        if (!exist)
+                        {
+                            this.id = System.Guid.NewGuid().ToString();
+                            ItemResponse<clsChartMinUpdate> SaveResponse = await container.CreateItemAsync<clsChartMinUpdate>(this, new PartitionKey(this.id));
+                        }
+                        blnLoop = false;
+                    }
+                }
+                catch (CosmosException de)
+                {
+                    Console.WriteLine(de.ToString());
+                    var log = new Log();
+                    log.Log_Message = de.ToString();
+                    log.Log_Type = "Error";
+                    log.Log_App = "clsChartUpdate/Add";
+                    log.Epic = this.Epic;
+                    await log.Save();
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.ToString());
+                    var log = new Log();
+                    log.Log_Message = e.ToString();
+                    log.Log_Type = "Error";
+                    log.Log_App = "clsChartUpdate/Add";
+                    log.Epic = this.Epic;
+                    await log.Save();
+                }
+            }
+
+
+            return (ret);
+        }
+        public async Task<bool> DoesThisTickExist(Database the_db, Container container)
+        {
+            bool ret = false;
+
+            try
+            {
+                if (the_db != null)
+                {
+
+
+                    var parameterizedQuery = new QueryDefinition(
+                        query: "SELECT * FROM c WHERE c.Epic= @epicName and c.UTM = @UTM"
+                    )
+                    .WithParameter("@epicName", this.Epic)
+                    .WithParameter("@UTM", this.UTM);
+
+                    using FeedIterator<clsChartUpdate> filteredFeed = container.GetItemQueryIterator<clsChartUpdate>(
+                        queryDefinition: parameterizedQuery
+                    );
+
+                    while (filteredFeed.HasMoreResults)
+                    {
+                        FeedResponse<clsChartUpdate> response = await filteredFeed.ReadNextAsync();
+
+                        // Iterate query results
+                        foreach (clsChartUpdate item in response)
+                        {
+                            if (item.Epic == this.Epic && this.Bid_Open == item.Bid)
+                            {
+                                ret = true;
+                            }
+
+                        }
+                    }
+                }
+
+            }
+            catch (CosmosException de)
+            {
+                Console.WriteLine(de.ToString());
+                var log = new Log();
+                log.Log_Message = de.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "clsChartUpdate/DoesThisTickExist";
+                log.Epic = this.Epic;
+                await log.Save();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+                var log = new Log();
+                log.Log_Message = e.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "clsChartUpdate/DoesThisTickExist";
+                log.Epic = this.Epic;
+                await log.Save();
+            }
+            return ret;
+        }
+
     }
 }

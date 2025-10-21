@@ -1,65 +1,68 @@
-﻿using dto.endpoint.watchlists.retrieve;
+﻿using Azure.Core.GeoJson;
+using Azure.Storage;
+using com.lightstreamer.client;
+using dto.endpoint.application.operation;
+using dto.endpoint.auth.session.v2;
+using dto.endpoint.confirms;
+using dto.endpoint.positions.close.v1;
+using dto.endpoint.positions.create.otc.v1;
+using dto.endpoint.positions.edit.v1;
+using dto.endpoint.positions.get.otc.v1;
+using dto.endpoint.search;
+using dto.endpoint.type;
+using dto.endpoint.watchlists.retrieve;
+using dto.endpoint.workingorders.create.v1;
+using dto.endpoint.workingorders.delete.v1;
+using dto.endpoint.workingorders.get.v1;
+using IGCandleCreator.Models;
+using IGModels;
+using IGModels.ModellingModels;
+using IGModels.RSI_Models;
 //using TradingBrain.Common;
 using IGWebApiClient;
 using IGWebApiClient.Common;
 using IGWebApiClient.Models;
-
+using Lightstreamer.DotNet.Client;
+using log4net.Core;
+using Microsoft.AspNetCore.Http.Connections.Client;
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.Azure;
+using MimeKit;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using NLog;
+using Org.BouncyCastle.Ocsp;
+using Org.BouncyCastle.Pqc.Crypto.Saber;
+using PInvoke;
+using Skender.Stock.Indicators;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Configuration;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.Eventing.Reader;
+using System.Drawing;
+using System.IO;
 using System.Linq;
+using System.Linq;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
+using System.Runtime.ConstrainedExecution;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using Lightstreamer.DotNet.Client;
-using com.lightstreamer.client;
-using System.Linq;
-using dto.endpoint.auth.session.v2;
-using dto.endpoint.application.operation;
-using Microsoft.Azure.Cosmos;
-using TradingBrain.Models;
-using IGModels;
-using static IGModels.ModellingModels.GetModelClass;
-using IGCandleCreator.Models;
-using System.Reflection.Metadata;
-using IGModels.ModellingModels;
-using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
-using Microsoft.Extensions.Azure;
-using System.Diagnostics.CodeAnalysis;
-using Microsoft.AspNetCore.SignalR.Client;
-using Newtonsoft.Json;
-using MimeKit;
-using System.Diagnostics;
-using Microsoft.AspNetCore.Http.Connections.Client;
-using Newtonsoft.Json.Linq;
-using dto.endpoint.search;
-using System.Runtime.InteropServices;
-using dto.endpoint.confirms;
-using dto.endpoint.positions.create.otc.v1;
-using System.Diagnostics.Eventing.Reader;
-using dto.endpoint.positions.close.v1;
-using dto.endpoint.positions.edit.v1;
-using dto.endpoint.type;
-using dto.endpoint.positions.get.otc.v1;
-using Azure.Core.GeoJson;
-using System.Xml.Xsl;
-using System.Drawing;
-using System.Runtime.CompilerServices;
-using static DotNetty.Common.ThreadLocalPool;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using dto.endpoint.workingorders.create.v1;
-using dto.endpoint.workingorders.delete.v1;
-using dto.endpoint.workingorders.get.v1;
-using log4net.Core;
-using Azure.Storage;
-using static TradingBrain.Models.clsCommonFunctions;
-using Skender.Stock.Indicators;
-using IGModels.RSI_Models;
-using Org.BouncyCastle.Pqc.Crypto.Saber;
-using NLog;
-using Org.BouncyCastle.Ocsp;
 using System.Timers;
+using System.Xml.Xsl;
+using TradingBrain.Models;
+using static DotNetty.Common.ThreadLocalPool;
+using static IGModels.ModellingModels.GetModelClass;
+using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using static TradingBrain.Models.clsCommonFunctions;
 using Timer = System.Timers.Timer;
 
 
@@ -90,6 +93,7 @@ namespace TradingBrain.Models
         public Microsoft.Azure.Cosmos.Container? the_container;
         public Microsoft.Azure.Cosmos.Container? the_chart_container;
         public Microsoft.Azure.Cosmos.Container? minute_container;
+        public Microsoft.Azure.Cosmos.Container? candles_RSI_container;
         public Microsoft.Azure.Cosmos.Container? TicksContainer;
         public Microsoft.Azure.Cosmos.Container? trade_container;
         //public List<clsEpicList> EpicList;
@@ -151,7 +155,7 @@ namespace TradingBrain.Models
 
         }
         public string logName { get; set; }
-        public MainApp(Database db, Database appDb, Container container, Container chart_container, string epic, Container _minute_container, Container _TicksContainer, Container _trade_container, IGContainer igContainer, string strategy = "SMA", string resolution = "")
+        public MainApp(Database db, Database appDb, Container container, Container chart_container, string epic, Container _minute_container,Container _candles_RSI_container, Container _TicksContainer, Container _trade_container, IGContainer igContainer, string strategy = "SMA", string resolution = "")
         {
             try
             {
@@ -202,6 +206,7 @@ namespace TradingBrain.Models
                 minute_container = _minute_container;
                 TicksContainer = _TicksContainer;
                 trade_container = _trade_container;
+                candles_RSI_container = _candles_RSI_container;
 
 
                 tb = new TradingBrainSettings();
@@ -240,6 +245,22 @@ namespace TradingBrain.Models
 
                 clsCommonFunctions.AddStatusMessage("Model Run ID = " + modelID, "INFO", logName);
 
+                currentStatus.calcAvgWinningTrade = tb.lastRunVars.calcAvgWinningTrade;
+
+                //Work out the calculated average winning trade value
+                if (this.strategy == "CASEYC" && tb.lastRunVars.calcAvgWinningTrade == 0)
+                {
+                    AccumulatedValues accumValues = new AccumulatedValues();
+                    accumValues = IGModels.clsCommonFunctions.GetAccumulatedValues(this.the_app_db, this.epicName, this.strategy, this.resolution).Result;
+                    if (accumValues != null)
+                    {
+                        if (accumValues.accumQuantity > 0)
+                        {
+                            modelVar.calcAvgWinningTrade = accumValues.accumProfit / accumValues.accumQuantity;
+                            currentStatus.calcAvgWinningTrade = modelVar.calcAvgWinningTrade;
+                        }
+                    }
+                }
                 //TradingBrainSettings thisTB = clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution).Result;
                 currentStatus.startDate = model.modelLogs.modelRunDate;
                 currentStatus.modelRunID = modelID;
@@ -261,6 +282,8 @@ namespace TradingBrain.Models
                 currentStatus.currentGain = tb.lastRunVars.currentGain;
                 currentStatus.startingQuantity = tb.lastRunVars.startingQuantity;
                 currentStatus.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+                currentStatus.seedAvgWinningTrade = tb.lastRunVars.seedAvgWinningTrade;
+                //currentStatus.calcAvgWinningTrade = tb.lastRunVars.calcAvgWinningTrade;
 
 
                 if (this.strategy == "SMA" || this.strategy == "SMA2")
@@ -472,20 +495,21 @@ namespace TradingBrain.Models
                 pos.orderType = "MARKET";
                 pos.guaranteedStop = false;
 
-                if (this.strategy == "SMA2" || 
-                    this.strategy == "RSI" || 
-                    this.strategy == "REI" || 
-                    this.strategy == "RSI-ATR" ) // || 
-                    //this.strategy == "RSI-CUML" || 
-                    //this.strategy == "CASEYC")
+                if (this.strategy == "SMA2" ||
+                    this.strategy == "RSI" ||
+                    this.strategy == "REI" ||
+                    this.strategy == "RSI-ATR") // || 
+                                                //this.strategy == "RSI-CUML" || 
+                                                //this.strategy == "CASEYC")
                 {
                     // If this is the SMA2 strategy, then we need to set the stop as a trailing stop (a stop that rises when the trade rises)
                     pos.trailingStop = true;
                     pos.trailingStopIncrement = 1;
                 }
-
-                pos.stopDistance = Convert.ToDecimal(stopLoss);
-
+                if (stopLoss != 0)
+                {
+                    pos.stopDistance = Convert.ToDecimal(stopLoss);
+                }
                 if (target > 0)
                 {
                     pos.limitDistance = Convert.ToDecimal(target);
@@ -1067,10 +1091,10 @@ namespace TradingBrain.Models
                             clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
                             //clsCommonFunctions.AddStatusMessage($"values before  run ctd... - doSuppTrades={model.doSuppTrades}, onSuppTrade={model.onSuppTrade}", "DEBUG");
 
-                            //clsCommonFunctions.AddStatusMessage($"currentCandle.ma30MinTypicalLongClose:{model.candles.currentCandle.mA30MinTypicalLongClose} currentCandle.ma30MinTypicalLongClose:{model.candles.currentCandle.mA30MinTypicalShortClose}", "DEBUG");
-                            //clsCommonFunctions.AddStatusMessage($"prevCandle.ma30MinTypicalLongClose:{model.candles.prevCandle.mA30MinTypicalLongClose} prevCandle.ma30MinTypicalLongClose:{model.candles.prevCandle.mA30MinTypicalShortClose}", "DEBUG");
-                            //clsCommonFunctions.AddStatusMessage($"prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalLongClose} prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalShortClose}", "DEBUG");
-                            //clsCommonFunctions.AddStatusMessage($"prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalLongClose} prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalShortClose}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"currentCandle.ma30MinTypicalLongClose:{model.candles.currentCandle.mA30MinTypicalLongClose} currentCandle.ma30MinTypicalLongClose:{model.candles.currentCandle.mA30MinTypicalShortClose}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"prevCandle.ma30MinTypicalLongClose:{model.candles.prevCandle.mA30MinTypicalLongClose} prevCandle.ma30MinTypicalLongClose:{model.candles.prevCandle.mA30MinTypicalShortClose}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalLongClose} prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalShortClose}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalLongClose} prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalShortClose}", "DEBUG");
 
 
 
@@ -1632,7 +1656,993 @@ namespace TradingBrain.Models
             //}
             return taskRet;
         }
+        public async Task<runRet> RunCodeV5(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            runRet taskRet = new runRet();
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            bool liveMode = true;
+            bool marketOpen = false;
 
+            DateTime dtNow = DateTime.UtcNow;
+            DateTime _startTime;
+            resolution = "MINUTE";
+
+            // Sometimes the timer that runs the RunCode will actually start at :59.xxx rather than at :00.000. This then means the minute candle is incorrect.
+            int seconds = dtNow.Second;
+            if (seconds < 59)
+            {
+                _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour, dtNow.Minute, 0).AddMinutes(-1);
+            }
+            else
+            {
+                _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour, dtNow.Minute, 0);
+            }
+
+
+            DateTime _endTime = _startTime;
+
+
+            if (!paused || paused && model.onMarket || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
+            {
+                // Check if the market is currently open. If it is not then skip till next time.
+                //marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow);
+                marketOpen = await IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates, this.epicName);
+                if (marketOpen)
+                {
+                    _igContainer.tbClient.FirstConfirmUpdate = false;
+                    string param = "";
+
+                    //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Running code");
+                    clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage($" - Epic       - {epicName}", "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage($" - Strategy   - {strategy}", "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage($" - Resolution - {resolution}", "INFO", logName);
+
+                    clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    //var watch = new System.Diagnostics.Stopwatch();
+                    //var bigWatch = new System.Diagnostics.Stopwatch();
+                    //bigWatch.Start();
+                    try
+                    {
+                        //watch.Start();
+
+
+                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy);
+
+                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+
+
+                        // If the trade has just been deleted then sort out the CFL
+
+                        if (lastTradeDeleted)
+                        {
+                            try
+                            {
+                                double nettPosition = lastTradeValue + lastTradeSuppValue;
+                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                            }
+
+                            catch (Exception ex)
+                            {
+                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                            }
+
+                            lastTradeDeleted = false;
+                            lastTradeValue = 0;
+                            lastTradeSuppValue = 0;
+                            lastTradeMaxQuantity = false;
+                        }
+                        //watch.Stop();
+                        //clsCommonFunctions.AddStatusMessage(DateTime.Now.ToString("o") + " - GetSettings - Time taken = " + watch.ElapsedMilliseconds);
+
+                        //Determine if we are to do long and or short trades
+                        model.doLongs = tb.doLongs;
+                        model.doShorts = tb.doShorts;
+                        model.doSuppTrades = tb.doSuppTrades;
+                        //tb.lastRunVars.doLongsVar = tb.doLongs;
+                        //tb.lastRunVars.doShortsVar = tb.doShorts;
+                        //tb.lastRunVars.doSuppTradesVar = tb.doSuppTrades;
+
+                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+
+                        model.thisModel.inputs = this.tb.runDetails.inputs.DeepCopy();
+                        model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
+                        model.thisModel.matchProTrend = false;
+                        model.modelVar.counterVar = model.thisModel.counterVar;
+                        //model.modelVar = tb.lastRunVars;
+
+                        model.startTime = dtNow;
+                        model.modelRunID = modelID;
+                        if (model.modelVar.quantity == 0)
+                        {
+                            //model.modelVar.baseQuantity = tb.runDetails.quantity;
+                            //model.modelVar.startingQuantity = tb.runDetails.quantity;
+                            //model.modelVar.startingQuantity = tb.lastRunVars.startingQuantity;
+
+                            model.modelVar.minQuantity = tb.runDetails.quantity;
+                            model.modelVar.quantity = tb.runDetails.quantity;
+                        }
+
+                        //model.counterVar = tb.runDetails.counterVar;
+                        currentStatus.inputs = tb.runDetails.inputs;
+                        currentStatus.countervar = Math.Max(this.tb.runDetails.counterVar, 1000);
+                        //currentStatus.quantity = model.modelVar.quantity;
+                        currentStatus.quantity = tb.lastRunVars.minQuantity;
+
+
+                        // Here is where I can force it to run for a full day, rather than just for the current minute. Just to test like.
+
+                        if (Environment.GetCommandLineArgs().Length >= 3)
+                        {
+                            param = Environment.GetCommandLineArgs()[2];
+                        }
+                        if (param == "DEBUG")
+                        {
+                            _startTime = new DateTime(2024, 11, 11, 16, 12, 00);
+                            _endTime = new DateTime(2024, 11, 12, 14, 30, 00);
+                            liveMode = false;
+                        }
+                        modelInstanceInputs thisInput = new modelInstanceInputs();
+                        //while (_startTime <= _endTime)
+                        //{
+                        //bigWatch.Restart();
+
+
+                        /////////////////////////////////////////////////////////
+                        // using the candle time determine which inputs to use //
+                        /////////////////////////////////////////////////////////
+                        //thisInput = IGModels.clsCommonFunctions.GetInputs(tb.runDetails.inputs, _startTime);
+
+                        // Get the last candle so we can get the spread
+                        clsCommonFunctions.AddStatusMessage($"Checking Spread ", "INFO", logName);
+                        //double thisSpread = await Get_SpreadFromLastCandle(the_app_db, minute_container, _endTime);
+                        double thisSpread = await Get_SpreadFromLastCandleRSI(the_db, candles_RSI_container, _endTime,resolution,epicName);
+
+                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO", logName);
+                        thisInput = tb.runDetails.inputs.FirstOrDefault(t => t.spread == thisSpread);
+
+                        if (thisInput == null)
+                        {
+                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}, trying spread 0", "INFO", logName);
+                            thisInput = tb.runDetails.inputs.FirstOrDefault(t => t.spread == 0);
+                        }
+                        if (thisInput == null)
+                        {
+                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                        }
+                        else
+                        {
+                            clsCommonFunctions.AddStatusMessage("Getting current candle data");
+                            //Get the last tick from the list of ticks
+                            LOepic thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epicName).FirstOrDefault();
+                            DateTime tickStart = _startTime;
+                            DateTime tickeEnd = _startTime.AddMinutes(1).AddMilliseconds(-1);
+                            List<tick> ticks = new List<tick>();
+                            ticks = thisEpic.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
+
+                            tbPrice thisPrice = new tbPrice();
+
+                            dto.endpoint.prices.v2.Price lowPrice = new dto.endpoint.prices.v2.Price();
+                            dto.endpoint.prices.v2.Price highPrice = new dto.endpoint.prices.v2.Price();
+                            dto.endpoint.prices.v2.Price openPrice = new dto.endpoint.prices.v2.Price();
+                            dto.endpoint.prices.v2.Price closePrice = new dto.endpoint.prices.v2.Price();
+
+                            highPrice.bid = ticks.Max(x => x.bid);
+                            highPrice.ask = ticks.Max(x => x.offer);
+                            lowPrice.bid = ticks.Min(x => x.bid);
+                            lowPrice.ask = ticks.Min(x => x.offer);
+                            openPrice.bid = ticks.OrderBy(x => x.UTM).FirstOrDefault().bid;
+                            openPrice.ask = ticks.OrderBy(x => x.UTM).FirstOrDefault().offer;
+                            closePrice.bid = ticks.OrderByDescending(x => x.UTM).FirstOrDefault().bid;
+                            closePrice.ask  = ticks.OrderByDescending(x => x.UTM).FirstOrDefault().offer;
+
+                            thisPrice.startDate = tickStart;
+                            thisPrice.endDate = tickeEnd;
+                            thisPrice.openPrice = openPrice;
+                            thisPrice.closePrice = closePrice;
+                            thisPrice.highPrice = highPrice;
+                            thisPrice.lowPrice =   lowPrice;
+                            thisPrice.typicalPrice.bid = (highPrice.bid + lowPrice.bid + closePrice.bid) / 3;
+                            thisPrice.typicalPrice.ask = (highPrice.ask + lowPrice.ask + closePrice.ask) / 3;
+
+                            List<double> closePrices = new List<double>();
+                            closePrices = ticks.Select(x => (double)(x.bid + x.offer) / 2).ToList();
+                            StandardDeviation sd = new StandardDeviation(closePrices);
+                            thisPrice.stdDev = sd.Value;
+
+                            //StandardDeviation sd = new StandardDeviation((IEnumerable<double>)ticks.Select(x => (x.bid + x.offer) / 2).ToList());
+                            //thisPrice.stdDev = sd.Value;
+
+                            modQuote thisCandle = new modQuote();
+                            thisCandle.Date = tickStart;
+                            thisCandle.Close = (decimal)(thisPrice.closePrice.bid + thisPrice.closePrice.ask) / 2;
+                            thisCandle.Open= (decimal)(thisPrice.openPrice.bid + thisPrice.openPrice.ask) / 2;
+                            thisCandle.High= (decimal)(thisPrice.highPrice.bid + thisPrice.highPrice.ask) / 2;
+                            thisCandle.Low = (decimal)(thisPrice.lowPrice.bid + thisPrice.lowPrice.ask) / 2;
+                            thisCandle.Typical= (decimal)(thisPrice.typicalPrice.bid + thisPrice.typicalPrice.ask) / 2;
+                            thisCandle.stdDev = sd.Value;
+
+                            AddStatusMessage($"New Tick :{thisPrice.startDate} - {thisPrice.endDate}");
+                            AddStatusMessage($"   Open: {thisPrice.openPrice.bid} / {thisPrice.openPrice.ask} ");
+                            AddStatusMessage($"   High: {thisPrice.highPrice.bid} / {thisPrice.highPrice.ask} ");
+                            AddStatusMessage($"   Low:  {thisPrice.lowPrice.bid} / {thisPrice.lowPrice.ask} ");
+                            AddStatusMessage($"   Close:{thisPrice.closePrice.bid} / {thisPrice.closePrice.ask} ");
+                            AddStatusMessage($"   Typical:{thisPrice.typicalPrice.bid} / {thisPrice.typicalPrice.ask} ");
+
+                            foreach (tick item in ticks) thisEpic.ticks.Remove(item);
+
+
+
+                            //    bool createMinRecord = liveMode;
+                            //if (model.region == "test" || strategy == "SMA2") { createMinRecord = false; }
+                            ////clsCommonFunctions.AddStatusMessage($"Checking B ", "INFO", logName);
+                            //model.candles.currentCandle = await CreateLiveCandle(the_db, thisInput.var1, thisInput.var3, thisInput.var2, thisInput.var13, _startTime, epicName, minute_container, TicksContainer, false, createMinRecord, the_app_db, model.exchangeClosedDates);
+                            ////clsCommonFunctions.AddStatusMessage($"Checking C ", "INFO", logName);
+
+                            //// Check to see if we have prev and prev2 candles already. If not (i.e. first run) then go get them.
+                            ////clsCommonFunctions.AddStatusMessage($"Checking D ", "INFO", logName);
+                            //if (model.candles.prevCandle.candleStart == DateTime.MinValue)
+                            //{
+                            //    model.candles.prevCandle = await CreateLiveCandle(the_db, thisInput.var1, thisInput.var3, thisInput.var2, thisInput.var13, _startTime.AddMinutes(-1), epicName, minute_container, TicksContainer, false, false, the_app_db, model.exchangeClosedDates);
+
+                            //}
+                            ////clsCommonFunctions.AddStatusMessage($"Checking E ", "INFO", logName);
+                            //if (model.candles.prevCandle2.candleStart == DateTime.MinValue)
+                            //{
+                            //    model.candles.prevCandle2 = await CreateLiveCandle(the_db, thisInput.var1, thisInput.var3, thisInput.var2, thisInput.var13, _startTime.AddMinutes(-2), epicName, minute_container, TicksContainer, false, false, the_app_db, model.exchangeClosedDates);
+                            //}
+                            ////clsCommonFunctions.AddStatusMessage($"Checking F ", "INFO", logName);
+                            //DateTime getStartDate = await model.getPrevMAStartDate(model.candles.currentCandle.candleStart, model.candles.currentCandle.epicName);
+                            ////clsCommonFunctions.AddStatusMessage($"Checking G ", "INFO", logName);
+                            //IG_Epic epic = new IG_Epic(epicName);
+                            //clsMinuteCandle prevMa = await Get_MinuteCandle(the_db, minute_container, epic, getStartDate);
+                            //model.candles.prevMACandle.mA30MinTypicalLongClose = prevMa.MovingAverages30Min[thisInput.var3 - 1].movingAverage.Close;
+                            //model.candles.prevMACandle.mA30MinTypicalShortClose = prevMa.MovingAverages30Min[thisInput.var13 - 1].movingAverage.Close;
+
+                            model.quotes = new ModelQuotes();
+
+                            AddStatusMessage("Getting rsi quotes from DB.......");
+                            
+
+                            List<modQuote> rsiQuotes = new List<modQuote>();
+                            List<modQuote> indCandles = await RSI_LoadPrices.GetPriceDataSMA(the_db,  epicName, "MINUTE", 0, _startTime, _endTime, strategy, true,50);
+
+                            indCandles.Add(thisCandle);
+
+                            AddStatusMessage("Getting Moving Averages quotes from indCandles.......");
+                            int intI = 0;
+                            //List<modQuote> newCandles = new List<modQuote>();
+                            foreach (modQuote mq in indCandles)
+                            {
+                                if (intI >= 1500)
+                                {
+                                    int indIndex2 = indCandles.BinarySearch(new modQuote { Date = mq.Date }, new QuoteComparer());
+                                    for (int sma = 1; sma <= 100; sma += 1)
+                                    {
+
+                                        modQuote thisQuote = new modQuote();
+                                        thisQuote.Date = mq.Date;
+                                        thisQuote.High = indCandles.GetRange(indIndex2 + 1 - sma, sma).Average(s => s.High);
+                                        thisQuote.Low = indCandles.GetRange(indIndex2 + 1 - sma, sma).Average(s => s.Low);
+                                        thisQuote.Close = indCandles.GetRange(indIndex2 + 1 - sma, sma).Average(s => s.Close);
+                                        thisQuote.Open = indCandles.GetRange(indIndex2 + 1 - sma, sma).Average(s => s.Open);
+                                        thisQuote.Typical = indCandles.GetRange(indIndex2 + 1 - sma, sma).Average(s => s.Typical);
+                                        thisQuote.index = sma;
+
+                                        mq.smaQuotes.Add(thisQuote);
+
+
+                                    }
+
+                                    List<modQuote> sma30Quotes = new List<modQuote>();
+
+                                    sma30Quotes = indCandles.Where(s => s.Date <= mq.Date).Where(s => s.Date == mq.Date || s.Date.Minute == 29 || s.Date.Minute == 59).ToList();
+
+                                    for (int sma30 = 1; sma30 <= 50; sma30 += 1)
+                                    {
+                                        //if (indIndex >= sma30 - 1)
+                                        //{
+                                        modQuote thisQuote = new modQuote();
+                                        thisQuote.Date = mq.Date;
+                                        thisQuote.High = sma30Quotes.TakeLast(sma30).Average(s => s.High);
+                                        thisQuote.Low = sma30Quotes.TakeLast(sma30).Average(s => s.Low);
+                                        thisQuote.Close = sma30Quotes.TakeLast(sma30).Average(s => s.Close);
+                                        thisQuote.Open = sma30Quotes.TakeLast(sma30).Average(s => s.Open);
+                                        thisQuote.Typical = sma30Quotes.TakeLast(sma30).Average(s => s.Typical);
+                                        thisQuote.index = sma30;
+
+                                        mq.sma30Quotes.Add(thisQuote);
+
+
+                                    }
+                                    //newCandles.Add(mq);
+                                }
+
+                                intI++;
+                            }
+
+
+
+                            int newVar1 = thisInput.var1 - 1;
+                            int newVar2 = thisInput.var2 - 1;
+                            int newVar3 = thisInput.var3 - 1;
+                            int newVar13 = thisInput.var13 - 1;
+
+                            model.candles.spread = thisSpread;
+
+
+                            int indIndex = indCandles.BinarySearch(new modQuote { Date = thisPrice.startDate }, new QuoteComparer());
+                            int numNewCandles = indCandles.Count;
+
+                            model.candles.currentCandle = new ModelMinuteCandle();
+                            model.candles.currentCandle.epicName = epicName;
+                            model.candles.currentCandle.candleStart = thisPrice.startDate;
+                            model.candles.currentCandle.thisQuote = indCandles[numNewCandles - 1];
+                            model.candles.currentCandle.mATypicalLongTypical = model.candles.currentCandle.thisQuote.smaQuotes[newVar1].Typical;// newCandles.TakeLast( thisInput.var1).Average(s => s.Typical);
+                            model.candles.currentCandle.mATypicalShortTypical =     model.candles.currentCandle.thisQuote.smaQuotes[newVar2].Typical;// newCandles.TakeLast( thisInput.var2).Average(s => s.Typical);
+                            model.candles.currentCandle.mA30MinTypicalLongClose = model.candles.currentCandle.thisQuote.sma30Quotes[newVar3].Close; //sma30Quotes.TakeLast(thisInput.var3).Average(s => s.Close);
+                            model.candles.currentCandle.mA30MinTypicalShortClose = model.candles.currentCandle.thisQuote.sma30Quotes[newVar13].Close; //sma30Quotes.TakeLast(thisInput.var13).Average(s => s.Close);
+                            model.candles.currentCandle.FirstBid = (decimal)thisPrice.openPrice.bid;
+                            model.candles.currentCandle.FirstOffer = (decimal)thisPrice.openPrice.ask;
+                            
+
+                            model.candles.prevCandle = new ModelMinuteCandle();
+                            model.candles.prevCandle.candleStart = indCandles[numNewCandles - 2].Date ;
+                            model.candles.prevCandle.thisQuote = indCandles[numNewCandles - 2];
+                            model.candles.prevCandle.mATypicalLongTypical = model.candles.prevCandle.thisQuote.smaQuotes[newVar1].Typical;// newCandles.TakeLast( thisInput.var1).Average(s => s.Typical);
+                            model.candles.prevCandle.mATypicalShortTypical = model.candles.prevCandle.thisQuote.smaQuotes[newVar2].Typical;// newCandles.TakeLast( thisInput.var2).Average(s => s.Typical);
+                            model.candles.prevCandle.mA30MinTypicalLongClose = model.candles.prevCandle.thisQuote.sma30Quotes[newVar3].Close; //sma30Quotes.TakeLast(thisInput.var3).Average(s => s.Close);
+                            model.candles.prevCandle.mA30MinTypicalShortClose = model.candles.prevCandle.thisQuote.sma30Quotes[newVar13].Close; //sma30Quotes.TakeLast(thisInput.var13).Average(s => s.Close);
+
+                            model.candles.prevCandle2 = new ModelMinuteCandle();
+                            model.candles.prevCandle2.candleStart = indCandles[numNewCandles - 3].Date;
+                            model.candles.prevCandle2.thisQuote = indCandles[numNewCandles - 3];
+                            model.candles.prevCandle2.mATypicalLongTypical = model.candles.prevCandle2.thisQuote.smaQuotes[newVar1].Typical;// newCandles.TakeLast( thisInput.var1).Average(s => s.Typical);
+                            model.candles.prevCandle2.mATypicalShortTypical = model.candles.prevCandle2.thisQuote.smaQuotes[newVar2].Typical;// newCandles.TakeLast( thisInput.var2).Average(s => s.Typical);
+                            model.candles.prevCandle2.mA30MinTypicalLongClose = model.candles.prevCandle2.thisQuote.sma30Quotes[newVar3].Close; //sma30Quotes.TakeLast(thisInput.var3).Average(s => s.Close);
+                            model.candles.prevCandle2.mA30MinTypicalShortClose = model.candles.prevCandle2.thisQuote.sma30Quotes[newVar13].Close; //sma30Quotes.TakeLast(thisInput.var13).Average(s => s.Close);
+
+                            DateTime getStartDate = await getPrevMAStartDate(model.candles.currentCandle.candleStart, model.candles.currentCandle.epicName);
+                            int candleIndex = indCandles.BinarySearch(new modQuote { Date = getStartDate }, new QuoteComparer());
+
+                            if (candleIndex >= 0)
+                            {
+                                model.candles.prevMACandle = new ModelMinuteCandle();
+                                model.candles.prevMACandle.candleStart = indCandles[candleIndex].Date;
+                                model.candles.prevMACandle.thisQuote = indCandles[candleIndex];
+                                model.candles.prevMACandle.mATypicalLongTypical = model.candles.prevMACandle.thisQuote.smaQuotes[newVar1].Typical;// newCandles.TakeLast( thisInput.var1).Average(s => s.Typical);
+                                model.candles.prevMACandle.mATypicalShortTypical = model.candles.prevMACandle.thisQuote.smaQuotes[newVar2].Typical;// newCandles.TakeLast( thisInput.var2).Average(s => s.Typical);
+                                model.candles.prevMACandle.mA30MinTypicalLongClose = model.candles.prevMACandle.thisQuote.sma30Quotes[newVar3].Close; //sma30Quotes.TakeLast(thisInput.var3).Average(s => s.Close);
+                                model.candles.prevMACandle.mA30MinTypicalShortClose = model.candles.prevMACandle.thisQuote.sma30Quotes[newVar13].Close; //sma30Quotes.TakeLast(thisInput.var13).Average(s => s.Close);
+                            }
+                            else
+                            {
+                                model.candles.prevMACandle = null;
+                            }
+
+                            clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
+                            
+                            
+                            clsCommonFunctions.AddStatusMessage($"longLTTValue:{model.candles.currentCandle.mA30MinTypicalLongClose} ", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"shortLTTValue:{model.candles.currentCandle.mA30MinTypicalShortClose}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"longLTTPrevValue:{model.candles.prevCandle.mA30MinTypicalLongClose}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"shortLTTPrevValue:{model.candles.prevCandle.mA30MinTypicalShortClose}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"shortMAT:{model.candles.currentCandle.mATypicalShortTypical}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"shortPrevMAT:{model.candles.prevCandle.mATypicalShortTypical}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"longMAT:{model.candles.currentCandle.mATypicalLongTypical}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"longPrevMAT:{model.candles.prevCandle.mATypicalLongTypical}", "DEBUG");
+
+                            clsCommonFunctions.AddStatusMessage($"");
+
+                            clsCommonFunctions.AddStatusMessage($"prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalLongClose}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"prevCandle2.mA30MinTypicalShortClose:{model.candles.prevCandle2.mA30MinTypicalShortClose}", "DEBUG");
+
+
+                            if (model.candles.prevMACandle != null)
+                            {
+                                clsCommonFunctions.AddStatusMessage($"prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalLongClose}", "DEBUG");
+                                clsCommonFunctions.AddStatusMessage($"prevMACandle.mA30MinTypicalShortClose:{model.candles.prevMACandle.mA30MinTypicalShortClose}", "DEBUG");
+
+                            }
+                            else { 
+                                clsCommonFunctions.AddStatusMessage($"prevMaCandle is null. getStartDate = {getStartDate}");
+                            }
+                                //model.RunProTrendCodeV2(model.candles);
+                                //model.RunProTrendCodeV3(model.candles);
+                                model.RunProTrendCodeV5(model.candles);
+
+
+
+                            clsCommonFunctions.AddStatusMessage($"values after  run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
+                            //clsCommonFunctions.AddStatusMessage($"values after  run ctd... - doSuppTrades={model.doSuppTrades}, onSuppTrade={model.onSuppTrade}", "DEBUG");
+                            clsCommonFunctions.AddStatusMessage($"Current standard deviation - {model.candles.currentCandle.thisQuote.stdDev}", "DEBUG", logName);
+
+                            clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                            clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                            clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                            clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                            clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                            clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                            clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                            clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                            //clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG");
+                            //clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG");
+
+
+                            if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                            if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+
+                            //model.sellShort = true;
+
+                            if (param != "DEBUG")
+                            {
+                                string thisDealRef = "";
+                                string dealType = "";
+                                bool dealSent = false;
+
+                                double targetVar = thisInput.targetVarInput / 100 + 1;
+                                double targetVarShort = thisInput.targetVarInputShort / 100 + 1;
+
+                                //////////////////////////////////////////////////////////////////////////////////////////////
+                                // Check for changes to stop limit that would mean the current trade has to end immediately //
+                                //////////////////////////////////////////////////////////////////////////////////////////////
+
+                                double currentStop = 0;
+                                double newStop = 0;
+                                double currentPrice = 0;
+
+                                if (model.longOnmarket && model.modelVar.breakEvenVar == 0)
+                                {
+                                    currentStop = IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue));
+                                    newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
+                                    currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.candles.currentCandle.candleData.Close);
+
+                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
+
+
+                                    if (currentStop < newStop && currentPrice < newStop && currentPrice > currentStop)
+                                    {
+                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
+                                        model.sellLong = true;
+                                    }
+
+                                }
+                                if (model.shortOnMarket && model.modelVar.breakEvenVar == 0)
+                                {
+                                    currentStop = IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.sellPrice + Math.Abs(model.thisModel.currentTrade.stopLossValue));
+                                    newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
+                                    currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.candles.currentCandle.candleData.Close);
+
+                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop > newStop = {currentStop > newStop},  currentPrice > newStop = {currentPrice > newStop}, currentPrice < currentStop {currentPrice < currentStop}  ", "DEBUG", logName);
+
+
+                                    if (currentStop > newStop && currentPrice > newStop && currentPrice < currentStop)
+                                    {
+                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "buying short because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now higher than the new stop.", the_app_db);
+                                        model.buyShort = true;
+                                    }
+                                }
+
+
+                                // Check if target price has changed when an attached order is set but the supp trade hasn't started yet. //
+
+                                if (model.onMarket && this.currentTrade != null && model.onSuppTrade == false && model.thisModel.currentTrade.attachedOrder != null)
+                                {
+                                    OrderValues orderValues = new OrderValues();
+                                    string direction = "";
+                                    if (model.longOnmarket)
+                                    {
+                                        direction = "buy";
+                                    }
+                                    if (model.shortOnMarket)
+                                    {
+                                        direction = "sell";
+                                    }
+                                    orderValues.SetOrderValues(direction, this);
+                                    clsCommonFunctions.AddStatusMessage($"Checking order level {orderValues.level} = attached order level {model.thisModel.currentTrade.attachedOrder.orderLevel}", "DEBUG", logName);
+                                    if (orderValues.level != model.thisModel.currentTrade.attachedOrder.orderLevel)
+                                    {
+                                        // get stuff done :- specifically get the order values 
+
+
+                                        if (orderValues.stopDistance > 0 && orderValues.level > 0)
+                                        {
+                                            EditOrder(orderValues.level, orderValues.stopDistance, model.thisModel.currentTrade.attachedOrder.dealId);
+                                        }
+
+
+                                    }
+                                }
+
+
+                                //////////////////////////////////////////////////////////////////
+
+                                // Check first that the stop loss is more than 4x the current std dev
+
+                                double stdDev = model.candles.currentCandle.thisQuote.stdDev;
+                                double sL = 0;
+                                double stdDevSL = 0;
+                                if (model.buyLong)
+                                {
+                                    sL = (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
+                                    stdDevSL = sL / stdDev;
+                                }
+                                else
+                                {
+                                    if (model.sellShort)
+                                    {
+                                        sL = (double)thisInput.var5 * Math.Abs((double)targetVarShort * (double)model.candles.currentCandle.mATypicalShortTypical - (double)model.candles.currentCandle.mATypicalShortTypical);
+                                        stdDevSL = sL / stdDev;
+                                    }
+                                }
+                                //bool stdDevOK = true;
+                                if (model.buyLong || model.sellShort)
+                                {
+                                    if (stdDevSL < 4)
+                                    {
+                                        //stdDevOK = false;
+                                        clsCommonFunctions.AddStatusMessage($"Stop loss ({sL}) is not more than 4x the current std dev ({stdDev}) - stdDevSL = {stdDevSL}", "ERROR", logName);
+                                        model.buyLong = false;
+                                        model.sellShort = false;
+                                    }
+                                    else
+                                    {
+                                        clsCommonFunctions.AddStatusMessage($"Stop loss ({sL}) is more than 4x the current std dev ({stdDev}) - stdDevSL = {stdDevSL}", "INFO", logName);
+                                    }
+                                }
+
+
+                                if (model.buyLong && this.currentTrade == null)
+                                {
+                                    clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                    model.stopLossVar = (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
+                                    requestedTrade reqTrade = new requestedTrade();
+                                    reqTrade.dealType = "POSITION";
+                                    reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, model.stopLossVar, this.igAccountId);
+                                    requestedTrades.Add(reqTrade);
+                                    if (reqTrade.dealReference != "")
+                                    {
+                                        dealSent = true;
+                                        thisDealRef = reqTrade.dealReference;
+                                        dealType = "PlaceDeal";
+                                    }
+
+                                }
+                                else
+                                {
+                                    if (model.sellLong)
+                                    {
+                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                        clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
+                                        //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
+                                        string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
+                                        if (dealRef != "")
+                                        {
+                                            dealSent = true;
+                                            thisDealRef = dealRef;
+                                            dealType = "PlaceDeal";
+                                        }
+
+                                        if (model.doSuppTrades && model.onSuppTrade)
+                                        {
+                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong Supplementary", the_app_db);
+                                            clsCommonFunctions.AddStatusMessage("SellLong Supplementary activated", "INFO", logName);
+                                            dealRef = await CloseDeal("long", (double)this.suppTrade.size, this.suppTrade.dealId);
+                                            if (dealRef != "")
+                                            {
+                                                dealSent = true;
+                                                thisDealRef = dealRef;
+                                                dealType = "PlaceDeal";
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (model.sellShort && this.currentTrade == null)
+                                {
+                                    clsCommonFunctions.AddStatusMessage("SellShort activated", "INFO", logName);
+                                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellShort", the_app_db);
+                                    model.stopLossVar = (double)thisInput.var5 * Math.Abs((double)targetVarShort * (double)model.candles.currentCandle.mATypicalShortTypical - (double)model.candles.currentCandle.mATypicalShortTypical);
+                                    requestedTrade reqTrade = new requestedTrade();
+                                    reqTrade.dealType = "POSITION";
+                                    reqTrade.dealReference = await PlaceDeal("short", model.modelVar.quantity, model.stopLossVar, this.igAccountId);
+                                    requestedTrades.Add(reqTrade);
+                                    if (reqTrade.dealReference != "")
+                                    {
+                                        dealSent = true;
+                                        thisDealRef = reqTrade.dealReference;
+                                        dealType = "PlaceDeal";
+                                    }
+                                }
+                                else
+                                {
+                                    if (model.buyShort)
+                                    {
+                                        clsCommonFunctions.AddStatusMessage("BuyShort activated", "INFO", logName);
+                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyShort)", the_app_db);
+                                        //CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId);
+                                        string dealRef = await CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId);
+                                        if (dealRef != "")
+                                        {
+                                            dealSent = true;
+                                            thisDealRef = dealRef;
+                                            dealType = "PlaceDeal";
+                                        }
+
+                                        if (model.doSuppTrades && model.onSuppTrade)
+                                        {
+                                            clsCommonFunctions.AddStatusMessage("BuyShort Supplementary activated", "INFO", logName);
+                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyShort Supplementary", the_app_db);
+                                            string dealRefSupp = await CloseDeal("short", (double)this.suppTrade.size, this.suppTrade.dealId);
+                                        }
+                                    }
+                                }
+
+
+                                if (model.longOnmarket)
+                                {
+                                    clsCommonFunctions.AddStatusMessage($"[LONG] Check if buyprice ({model.thisModel.currentTrade.buyPrice}) - stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
+
+                                    if ((IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)) && (IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.stopLossValue) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)))
+                                    {
+
+
+
+                                        //EditDeal(Math.Abs( model.thisModel.currentTrade.stopLossValue), this.currentTrade.dealId);
+                                        decimal? currentStopLevel = this.currentTrade.stopLevel;
+                                        if (model.modelVar.breakEvenVar == 1)
+                                        {
+
+
+                                            this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.buyPrice + (decimal)model.thisModel.currentTrade.stopLossValue;
+                                            clsCommonFunctions.AddStatusMessage($"EditLong activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal - BREAKEVEN", the_app_db);
+                                            string dealRef = await EditDeal((double)model.thisModel.currentTrade.buyPrice + model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue);
+                                            if (dealRef != "")
+                                            {
+                                                dealSent = true;
+                                                thisDealRef = dealRef;
+                                                dealType = "PlaceDeal";
+                                            }
+
+                                            //If on a supp trade then set that trades sl to be the same as the current trade
+                                            if (model.onSuppTrade && this.suppTrade != null)
+                                            {
+                                                clsCommonFunctions.AddStatusMessage($"EditLong SUPP activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Long Deal BREAKEVEN", the_app_db);
+                                                string dealRefSupp = await EditDeal((double)model.thisModel.currentTrade.buyPrice + model.thisModel.currentTrade.stopLossValue, this.suppTrade.dealId, model.thisModel.currentTrade.stopLossValue);
+                                            }
+                                        }
+                                        else
+
+                                        {
+
+                                            if (model.onSuppTrade)
+                                            {
+                                                // on a supp trade so make the current trade have the same stop loss value so they close at the same time.
+                                                //this.currentTrade.stopLevel = model.suppStopLossVar;
+                                                this.model.thisModel.currentTrade.stopLossValue = (double)this.suppTrade.stopLevel;
+                                                this.currentTrade.stopLevel = this.suppTrade.stopLevel;
+
+                                                clsCommonFunctions.AddStatusMessage($"EditLong Long SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Long Deal ", the_app_db);
+                                                string dealRefSupp = await EditDeal((double)this.currentTrade.stopLevel, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue);
+                                            }
+                                            else
+                                            {
+                                                this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.buyPrice - (decimal)model.thisModel.currentTrade.stopLossValue;
+                                                clsCommonFunctions.AddStatusMessage($"EditLong Long activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal ", the_app_db);
+                                                string dealRef = await EditDeal((double)model.thisModel.currentTrade.buyPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue);
+                                                if (dealRef != "")
+                                                {
+                                                    dealSent = true;
+                                                    thisDealRef = dealRef;
+                                                    dealType = "PlaceDeal";
+                                                }
+                                            }
+                                        }
+
+                                    }
+                                }
+                                if (model.shortOnMarket)
+                                {
+                                    clsCommonFunctions.AddStatusMessage($"[SHORT] Check if sellPrice ({model.thisModel.currentTrade.sellPrice}) + stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.sellPrice + Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
+
+                                    if ((IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.sellPrice + Math.Abs(model.thisModel.currentTrade.stopLossValue)) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)) && (IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.stopLossValue) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)))
+                                    {
+                                        clsCommonFunctions.AddStatusMessage("EditShort activated", "INFO", logName);
+                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Short Deal", the_app_db);
+
+
+                                        //EditDeal(Math.Abs( model.thisModel.currentTrade.stopLossValue), this.currentTrade.dealId);
+                                        decimal? currentStopLevel = this.currentTrade.stopLevel;
+
+                                        if (model.modelVar.breakEvenVar == 1)
+                                        {
+
+                                            this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.sellPrice - (decimal)model.thisModel.currentTrade.stopLossValue;
+                                            clsCommonFunctions.AddStatusMessage($"EditShort activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Short Deal - BREAKEVEN", the_app_db);
+                                            string dealRef = await EditDeal((double)model.thisModel.currentTrade.sellPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue);
+                                            if (dealRef != "")
+                                            {
+                                                dealSent = true;
+                                                thisDealRef = dealRef;
+                                                dealType = "PlaceDeal";
+                                            }
+                                            //If on a supp trade then set that trades sl to be the same as the current trade
+                                            if (model.onSuppTrade && this.suppTrade != null)
+                                            {
+                                                clsCommonFunctions.AddStatusMessage($"EditShort SUPP activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Short SUPP Deal - BREAKEVEN", the_app_db);
+                                                string dealRefSupp = await EditDeal((double)model.thisModel.currentTrade.sellPrice - model.thisModel.currentTrade.stopLossValue, this.suppTrade.dealId, model.thisModel.currentTrade.stopLossValue);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if (model.onSuppTrade)
+                                            {
+                                                // on a supp trade so make the current trade have the same stop loss value so they close at the same time.
+                                                //this.currentTrade.stopLevel = model.suppStopLossVar;
+                                                this.model.thisModel.currentTrade.stopLossValue = (double)this.suppTrade.stopLevel;
+                                                this.currentTrade.stopLevel = this.suppTrade.stopLevel;
+
+                                                clsCommonFunctions.AddStatusMessage($"EditShort SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Short Deal ", the_app_db);
+                                                string dealRefSupp = await EditDeal((double)this.currentTrade.stopLevel, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue);
+                                            }
+                                            else
+                                            {
+                                                this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.sellPrice + (decimal)model.thisModel.currentTrade.stopLossValue;
+                                                clsCommonFunctions.AddStatusMessage($"EditShort SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Short Deal ", the_app_db);
+                                                string dealRef = await EditDeal((double)model.thisModel.currentTrade.sellPrice + model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue);
+                                                if (dealRef != "")
+                                                {
+                                                    dealSent = true;
+                                                    thisDealRef = dealRef;
+                                                    dealType = "PlaceDeal";
+                                                }
+                                            }
+                                        }
+
+                                    }
+                                }
+
+
+                            }
+                            try
+                            {
+                                if (model.thisModel.currentTrade != null)
+                                {
+                                    if (model.thisModel.currentTrade.targetPrice != 0)
+                                    {
+                                        await model.thisModel.currentTrade.SaveDocument(this.trade_container);
+                                    }
+                                    ;
+                                }
+                                if (model.thisModel.suppTrade != null)
+                                {
+                                    if (model.thisModel.suppTrade.targetPrice != 0)
+                                    {
+                                        await model.thisModel.suppTrade.SaveDocument(this.trade_container);
+                                    }
+                                    ;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Log log = new Log(the_app_db);
+                                log.Log_Message = ex.ToString();
+                                log.Log_Type = "Error";
+                                log.Log_App = "RunCode";
+                                await log.Save();
+
+                            }
+
+                            //reset any deal variables that could have been placed by the RunCode
+                            model.buyLong = false;
+                            model.buyShort = false;
+                            model.sellLong = false;
+                            model.sellShort = false;
+                            model.buyLongSupp = false;
+                            model.buyShortSupp = false;
+                            model.sellLongSupp = false;
+                            model.sellShortSupp = false;
+
+                            if (model.candles.prevCandle2.candleStart == DateTime.MinValue)
+                            {
+
+                            }
+
+
+                            if (model.modelLogs.logs.Count() > 0)
+                            {
+                                ModelLog log = new ModelLog();
+                                log = model.modelLogs.logs[0];
+                                log.modelRunID = modelID;
+                                log.runDate = _startTime;
+                                log.id = System.Guid.NewGuid().ToString();
+                                if (model.onMarket)
+                                {
+                                    currentStatus.onMarket = true;
+                                    if (model.longOnmarket)
+                                    {
+                                        currentStatus.tradeType = "Long";
+                                    }
+                                    if (model.shortOnMarket)
+                                    {
+                                        currentStatus.tradeType = "Short";
+                                    }
+                                    currentStatus.target = model.thisModel.currentTrade.targetPrice;
+                                    currentStatus.count = model.thisModel.currentTrade.count;
+
+                                }
+                                else
+                                {
+                                    currentStatus.onMarket = false;
+                                    currentStatus.tradeType = "";
+                                }
+
+                                currentStatus.carriedForwardLoss = modelVar.carriedForwardLoss;
+                                currentStatus.accountId = this.igAccountId;
+                                currentStatus.startingQuantity = modelVar.startingQuantity;
+                                currentStatus.minQuantity = modelVar.minQuantity;
+                                currentStatus.maxQuantity = modelVar.maxQuantity;
+                                currentStatus.gainMultiplier = modelVar.gainMultiplier;
+                                currentStatus.maxQuantityMultiplier = modelVar.maxQuantityMultiplier;
+                                currentStatus.currentGain = modelVar.currentGain;
+                                currentStatus.baseQuantity = modelVar.baseQuantity;
+                                currentStatus.suppQuantityMultiplier = modelVar.suppQuantityMultiplier;
+                                currentStatus.suppStopPercentage = modelVar.suppStopPercentage;
+                                currentStatus.doSuppTrades = model.doSuppTrades;
+                                currentStatus.doShorts = model.doShorts;
+                                currentStatus.doLongs = model.doLongs;
+                                //if(strategy == "RSI")
+                                //{
+                                currentStatus.hoursToTrade = tb.lastRunVars.hoursToTrade;
+                                //}
+                                //currentStatus.epicName = this.epicName;
+                                //send log to the website
+                                model.modelLogs.logs[0].epicName = this.epicName;
+                                Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                //save log to the database
+                                Container logContainer = the_app_db.GetContainer("ModelLogs");
+                                await log.SaveDocument(logContainer);
+                                model.modelLogs.logs = new List<ModelLog>();
+
+                            }
+                        }
+                        model.candles.prevCandle2 = model.candles.prevCandle.DeepCopy();
+                        model.candles.prevCandle = model.candles.currentCandle.DeepCopy();
+                        _startTime = _startTime.AddMinutes(1);
+                        //bigWatch.Stop();
+                        //clsCommonFunctions.AddStatusMessage(DateTime.Now.ToString("o") + " - Completed run - Time taken = " + bigWatch.ElapsedMilliseconds);
+
+
+
+
+                    }
+                    catch (Exception ex)
+                    {
+                        AddStatusMessage($"Error - {ex.ToString()}", "ERROR");
+                        Log log = new Log(the_app_db);
+                        log.Log_Message = ex.ToString();
+                        log.Log_Type = "Error";
+                        log.Log_App = "RunCode";
+                        await log.Save();
+                    }
+
+                    //bigWatch.Stop();
+                    //clsCommonFunctions.AddStatusMessage( "Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    // call the accounts api each hour just so we ensure the tokens don't expire
+                    //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
+                }
+                else
+                {
+                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                }
+            }
+            else
+            {
+                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                pausedAfterNGL = false;
+            }
+
+            if (latestHour != DateTime.UtcNow.Hour)
+            {
+                //clsCommonFunctions.AddStatusMessage("Hour has changed so call the AccountDetails API to ensure token doesn't expire", "INFO", logName);
+                //try
+                //{
+                //    IgResponse<dto.endpoint.accountbalance.AccountDetailsResponse> ret = await _igContainer.igRestApiClient.accountBalance();
+                //    if (ret != null)
+                //    {
+                //        clsCommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO", logName);
+                //    }
+                latestHour = DateTime.UtcNow.Hour;
+                //}
+                //catch (Exception ex)
+                //{
+                //    Log log = new Log(the_app_db);
+                //    log.Log_Message = ex.ToString();
+                //    log.Log_Type = "Error";
+                //    log.Log_App = "RunCode";
+                //    await log.Save();
+                //}
+
+            }
+
+            //if (liveMode)
+            //{
+            //    ti.Interval = GetInterval();
+            //    ti.Start();
+            //}
+            return taskRet;
+        }
+        public async Task<DateTime> getPrevMAStartDate(DateTime candleStartDate, string epic)
+        {
+            DateTime getStartDate = model.candles.currentCandle.candleStart;
+
+
+            int mm = model.candles.currentCandle.candleStart.Minute;
+            int hh = model.candles.currentCandle.candleStart.Hour;
+            if (mm <= 29) { mm = 29; } else { mm = 59; }
+            getStartDate = new DateTime(model.candles.currentCandle.candleStart.Year, model.candles.currentCandle.candleStart.Month, model.candles.currentCandle.candleStart.Day, model.candles.currentCandle.candleStart.Hour, mm, model.candles.currentCandle.candleStart.Second);
+            getStartDate = getStartDate.AddMinutes(-30);
+
+            //if (!await IGModels.clsCommonFunctions.IsTradingOpen(candles.currentCandle.candleStart, this.exchangeClosedDates))
+            if (!await IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, model.exchangeClosedDates, epic))
+            //if (!IGModels.clsCommonFunctions.IsTradingOpen(getStartDate))
+            {
+                int daysToSubtract = 0;
+                // get the current day and then work out how many days to remove to make it friday at 21:00
+                if (getStartDate.DayOfWeek == DayOfWeek.Sunday)
+                {
+                    daysToSubtract = -2;
+                }
+                else
+                {
+                    if (getStartDate.DayOfWeek == DayOfWeek.Saturday)
+                    {
+                        daysToSubtract = -1;
+                    }
+                }
+                getStartDate = getStartDate.AddDays(daysToSubtract);
+
+                int time1 = 20;
+
+
+                bool isDaylight = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time").IsDaylightSavingTime(getStartDate);
+
+
+                //Hack because the US stay on DST for an extra week for some reason.
+                if (getStartDate < new DateTime(2024, 11, 3, 0, 0, 0) && getStartDate > new DateTime(2024, 10, 28, 0, 0, 0))
+                {
+                    isDaylight = true;
+                }
+                //bool isDaylight = TimeZoneInfo.Local.IsDaylightSavingTime(dtCurrentDate);
+                if (!isDaylight)
+                {
+                    time1 = 21;
+
+                }
+
+                getStartDate = new DateTime(getStartDate.Year, getStartDate.Month, getStartDate.Day, time1, getStartDate.Minute, 0);
+
+            }
+            return getStartDate;
+        }
         public async Task<runRet> iGUpdate (updateMessage msg)
         {
             runRet taskRet = new runRet();
@@ -3012,12 +4022,12 @@ namespace TradingBrain.Models
 
 
 
-                            model.quotes.rsiCandleLow = indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var1).LastOrDefault();
-                            model.quotes.rsiCandleHigh = indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var3).LastOrDefault();
-                            model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault();
-                            model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault();
+                            model.quotes.rsiCandleLow = indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var1).LastOrDefault().Rsi ?? 0;
+                            model.quotes.rsiCandleHigh = indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var3).LastOrDefault().Rsi ?? 0;
+                            model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault().StdDev ?? 0;
+                            model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault().StdDev ?? 0;
                             int idx = (indIndex) - (int)thisInput.var7;
-                            model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx]; //stdDevResults[idx];
+                            model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx].StdDev ?? 0; //stdDevResults[idx];
 
 
                             //model.candles.currentCandle = await CreateLiveCandle(the_db, thisInput.var1, thisInput.var3, thisInput.var2, thisInput.var13, _startTime, epicName, minute_container, TicksContainer, false, createMinRecord, the_app_db, model.exchangeClosedDates);
@@ -3055,8 +4065,8 @@ namespace TradingBrain.Models
 
 
                                 clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle.StdDev} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle.StdDev}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle.StdDev}", "DEBUG", logName);
+                                clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
+                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
                                 clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
 
@@ -3524,15 +4534,15 @@ namespace TradingBrain.Models
 
                             int indIndex = indCandles.BinarySearch(new modQuote { Date = _startTime }, new QuoteComparer());
 
-                            model.quotes.rsiCandleLow = indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var1).LastOrDefault();
-                            model.quotes.rsiCandleHigh = indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var3).LastOrDefault();
-                            model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault();
-                            model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault();
-                            model.quotes.atrCandleLow = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var10).LastOrDefault();
-                            model.quotes.atrCandleHigh = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var12).LastOrDefault();
+                            model.quotes.rsiCandleLow = indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var1).LastOrDefault().Rsi ?? 0;
+                            model.quotes.rsiCandleHigh = indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var3).LastOrDefault().Rsi ?? 0;
+                            model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault().StdDev ?? 0;
+                            model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault().StdDev ?? 0;
+                            model.quotes.atrCandleLow = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var10).LastOrDefault().Atr ?? 0;
+                            model.quotes.atrCandleHigh = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var12).LastOrDefault().Atr ?? 0;
 
                             int idx = (indIndex) - (int)thisInput.var7;
-                            model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx]; //stdDevResults[idx];
+                            model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx].StdDev ?? 0; //stdDevResults[idx];
 
                             // Check if we should be adding trades at this hour
                             bool doTrade = true;
@@ -3548,9 +4558,9 @@ namespace TradingBrain.Models
 
 
                                 clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow.Atr} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh.Atr}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle.StdDev} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle.StdDev}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle.StdDev}", "DEBUG", logName);
+                                clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
+                                clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
+                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
                                 clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
                                 // run the actual code 
@@ -4030,18 +5040,18 @@ namespace TradingBrain.Models
 
                             //model.quotes.rsiCandleLow = indCandles.Take(indIndex + 1).GetRsi(thisInput.var1).LastOrDefault();
                             //model.quotes.rsiCandleHigh = indCandles.Take(indIndex + 1).GetRsi(thisInput.var3).LastOrDefault();
-                            model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault();
-                            model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault();
-                            model.quotes.atrCandleLow = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var10).LastOrDefault();
-                            model.quotes.atrCandleHigh = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var12).LastOrDefault();
+                            model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault().StdDev ?? 0;
+                            model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault().StdDev ?? 0;
+                            model.quotes.atrCandleLow = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var10).LastOrDefault().Atr ?? 0;
+                            model.quotes.atrCandleHigh = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var12).LastOrDefault().Atr ?? 0;
 
-                            model.quotes.rsiCandleHigh = new RsiResult(_startTime);
-                            model.quotes.rsiCandleLow = new RsiResult(_startTime);
-                            model.quotes.rsiCandleLow.Rsi = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var10).TakeLast(3).Average(s => s.Rsi);
-                            model.quotes.rsiCandleHigh.Rsi = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var12).TakeLast(3).Average(s => s.Rsi);
+                            //model.quotes.rsiCandleHigh = new RsiResult(_startTime);
+                            //model.quotes.rsiCandleLow = new RsiResult(_startTime);
+                            model.quotes.rsiCandleLow = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var10).TakeLast(3).Average(s => s.Rsi);
+                            model.quotes.rsiCandleHigh = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var12).TakeLast(3).Average(s => s.Rsi);
 
                             int idx = (indIndex) - (int)thisInput.var7;
-                            model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx]; //stdDevResults[idx];
+                            model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx].StdDev ?? 0; //stdDevResults[idx];
 
                             // Check if we should be adding trades at this hour
                             bool doTrade = true;
@@ -4057,9 +5067,9 @@ namespace TradingBrain.Models
 
 
                                 clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow.Atr} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh.Atr}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle.StdDev} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle.StdDev}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle.StdDev}", "DEBUG", logName);
+                                clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
+                                clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
+                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
                                 clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
                                 // run the actual code 
@@ -5074,6 +6084,7 @@ namespace TradingBrain.Models
                         model.modelVar.maxBetMultiple = tb.lastRunVars.maxBetMultiple;
                         model.thisModel.strategy = strategy;
                         model.thisModel.resolution = resolution;
+                        model.thisModel.epicName = epicName;
                         //model.modelVar = tb.lastRunVars;
 
                         model.startTime = dtNow;
@@ -5154,24 +6165,33 @@ namespace TradingBrain.Models
                             {
                                 //model.quotes.rsiCandleLow = indCandles.Take(indIndex + 1).GetRsi(thisInput.var1).LastOrDefault();
                                 //model.quotes.rsiCandleHigh = indCandles.Take(indIndex + 1).GetRsi(thisInput.var3).LastOrDefault();
-                                model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault();
-                                model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault();
-                                model.quotes.atrCandleLow = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var10).LastOrDefault();
-                                model.quotes.atrCandleHigh = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var12).LastOrDefault();
+                                model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault().StdDev ?? 0;
+                                model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault().StdDev ?? 0;
+                                model.quotes.atrCandleLow = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var10).LastOrDefault().Atr ?? 0;
+                                model.quotes.atrCandleHigh = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var12).LastOrDefault().Atr ?? 0;
 
-                                model.quotes.rsiCandleHigh = new RsiResult(_startTime);
-                                model.quotes.rsiCandleLow = new RsiResult(_startTime);
-                                model.quotes.rsiCandleLow.Rsi = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var10).TakeLast(3).Average(s => s.Rsi);
-                                model.quotes.rsiCandleHigh.Rsi = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var12).TakeLast(3).Average(s => s.Rsi);
+                                //model.quotes.rsiCandleHigh = new RsiResult(_startTime);
+                                //model.quotes.rsiCandleLow = new RsiResult(_startTime);
+                                //model.quotes.rsiCandleLow.Rsi = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var10).TakeLast(3).Average(s => s.Rsi);
+                                //model.quotes.rsiCandleHigh.Rsi = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var12).TakeLast(3).Average(s => s.Rsi);
 
                                 model.quotes.caseyC = (double)indCandles.GetRange(indIndex + 1 - (int)thisInput.var1, (int)thisInput.var1).Average(s => s.cRank[(int)thisInput.var0 - 1].cRank);
                                 model.quotes.caseyCExit = (double)indCandles.GetRange(indIndex + 1 - (int)thisInput.var3, (int)thisInput.var3).Average(s => s.cRank[(int)thisInput.var0 - 1].cRank);
+
+                                model.quotes.caseyCShort = (double)indCandles.GetRange(indIndex + 1 - (int)thisInput.svar1, (int)thisInput.svar1).Average(s => s.cRank[(int)thisInput.svar0 - 1].cRank);
+                                model.quotes.caseyCExitShort = (double)indCandles.GetRange(indIndex + 1 - (int)thisInput.svar3, (int)thisInput.svar3).Average(s => s.cRank[(int)thisInput.svar0 - 1].cRank);
+
                                 //model.quotes.caseyCAverage = await RSI_LoadPrices.GetCASEYCAverageClose(the_db, epicName, resolution, resMod,200,  _endTime);
 
-                                clsCommonFunctions.AddStatusMessage($"caseyC = {model.quotes.caseyC}, caseyCExit = {model.quotes.caseyCExit}, caseyAverage = {model.quotes.caseyCAverage}");
+
 
                                 int idx = (indIndex) - (int)thisInput.var7;
-                                model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx]; //stdDevResults[idx];
+                                model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx].StdDev ?? 0; //stdDevResults[idx];
+                                model.quotes.prevStdDevCandleShort = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.svar6).ToList()[idx].StdDev ?? 0; //stdDevResults[idx];
+
+                                model.quotes.ema = (double)indCandles.Take(indIndex + 1).GetEma((int)thisInput.var14).LastOrDefault().Ema;
+                                model.quotes.prevEma = (double)indCandles.Take(indIndex).GetEma((int)thisInput.var14).LastOrDefault().Ema;
+
 
                                 // Check if we should be adding trades at this hour
                                 bool doTrade = true;
@@ -5182,20 +6202,28 @@ namespace TradingBrain.Models
                                     doTrade = tradeHour.trade;
                                 }
 
-                                if (model.onMarket || (!model.onMarket && doTrade))
+                                if (model.onMarket || (!model.onMarket && doTrade && model.quotes.prevEma > 0))
                                 {
 
 
-                                    clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow.Atr} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh.Atr}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle.StdDev} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle.StdDev}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle.StdDev}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
+                                    // clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}, modelQuotes.prevStdDevCandleShort {model.quotes.prevStdDevCandleShort}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.caseyC = {model.quotes.caseyC}, modelQuotes.caseyCExit = {model.quotes.caseyCExit}");
+                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.caseyCShort = {model.quotes.caseyCShort}, modelQuotes.caseyCExitShort = {model.quotes.caseyCExitShort}");
+                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.ema:{model.quotes.ema} modelQuotes.prevEma:{model.quotes.prevEma}", "DEBUG", logName);
                                     clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
                                     // run the actual code 
                                     model.RunProTrendCodeCASEYC(model.quotes);
 
-                                    clsCommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
+
+                                    clsCommonFunctions.AddStatusMessage($"values after run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
                                     clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
                                     clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
                                     clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
@@ -5211,6 +6239,8 @@ namespace TradingBrain.Models
                                     clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
                                     clsCommonFunctions.AddStatusMessage($"WinningBetMultiple - {model.modelVar.winningBetMultiple}", "DEBUG", logName);
                                     clsCommonFunctions.AddStatusMessage($"maxBetMultiple - {model.modelVar.maxBetMultiple}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"calcAvgWinningTrade - {model.modelVar.calcAvgWinningTrade}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"seedAvgWinningTrade - {model.modelVar.seedAvgWinningTrade}", "DEBUG", logName);
 
 
                                     if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
@@ -5229,39 +6259,23 @@ namespace TradingBrain.Models
                                         // Check for changes to stop limit that would mean the current trade has to end immediately //
                                         //////////////////////////////////////////////////////////////////////////////////////////////
 
-                                        double currentStop = 0;
-                                        double newStop = 0;
-                                        double currentPrice = 0;
-
-                                        if (model.longOnmarket && model.modelVar.breakEvenVar == 0)
-                                        {
-                                            currentStop = IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue));
-                                            newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
-                                            currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.quotes.currentCandle.closePrice.ask);
-
-                                            clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                            clsCommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
+                                        //double currentStop = 0;
+                                        //double newStop = 0;
+                                        //double currentPrice = 0;
 
 
-                                            if (currentStop < newStop && currentPrice < newStop && currentPrice > currentStop)
-                                            {
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
-                                                model.sellLong = true;
-                                            }
-
-                                        }
 
                                         //////////////////////////////////////////////////////////////////
 
                                         if (model.buyLong && this.currentTrade == null)
                                         {
                                             clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
-                                            model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
+                                            //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                            //model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
                                             requestedTrade reqTrade = new requestedTrade();
                                             reqTrade.dealType = "POSITION";
-                                            reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, model.stopLossVar, this.igAccountId, thisInput.profitTarget);
+                                            reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, 0, this.igAccountId, 0);
                                             requestedTrades.Add(reqTrade);
 
                                             if (reqTrade.dealReference != "")
@@ -5290,51 +6304,60 @@ namespace TradingBrain.Models
                                         }
 
 
-                                        if (model.longOnmarket)
+
+                                        if (model.sellShort && this.currentTrade == null)
                                         {
+                                            clsCommonFunctions.AddStatusMessage("sellShort activated", "INFO", logName);
+                                            //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                            //model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
-                                            //Don't touch the stop level as it should be done by trailing stops instead
+                                            requestedTrade reqTrade = new requestedTrade();
+                                            reqTrade.dealType = "POSITION";
+                                            reqTrade.dealReference = await PlaceDeal("short", model.modelVar.quantity, 0, this.igAccountId, 0);
+                                            requestedTrades.Add(reqTrade);
 
-                                            //Also, if we put this back in, the edit deal function is not sending the limit level (target) so it is being overwritten.
-
-
-                                            //clsCommonFunctions.AddStatusMessage($"[LONG] Check if buyprice ({model.thisModel.currentTrade.buyPrice}) - stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
-
-                                            //if ((IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)) && (IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.stopLossValue) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)))
-                                            //{
-
-
-
-                                            //    //EditDeal(Math.Abs( model.thisModel.currentTrade.stopLossValue), this.currentTrade.dealId);
-                                            //    decimal? currentStopLevel = this.currentTrade.stopLevel;
-
-
-                                            //    this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.buyPrice - (decimal)model.thisModel.currentTrade.stopLossValue;
-                                            //    clsCommonFunctions.AddStatusMessage($"EditLong Long activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                            //    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal ", the_app_db);
-                                            //    EditDeal((double)model.thisModel.currentTrade.buyPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue);
-
-
-
-                                            //}
+                                            if (reqTrade.dealReference != "")
+                                            {
+                                                dealSent = true;
+                                                thisDealRef = reqTrade.dealReference;
+                                                dealType = "PlaceDeal";
+                                            }
                                         }
+                                        else
+                                        {
+                                            if (model.buyShort)
+                                            {
+                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                                clsCommonFunctions.AddStatusMessage("buyShort activated", "INFO");
+                                                //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
+                                                string dealRef = await CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId);
+                                                if (dealRef != "")
+                                                {
+                                                    dealSent = true;
+                                                    thisDealRef = dealRef;
+                                                    dealType = "PlaceDeal";
+                                                }
 
+                                            }
+                                        }
 
 
                                     }
                                     try
                                     {
-                                        if (model.thisModel.currentTrade != null && model.thisModel.currentTrade.purchaseDate != DateTime.MinValue)
+                                        if (model.thisModel.currentTrade != null && (model.thisModel.currentTrade.purchaseDate != DateTime.MinValue || model.thisModel.currentTrade.sellDate != DateTime.MinValue ))
                                         {
                                             model.thisModel.currentTrade.numCandlesOnMarket = model.modelVar.numCandlesOnMarket;
 
                                             await model.thisModel.currentTrade.SaveDocument(this.trade_container);
 
                                         }
+                                         
 
                                     }
                                     catch (Exception ex)
                                     {
+                                        clsCommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
                                         Log log = new Log(the_app_db);
                                         log.Log_Message = ex.ToString();
                                         log.Log_Type = "Error";
@@ -5346,6 +6369,8 @@ namespace TradingBrain.Models
                                     //reset any deal variables that could have been placed by the RunCode
                                     model.buyLong = false;
                                     model.sellLong = false;
+                                    model.buyShort = false;
+                                    model.sellShort = false;
 
 
                                     if (model.modelLogs.logs.Count() > 0)
@@ -5359,7 +6384,9 @@ namespace TradingBrain.Models
                                         {
                                             currentStatus.onMarket = true;
 
-                                            currentStatus.tradeType = "Long";
+
+
+                                            currentStatus.tradeType = model.thisModel.currentTrade.longShort;
 
 
                                             currentStatus.target = model.thisModel.currentTrade.targetPrice;
@@ -5408,6 +6435,7 @@ namespace TradingBrain.Models
 
                                     TradingBrainSettings newTB = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
                                     newTB.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
+                                    newTB.lastRunVars.calcAvgWinningTrade = modelVar.calcAvgWinningTrade;
                                     await newTB.SaveDocument(the_app_db);
 
 
@@ -5432,6 +6460,7 @@ namespace TradingBrain.Models
                     }
                     catch (Exception ex)
                     {
+                        clsCommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
                         Log log = new Log(the_app_db);
                         log.Log_Message = ex.ToString();
                         log.Log_Type = "Error";
@@ -5478,6 +6507,670 @@ namespace TradingBrain.Models
 
 
                     latestHour = DateTime.UtcNow.Hour;
+                //}
+                //catch (Exception ex)
+                //{
+                //    Log log = new Log(the_app_db);
+                //    log.Log_Message = ex.ToString();
+                //    log.Log_Type = "Error";
+                //    log.Log_App = "RunCode";
+                //    await log.Save();
+                //}
+
+            }
+
+            //if (liveMode)
+            //{
+
+            //    ti.Interval = GetIntervalWithResolution(this.resolution);
+            //    ti.Start();
+            //}
+
+            return taskRet;
+        }
+        public async Task<runRet> RunCode_CASEYCv2(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            ///////////////////////////////
+            // Run the RSI strategy code //
+            ///////////////////////////////
+            ///
+
+            AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
+            runRet taskRet = new runRet();
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            int resMod = 0;
+
+            bool liveMode = true;
+            bool marketOpen = false;
+
+            DateTime dtNow = DateTime.UtcNow;
+            DateTime _startTime;
+
+            //
+            //_igContainer.tbClient.ConnectToRest();
+
+            int min = RSI_LoadPrices.GetMinsFromResolution(this.resolution).Result;
+            // Sometimes the timer that runs the RunCode will actually start at :59.xxx rather than at :00.000. This then means the minute candle is incorrect.
+            int seconds = dtNow.Second;
+            int minutes = dtNow.Minute;
+            if (seconds == 59 && minutes == 59)
+            {
+                _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour + 1, 0, 0).AddMinutes(-min);
+            }
+            else
+            {
+                _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour, 0, 0).AddMinutes(-min);
+            }
+
+
+            DateTime _endTime = _startTime.AddMinutes(min).AddMilliseconds(-1);
+
+            if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
+            {
+                int i = 0;
+                i = Convert.ToInt16(resolution.Split("_")[1].ToString());
+                resMod = _startTime.Hour % i;
+            }
+
+            if (!paused || paused && model.onMarket || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
+            {
+                // Check if the market is currently open. If it is not then skip till next time.
+
+                marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates, this.epicName, this.futures).Result;
+                if (marketOpen)
+                {
+                    _igContainer.tbClient.FirstConfirmUpdate = false;
+                    string param = "";
+
+                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    clsCommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
+
+                    try
+                    {
+                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+
+                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+
+                        // If the trade has just been deleted then sort out the CFL
+
+                        if (lastTradeDeleted)
+                        {
+                            try
+                            {
+                                //clsCommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                double nettPosition = lastTradeValue + lastTradeSuppValue;
+                                //clsCommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
+
+                                if (nettPosition <= 0)
+                                {
+                                    //model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss + (double)Math.Abs(nettPosition);
+                                    //model.modelVar.quantityMultiplier = 1;
+                                }
+                                else
+                                {
+                                    //model.modelVar.carriedForwardLoss = model.modelVar.carriedForwardLoss - (double)Math.Abs(nettPosition);
+                                    //if (model.modelVar.carriedForwardLoss < 0) { model.modelVar.carriedForwardLoss = 0; }
+                                    //model.modelVar.currentGain += Math.Max(nettPosition - model.modelVar.carriedForwardLoss, 0);
+                                    //if (model.modelVar.quantityMultiplier == 1 && model.modelVar.carriedForwardLoss == 0) { model.modelVar.quantityMultiplier = 2; }
+                                }
+
+                                //tb.lastRunVars.carriedForwardLoss = model.modelVar.carriedForwardLoss;
+                                //tb.lastRunVars.currentGain = model.modelVar.currentGain;
+                                tb.lastRunVars.numCandlesOnMarket = 0;
+                                tb.lastRunVars.quantityMultiplier = model.modelVar.quantityMultiplier;
+                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                            }
+
+                            catch (Exception ex)
+                            {
+                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                            }
+
+                            lastTradeDeleted = false;
+                            lastTradeValue = 0;
+                            lastTradeSuppValue = 0;
+                            lastTradeMaxQuantity = false;
+                        }
+
+                        //Determine if we are to do long and or short trades
+                        model.doLongs = tb.doLongs;
+                        model.doShorts = tb.doShorts;
+                        model.doSuppTrades = tb.doSuppTrades;
+
+                        // turn on nightingale
+                        model.nightingaleOn = true;
+
+                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        clsCommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
+
+                        model.thisModel.inputs_RSI = this.tb.runDetails.inputs_RSI.DeepCopy();
+                        model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
+                        model.thisModel.matchProTrend = false;
+                        model.modelVar.counterVar = model.thisModel.counterVar;
+                        model.modelVar.baseQuantity = tb.lastRunVars.baseQuantity;
+                        model.modelVar.gainMultiplier = tb.lastRunVars.gainMultiplier;
+                        model.modelVar.maxQuantityMultiplier = tb.lastRunVars.maxQuantityMultiplier;
+                        model.modelVar.carriedForwardLoss = tb.lastRunVars.carriedForwardLoss;
+                        model.modelVar.quantityMultiplier = tb.lastRunVars.quantityMultiplier;
+                        //model.modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+                        //modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+                        modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+
+                        model.modelVar.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+
+                        model.modelVar.winningBetMultiple = tb.lastRunVars.winningBetMultiple;
+                        model.modelVar.maxBetMultiple = tb.lastRunVars.maxBetMultiple;
+                        model.thisModel.strategy = strategy;
+                        model.thisModel.resolution = resolution;
+                        model.thisModel.epicName = epicName;
+                        //model.modelVar = tb.lastRunVars;
+
+                        model.startTime = dtNow;
+                        model.modelRunID = modelID;
+                        if (model.modelVar.quantity == 0)
+                        {
+                            model.modelVar.minQuantity = tb.runDetails.quantity;
+                            model.modelVar.quantity = tb.runDetails.quantity;
+                        }
+
+                        //model.counterVar = tb.runDetails.counterVar;
+                        currentStatus.inputs_RSI = tb.runDetails.inputs_RSI.DeepCopy();
+                        currentStatus.countervar = Math.Max(this.tb.runDetails.counterVar, 1000);
+                        //currentStatus.quantity = model.modelVar.quantity;
+                        currentStatus.quantity = tb.lastRunVars.minQuantity;
+                        currentStatus.hoursToTrade = tb.lastRunVars.hoursToTrade;
+                        currentStatus.strategy = this.strategy;
+                        currentStatus.resolution = this.resolution;
+                        currentStatus.baseQuantity = tb.lastRunVars.baseQuantity;
+                        currentStatus.gainMultiplier = tb.lastRunVars.gainMultiplier;
+                        currentStatus.maxQuantityMultiplier = tb.lastRunVars.maxQuantityMultiplier;
+                        currentStatus.carriedForwardLoss = tb.lastRunVars.carriedForwardLoss;
+                        currentStatus.quantityMultiplier = tb.lastRunVars.quantityMultiplier;
+                        currentStatus.numCandlesOnMarket = tb.lastRunVars.numCandlesOnMarket;
+                        currentStatus.maxBetMultiple = tb.lastRunVars.maxBetMultiple;
+                        currentStatus.winningBetMultiple = tb.lastRunVars.winningBetMultiple;
+
+                        modelInstanceInputs_RSI thisInput = new modelInstanceInputs_RSI();
+
+                        //bigWatch.Restart();
+
+
+                        /////////////////////////////////////////////////////////
+                        // using the candle time determine which inputs to use //
+                        /////////////////////////////////////////////////////////
+                        double thisSpread = 0;
+                        if (this.epicName.Substring(0, 3) == "IX." || this.epicName.Substring(0, 3) == "CS.")
+                        {
+                            thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
+                        }
+                        //double thisSpread = Math.Round(Math.Abs((double)currentTick.Offer - (double)currentTick.Bid), 1);
+                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
+                        thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadRSIv2(tb.runDetails.inputs_RSI, thisSpread);
+                        if (thisInput == null)
+                        {
+                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                        }
+                        else
+                        {
+                            //Create the current candle
+                            // only create a new min record if we are in live
+                            // 
+                            // reset the start time to be now to ensure we are in the correct minute (sometimes the timer will run the code at 59.99 rather than at 00.00
+                            // _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour, dtNow.Minute, 0).AddMinutes(-1);
+                            //ModelQuotes modelQuotes = new ModelQuotes(); rubb
+
+                            model.quotes = new ModelQuotes();
+
+                            bool createMinRecord = liveMode;
+                            if (model.region == "test") { createMinRecord = false; }
+
+                            // Don't create a new candle for HOUR_2, HOUR_3 or HOUR_4 as it would have been created when HOUR was sorted.
+                            // This means that for these candles, we need to run TB a little bit later than the HOUR candle to ensure all candles are created.
+                            if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4") { createMinRecord = false; }
+
+                            RSI_LoadPrices obj = new RSI_LoadPrices();
+
+                            tbPrice dbPrice = new tbPrice();
+                            dbPrice = obj.GetLastPriceByEndDate(the_db, minute_container, epicName, resolution, _endTime).Result;
+
+                            if (dbPrice != null || dbPrice.endDate == _endTime)
+                            {
+                                clsCommonFunctions.AddStatusMessage($"Current candles taken from DB using end date {_endTime} : ", "INFO", logName);
+                                model.quotes.currentCandle = dbPrice;
+                            }
+                            else {
+                                clsCommonFunctions.AddStatusMessage("Getting current candles from API", "INFO", logName);
+                                model.quotes.currentCandle = obj.LoadPrices(the_db, minute_container, epicName, resolution, _endTime, createMinRecord, _igContainer.igRestApiClient);
+                            }
+
+                            clsCommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
+                            List<modQuote> rsiQuotes = new List<modQuote>();
+
+                            List<modQuote> indCandles = await RSI_LoadPrices.GetPriceDataCASEYC(the_db, epicName, resolution, resMod, _startTime, _endTime, strategy, true);
+
+                            AddStatusMessage("Getting Moving Averages quotes from indCandles.......");
+                            int intI = 0;
+                            //List<modQuote> newCandles = new List<modQuote>();
+                            foreach (modQuote mq in indCandles)
+                            {
+                                if (intI >= 200)
+                                {
+                                    int indIndex2 = indCandles.BinarySearch(new modQuote { Date = mq.Date }, new QuoteComparer());
+                                    for (int sma = 1; sma <= 200; sma += 1)
+                                    {
+
+                                        modQuote thisQuote = new modQuote();
+                                        thisQuote.Date = mq.Date;
+                                        thisQuote.High = indCandles.GetRange(indIndex2 + 1 - sma, sma).Average(s => s.High);
+                                        thisQuote.Low = indCandles.GetRange(indIndex2 + 1 - sma, sma).Average(s => s.Low);
+                                        thisQuote.Close = indCandles.GetRange(indIndex2 + 1 - sma, sma).Average(s => s.Close);
+                                        thisQuote.Open = indCandles.GetRange(indIndex2 + 1 - sma, sma).Average(s => s.Open);
+                                        thisQuote.Typical = indCandles.GetRange(indIndex2 + 1 - sma, sma).Average(s => s.Typical);
+
+                                        //thisQuote.High = indCandles.TakeLast(  sma).Average(s => s.High);
+                                        //thisQuote.Low = indCandles.TakeLast(sma).Average(s => s.Low);
+                                        //thisQuote.Close = indCandles.TakeLast(sma).Average(s => s.Close);
+                                        //thisQuote.Open = indCandles.TakeLast(sma).Average(s => s.Open);
+                                        //thisQuote.Typical = indCandles.TakeLast(sma).Average(s => s.Typical);
+
+                                        thisQuote.index = sma;
+
+                                        mq.smaQuotes.Add(thisQuote);
+
+
+                                    }
+
+
+                                    //newCandles.Add(mq);
+                                }
+
+                                intI++;
+                            }
+                            int indIndex = indCandles.BinarySearch(new modQuote { Date = _startTime }, new QuoteComparer());
+                           // List<modQuote> seededList = indCandles.TakeLast(500).ToList();
+                            if (indIndex >= 0)
+                            {
+
+                                //model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault().StdDev ?? 0;
+                                //model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault().StdDev ?? 0;
+
+                                //model.quotes.stdDevCandleShort = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.svar6).LastOrDefault().StdDev ?? 0;
+
+                                //model.quotes.atrCandleLow = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var10).LastOrDefault().Atr ?? 0;
+                                //model.quotes.atrCandleHigh = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var12).LastOrDefault().Atr ?? 0;
+
+                                //model.quotes.atrCandleLowShort = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.svar10).LastOrDefault().Atr ?? 0;
+                                //model.quotes.atrCandleHighShort = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.svar12).LastOrDefault().Atr ?? 0;
+
+                                //model.quotes.stdDevCandle = indCandles.GetStdDev((int)thisInput.var6).LastOrDefault().StdDev ?? 0;
+                                model.quotes.stdDevLongCandle = indCandles.GetStdDev(30).LastOrDefault().StdDev ?? 0;
+
+                                //model.quotes.stdDevCandleShort = indCandles.GetStdDev((int)thisInput.svar6).LastOrDefault().StdDev ?? 0;
+
+                                model.quotes.atrCandleLow = indCandles.GetAtr((int)thisInput.var10).LastOrDefault().Atr ?? 0;
+                                model.quotes.atrCandleHigh = indCandles.GetAtr((int)thisInput.var12).LastOrDefault().Atr ?? 0;
+
+                                model.quotes.atrCandleLowShort = indCandles.GetAtr((int)thisInput.svar10).LastOrDefault().Atr ?? 0;
+                                model.quotes.atrCandleHighShort = indCandles.GetAtr((int)thisInput.svar12).LastOrDefault().Atr ?? 0;
+
+                                model.quotes.caseyC = (double)indCandles.TakeLast( (int)thisInput.var1).Average(s => s.cRank[(int)thisInput.var0 - 1].cRank);
+                                model.quotes.caseyCExit = (double)indCandles.TakeLast( (int)thisInput.var3).Average(s => s.cRank[(int)thisInput.var0 - 1].cRank);
+                                model.quotes.caseyCShort = (double)indCandles.TakeLast( (int)thisInput.svar1).Average(s => s.cRank[(int)thisInput.svar0 - 1].cRank);
+                                model.quotes.caseyCExitShort = (double)indCandles.TakeLast( (int)thisInput.svar3).Average(s => s.cRank[(int)thisInput.svar0 - 1].cRank);
+
+                                model.quotes.sma = (double)indCandles.Last().smaQuotes[(int)thisInput.var14 - 1].Close;
+                                model.quotes.prevSma = (double)indCandles.TakeLast(2).ToList()[0].smaQuotes[(int)thisInput.var14 - 1].Close;
+
+                                int idx = 500 - (int)thisInput.var7 -1;
+                                model.quotes.prevStdDevCandle = indCandles.GetStdDev((int)thisInput.var6).ToList()[idx].StdDev ?? 0;  
+
+                                idx = 500 - (int)thisInput.svar7 -1;
+                                model.quotes.prevStdDevCandleShort = indCandles.GetStdDev((int)thisInput.svar6).ToList()[idx].StdDev ?? 0;  
+
+                                // Check if we should be adding trades at this hour
+                                bool doTrade = true;
+                                //int currentHour = model.quotes.currentCandle.endDate.AddMinutes(1).Hour;
+                                //hourToTrade tradeHour = modelVar.hoursToTrade.FirstOrDefault(o => o.hour == currentHour);
+                                //if (tradeHour != null)
+                                //{
+                                //    doTrade = tradeHour.trade;
+                                //}
+
+                                if (model.onMarket || (!model.onMarket && doTrade ))
+                                {
+
+
+                                    clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
+
+
+
+                                    clsCommonFunctions.AddStatusMessage($"atrCandleLow:...........{model.quotes.atrCandleLow}");
+                                    clsCommonFunctions.AddStatusMessage($"atrCandleHigh:..........{model.quotes.atrCandleHigh}");
+                                    clsCommonFunctions.AddStatusMessage($"atrCandleLowShort:......{model.quotes.atrCandleLowShort}");
+                                    clsCommonFunctions.AddStatusMessage($"atrCandleHighShort:.....{model.quotes.atrCandleHighShort}");
+                                    clsCommonFunctions.AddStatusMessage($"caseyC:.................{model.quotes.caseyC}");
+                                    clsCommonFunctions.AddStatusMessage($"caseyCExit:.............{model.quotes.caseyCExit}");
+                                    clsCommonFunctions.AddStatusMessage($"caseyCShort:............{model.quotes.caseyCShort}");
+                                    clsCommonFunctions.AddStatusMessage($"caseyCExitShort:........{model.quotes.caseyCExitShort}");
+                                    clsCommonFunctions.AddStatusMessage($"sma:....................{model.quotes.sma}");
+                                    clsCommonFunctions.AddStatusMessage($"prevSma:................{model.quotes.prevSma}");
+                                    clsCommonFunctions.AddStatusMessage($"stdDevCandle:...........{model.quotes.stdDevCandle}");
+                                    clsCommonFunctions.AddStatusMessage($"stdDevLongCandle:.......{model.quotes.stdDevLongCandle}");
+                                    clsCommonFunctions.AddStatusMessage($"stdDevCandleShort:......{model.quotes.stdDevCandleShort}");
+                                    clsCommonFunctions.AddStatusMessage($"prevStdDevCandle:.......{model.quotes.prevStdDevCandle}");
+                                    clsCommonFunctions.AddStatusMessage($"prevStdDevCandleShort:..{model.quotes.prevStdDevCandleShort}");
+
+
+                                    // clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
+                                    //clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow.Atr} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh.Atr}", "DEBUG", logName);
+                                    //clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle.StdDev} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle.StdDev}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle.StdDev}, modelQuotes.prevStdDevCandleShort {model.quotes.prevStdDevCandleShort.StdDev}", "DEBUG", logName);
+                                    //clsCommonFunctions.AddStatusMessage($"modelQuotes.caseyC = {model.quotes.caseyC}, modelQuotes.caseyCExit = {model.quotes.caseyCExit}");
+                                    //clsCommonFunctions.AddStatusMessage($"modelQuotes.caseyCShort = {model.quotes.caseyCShort}, modelQuotes.caseyCExitShort = {model.quotes.caseyCExitShort}");
+                                    //clsCommonFunctions.AddStatusMessage($"modelQuotes.ema:{model.quotes.ema} modelQuotes.prevEma:{model.quotes.prevEma}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
+
+                                    // run the actual code 
+                                    model.RunProTrendCodeCASEYCv2(model.quotes);
+
+
+                                    clsCommonFunctions.AddStatusMessage($"values after run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
+                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
+                                    clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                                    //clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
+                                    //clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"WinningBetMultiple - {model.modelVar.winningBetMultiple}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"maxBetMultiple - {model.modelVar.maxBetMultiple}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"calcAvgWinningTrade - {model.modelVar.calcAvgWinningTrade}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"seedAvgWinningTrade - {model.modelVar.seedAvgWinningTrade}", "DEBUG", logName);
+
+
+                                    if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                                    if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+
+                                    //model.sellShort = true;
+
+                                    if (param != "DEBUG")
+                                    {
+
+                                        string thisDealRef = "";
+                                        string dealType = "";
+                                        bool dealSent = false;
+
+                                        //////////////////////////////////////////////////////////////////////////////////////////////
+                                        // Check for changes to stop limit that would mean the current trade has to end immediately //
+                                        //////////////////////////////////////////////////////////////////////////////////////////////
+
+                                        //double currentStop = 0;
+                                        //double newStop = 0;
+                                        //double currentPrice = 0;
+
+
+
+                                        //////////////////////////////////////////////////////////////////
+
+                                        if (model.buyLong && this.currentTrade == null)
+                                        {
+                                            clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                            //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                            //model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
+
+                                            requestedTrade reqTrade = new requestedTrade();
+                                            reqTrade.dealType = "POSITION";
+                                            reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, 0, this.igAccountId, 0);
+                                            requestedTrades.Add(reqTrade);
+
+                                            if (reqTrade.dealReference != "")
+                                            {
+                                                dealSent = true;
+                                                thisDealRef = reqTrade.dealReference;
+                                                dealType = "PlaceDeal";
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if (model.sellLong)
+                                            {
+                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                                clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO");
+                                                //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
+                                                string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
+                                                if (dealRef != "")
+                                                {
+                                                    dealSent = true;
+                                                    thisDealRef = dealRef;
+                                                    dealType = "PlaceDeal";
+                                                }
+
+                                            }
+                                        }
+
+
+
+                                        if (model.sellShort && this.currentTrade == null)
+                                        {
+                                            clsCommonFunctions.AddStatusMessage("sellShort activated", "INFO", logName);
+                                            //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                            //model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
+
+                                            requestedTrade reqTrade = new requestedTrade();
+                                            reqTrade.dealType = "POSITION";
+                                            reqTrade.dealReference = await PlaceDeal("short", model.modelVar.quantity, 0, this.igAccountId, 0);
+                                            requestedTrades.Add(reqTrade);
+
+                                            if (reqTrade.dealReference != "")
+                                            {
+                                                dealSent = true;
+                                                thisDealRef = reqTrade.dealReference;
+                                                dealType = "PlaceDeal";
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if (model.buyShort)
+                                            {
+                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                                clsCommonFunctions.AddStatusMessage("buyShort activated", "INFO");
+                                                //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
+                                                string dealRef = await CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId);
+                                                if (dealRef != "")
+                                                {
+                                                    dealSent = true;
+                                                    thisDealRef = dealRef;
+                                                    dealType = "PlaceDeal";
+                                                }
+
+                                            }
+                                        }
+
+
+                                    }
+                                    try
+                                    {
+                                        if (model.thisModel.currentTrade != null && (model.thisModel.currentTrade.purchaseDate != DateTime.MinValue || model.thisModel.currentTrade.sellDate != DateTime.MinValue))
+                                        {
+                                            model.thisModel.currentTrade.numCandlesOnMarket = model.modelVar.numCandlesOnMarket;
+
+                                            await model.thisModel.currentTrade.SaveDocument(this.trade_container);
+
+                                        }
+
+
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        clsCommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
+                                        Log log = new Log(the_app_db);
+                                        log.Log_Message = ex.ToString();
+                                        log.Log_Type = "Error";
+                                        log.Log_App = "RunCode";
+                                        await log.Save();
+
+                                    }
+
+                                    //reset any deal variables that could have been placed by the RunCode
+                                    model.buyLong = false;
+                                    model.sellLong = false;
+                                    model.buyShort = false;
+                                    model.sellShort = false;
+
+
+                                    if (model.modelLogs.logs.Count() > 0)
+                                    {
+                                        ModelLog log = new ModelLog();
+                                        log = model.modelLogs.logs[0];
+                                        log.modelRunID = modelID;
+                                        log.runDate = _startTime;
+                                        log.id = System.Guid.NewGuid().ToString();
+                                        if (model.onMarket)
+                                        {
+                                            currentStatus.onMarket = true;
+
+
+
+                                            currentStatus.tradeType = model.thisModel.currentTrade.longShort;
+
+
+                                            currentStatus.target = model.thisModel.currentTrade.targetPrice;
+                                            currentStatus.count = model.thisModel.currentTrade.count;
+
+                                        }
+                                        else
+                                        {
+                                            currentStatus.onMarket = false;
+                                            currentStatus.tradeType = "";
+                                        }
+
+                                        currentStatus.carriedForwardLoss = modelVar.carriedForwardLoss;
+                                        currentStatus.accountId = this.igAccountId;
+                                        currentStatus.startingQuantity = modelVar.startingQuantity;
+                                        currentStatus.minQuantity = modelVar.minQuantity;
+                                        currentStatus.maxQuantity = modelVar.maxQuantity;
+                                        currentStatus.gainMultiplier = modelVar.gainMultiplier;
+                                        currentStatus.maxQuantityMultiplier = modelVar.maxQuantityMultiplier;
+                                        currentStatus.currentGain = modelVar.currentGain;
+                                        currentStatus.baseQuantity = modelVar.baseQuantity;
+                                        currentStatus.suppQuantityMultiplier = modelVar.suppQuantityMultiplier;
+                                        currentStatus.suppStopPercentage = modelVar.suppStopPercentage;
+                                        currentStatus.doSuppTrades = model.doSuppTrades;
+                                        currentStatus.doShorts = model.doShorts;
+                                        currentStatus.doLongs = model.doLongs;
+                                        currentStatus.numCandlesOnMarket = modelVar.numCandlesOnMarket;
+                                        currentStatus.strategy = this.strategy;
+                                        currentStatus.resolution = this.resolution;
+                                        currentStatus.hoursToTrade = tb.lastRunVars.hoursToTrade;
+                                        //currentStatus.epicName = this.epicName;
+                                        //send log to the website
+                                        model.modelLogs.logs[0].epicName = this.epicName;
+                                        Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                        Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                        //save log to the database
+                                        Container logContainer = the_app_db.GetContainer("ModelLogs");
+                                        await log.SaveDocument(logContainer);
+                                        model.modelLogs.logs = new List<ModelLog>();
+
+                                    }
+
+
+                                    // save the run details to ensure all picked up
+                                    tb.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
+
+                                    TradingBrainSettings newTB = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                                    newTB.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
+                                    newTB.lastRunVars.calcAvgWinningTrade = modelVar.calcAvgWinningTrade;
+                                    await newTB.SaveDocument(the_app_db);
+
+
+                                }
+                                else
+                                {
+                                    //clsCommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
+                                }
+                            }
+                            else
+                            {
+                                clsCommonFunctions.AddStatusMessage($"No candle found for {_startTime}. ", "INFO");
+                            }
+                        }
+                        _startTime = _startTime.AddMinutes(1);
+                        //bigWatch.Stop();
+                        //clsCommonFunctions.AddStatusMessage(DateTime.Now.ToString("o") + " - Completed run - Time taken = " + bigWatch.ElapsedMilliseconds);
+
+
+
+
+                    }
+                    catch (Exception ex)
+                    {
+                        clsCommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
+                        Log log = new Log(the_app_db);
+                        log.Log_Message = ex.ToString();
+                        log.Log_Type = "Error";
+                        log.Log_App = "RunCode_CASEY";
+                        log.Epic = this.epicName + "-" + this.resolution;
+                        await log.Save();
+                    }
+
+                    //bigWatch.Stop();
+                    //clsCommonFunctions.AddStatusMessage("Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
+                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+
+                    // call the accounts api each hour just so we ensure the tokens don't expire
+                    //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
+                }
+                else
+                {
+                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                }
+            }
+            else
+            {
+                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                pausedAfterNGL = false;
+            }
+
+            if (latestHour != DateTime.UtcNow.Hour)
+            {
+                //clsCommonFunctions.AddStatusMessage("Hour has changed so call the AccountDetails API to ensure token doesn't expire", "INFO", logName);
+                //try
+                //{
+                //    IgResponse<dto.endpoint.accountbalance.AccountDetailsResponse> ret = await _igContainer.igRestApiClient.accountBalance();
+                //    if (ret != null)
+                //    {
+                //        clsCommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO", logName);
+
+                //        if (ret.StatusCode.ToString() == "Forbidden")
+                //        {
+                //            // re connect to API
+
+                //        }
+                //    }
+
+
+
+                latestHour = DateTime.UtcNow.Hour;
                 //}
                 //catch (Exception ex)
                 //{
@@ -5714,15 +7407,15 @@ namespace TradingBrain.Models
                             {
                                 //model.quotes.rsiCandleLow = indCandles.Take(indIndex + 1).GetRsi(thisInput.var1).LastOrDefault();
                                 //model.quotes.rsiCandleHigh = indCandles.Take(indIndex + 1).GetRsi(thisInput.var3).LastOrDefault();
-                                model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault();
-                                model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault();
-                                model.quotes.atrCandleLow = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var10).LastOrDefault();
-                                model.quotes.atrCandleHigh = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var12).LastOrDefault();
+                                model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).LastOrDefault().StdDev ?? 0;
+                                model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault().StdDev ?? 0;
+                                model.quotes.atrCandleLow = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var10).LastOrDefault().Atr ?? 0;
+                                model.quotes.atrCandleHigh = indCandles.Take(indIndex + 1).GetAtr((int)thisInput.var12).LastOrDefault().Atr ?? 0;
 
-                                model.quotes.rsiCandleHigh = new RsiResult(_startTime);
-                                model.quotes.rsiCandleLow = new RsiResult(_startTime);
-                                model.quotes.rsiCandleLow.Rsi = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var10).TakeLast(3).Average(s => s.Rsi);
-                                model.quotes.rsiCandleHigh.Rsi = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var12).TakeLast(3).Average(s => s.Rsi);
+                                //model.quotes.rsiCandleHigh = new RsiResult(_startTime);
+                                //model.quotes.rsiCandleLow = new RsiResult(_startTime);
+                                model.quotes.rsiCandleLow = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var10).TakeLast(3).Average(s => s.Rsi);
+                                model.quotes.rsiCandleHigh = (double)indCandles.Take(indIndex + 1).GetRsi((int)thisInput.var12).TakeLast(3).Average(s => s.Rsi);
 
                                 model.quotes.caseyC = (double)indCandles.GetRange(indIndex + 1 - (int)thisInput.var1, (int)thisInput.var1).Average(s => s.cRank[(int)thisInput.var0 - 1].cRank);
                                 model.quotes.caseyCExit = (double)indCandles.GetRange(indIndex + 1 - (int)thisInput.var3, (int)thisInput.var3).Average(s => s.cRank[(int)thisInput.var0 - 1].cRank);
@@ -5731,7 +7424,7 @@ namespace TradingBrain.Models
                                 clsCommonFunctions.AddStatusMessage($"caseyC = {model.quotes.caseyC}, caseyCExit = {model.quotes.caseyCExit}, caseyAverage = {model.quotes.caseyCAverage}");
 
                                 int idx = (indIndex) - (int)thisInput.var7;
-                                model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx]; //stdDevResults[idx];
+                                model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx].StdDev ?? 0; //stdDevResults[idx];
 
                                 // Check if we should be adding trades at this hour
                                 bool doTrade = true;
@@ -5747,9 +7440,9 @@ namespace TradingBrain.Models
 
 
                                     clsCommonFunctions.AddStatusMessage($"values before run         - buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow.Atr} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh.Atr}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle.StdDev} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle.StdDev}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle.StdDev}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
+                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
                                     clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
                                     // run the actual code 
@@ -6270,10 +7963,10 @@ namespace TradingBrain.Models
 
 
                             model.quotes.rei = indCandles.Take(indIndex + 1).LastOrDefault().rei;
-                            model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev(thisInput.var6).LastOrDefault();
-                            model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault();
+                            model.quotes.stdDevCandle = indCandles.Take(indIndex + 1).GetStdDev(thisInput.var6).LastOrDefault().StdDev ?? 0;
+                            model.quotes.stdDevLongCandle = indCandles.Take(indIndex + 1).GetStdDev(30).LastOrDefault().StdDev ?? 0;
                             int idx = (indIndex) - thisInput.var7;
-                            model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev(thisInput.var6).ToList()[idx]; //stdDevResults[idx];
+                            model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev(thisInput.var6).ToList()[idx].StdDev ?? 0; //stdDevResults[idx];
 
 
                             //model.candles.currentCandle = await CreateLiveCandle(the_db, thisInput.var1, thisInput.var3, thisInput.var2, thisInput.var13, _startTime, epicName, minute_container, TicksContainer, false, createMinRecord, the_app_db, model.exchangeClosedDates);
@@ -6312,7 +8005,7 @@ namespace TradingBrain.Models
 
                                 clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
                                 clsCommonFunctions.AddStatusMessage($"modelQuotes.rei:{model.quotes.rei} ", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle.StdDev} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle.StdDev}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle.StdDev}", "DEBUG", logName);
+                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
                                 clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
 
@@ -6640,7 +8333,7 @@ namespace TradingBrain.Models
         {
             string strat = this.strategy.Replace("-", "_");
             string resol = "";
-            if (this.resolution != "")
+            if (this.resolution != "" && this.strategy != "SMA")
             {
                 resol = "-" + this.resolution;
             }
@@ -6832,6 +8525,12 @@ namespace TradingBrain.Models
                                 clsCommonFunctions.AddStatusMessage("New gainMultiplier is 0", "ERROR", logName);
                             }
 
+                            clsCommonFunctions.AddStatusMessage("New seedAvgWinningTrade to use = " + newVars.seedAvgWinningTrade, "INFO", logName);
+                            tb.lastRunVars.seedAvgWinningTrade = newVars.seedAvgWinningTrade;
+                            model.modelVar.seedAvgWinningTrade = newVars.seedAvgWinningTrade;
+                            currentStatus.seedAvgWinningTrade = newVars.seedAvgWinningTrade;
+
+
                             //if (newVars.suppQuantityMultiplier > 0)
                             //{
                             //    clsCommonFunctions.AddStatusMessage("New suppQuantityMultiplier to use = " + newVars.suppQuantityMultiplier, "INFO", logName);
@@ -6857,19 +8556,19 @@ namespace TradingBrain.Models
                             //}
 
                             //clsCommonFunctions.AddStatusMessage("New doSuppTrades to use = " + newVars.doSuppTradesVar, "INFO", logName);
-      
+
                             //model.doSuppTrades = newVars.doSuppTradesVar;
                             //currentStatus.doSuppTrades = newVars.doSuppTradesVar;
                             //tb.doSuppTrades = newVars.doSuppTradesVar;
 
                             //clsCommonFunctions.AddStatusMessage("New doLongs to use = " + newVars.doLongsVar, "INFO", logName);
- 
+
                             //model.doLongs = newVars.doLongsVar;
                             //currentStatus.doLongs = newVars.doLongsVar;
                             //tb.doLongs = newVars.doLongsVar;
 
                             //clsCommonFunctions.AddStatusMessage("New doShorts to use = " + newVars.doShortsVar, "INFO", logName);
- 
+
                             //model.doShorts = newVars.doShortsVar;
                             //currentStatus.doShorts = newVars.doShortsVar;
                             //tb.doShorts = newVars.doShortsVar;

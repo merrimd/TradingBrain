@@ -280,6 +280,10 @@ namespace TradingBrain.Models
                     Container trade_container = null;
                     Container minute_container = null;
                     Container TicksContainer = null;
+                    Container candles_RSI_container = null;
+
+                    candles_RSI_container = the_db.GetContainer("Candles_RSI");
+
                     switch (tbepic.epic)
                     {
                         case "IX.D.NIKKEI.DAILY.IP":
@@ -287,7 +291,7 @@ namespace TradingBrain.Models
                             chart_container = the_db.GetContainer("CandleTicks_NIKKEI");
                             TicksContainer = the_db.GetContainer("CandleTicks_NIKKEI");
                             trade_container = the_app_db.GetContainer("TradingBrainTrades");
-
+                            
                             break;
 
                         default:
@@ -324,7 +328,7 @@ namespace TradingBrain.Models
                     }
                     tbLog.Info("Initialising app");
 
-                    workerList.Add(new MainApp(the_db, the_app_db, container, chart_container, tbepic.epic, minute_container, TicksContainer, trade_container, igContainer, tbepic.strategy, tbepic.resolution));
+                    workerList.Add(new MainApp(the_db, the_app_db, container, chart_container, tbepic.epic, minute_container, candles_RSI_container, TicksContainer, trade_container, igContainer, tbepic.strategy, tbepic.resolution));
                     /* workerList.Add(new EventWorker(new EventParams(tbepic.epic, tbepic.strategy, tbepic.resolution, igContainer)))*/
                     ;
 
@@ -387,7 +391,8 @@ namespace TradingBrain.Models
                         parallelTasks.Add(task);
                         break;
                     case "CASEYC":
-                        task = Task.Run(() => app.RunCode_CASEYC(sender, e));
+                        //task = Task.Run(() => app.RunCode_CASEYC(sender, e));
+                        task = Task.Run(() => app.RunCode_CASEYCv2(sender, e));
                         parallelTasks.Add(task);
                         break;
                     case "CASEYCEQUITIES":
@@ -408,7 +413,17 @@ namespace TradingBrain.Models
                         break;
 
                     default:
-                        task = Task.Run(() => app.RunCode(sender, e));
+                        if (app.resolution == "")
+                        {
+  
+                            task = Task.Run(() => app.RunCode(sender, e));
+                        }
+                        else
+                        {
+                            task = Task.Run(() => app.RunCodeV5(sender, e));
+                        }
+                            //
+                            
                         parallelTasks.Add(task);
                         break;
 
@@ -522,12 +537,18 @@ namespace TradingBrain.Models
                 //}
                 //else
                 //{
-                nextRun = nextRun.AddSeconds(30);
+
+               // nextRun = nextRun.AddSeconds(10);
+
+                nextRun = nextRun.AddSeconds(150);
+                
+                
+                
                 //}
             }
             else
             {
-                nextRun = nextRun.AddSeconds(75);
+                nextRun = nextRun.AddSeconds(150);
                 // Make the hour_2, hour_3 and hour_4 resolutions run 15 seconds later to ensure all the candles have been created.
                 //if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
                 //{
@@ -668,6 +689,7 @@ namespace TradingBrain.Models
                 Container chart_container;
                 Container trade_container;
 
+                Container candles_RSI_container = the_db.GetContainer("Candles_RSI");
                 switch (epic)
                 {
                     case "IX.D.NIKKEI.DAILY.IP":
@@ -691,7 +713,7 @@ namespace TradingBrain.Models
 
                 tbLog.Info("Initialising app");
 
-                app = new MainApp(the_db, the_app_db, container, chart_container, epic, minute_container, TicksContainer, trade_container,igContainer, strategy, resolution);
+                app = new MainApp(the_db, the_app_db, container, chart_container, epic, minute_container, candles_RSI_container , TicksContainer, trade_container,igContainer, strategy, resolution);
 
 
 

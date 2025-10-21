@@ -173,6 +173,7 @@ namespace TradingBrain.Models
                 Container trade_container = null;
                 Container minute_container = null;
                 Container TicksContainer = null;
+                Container candles_RSI_container = null; 
                 switch (pms.epic)
                 {
                     case "IX.D.NIKKEI.DAILY.IP":
@@ -180,7 +181,7 @@ namespace TradingBrain.Models
                         chart_container = the_db.GetContainer("CandleTicks_NIKKEI");
                         TicksContainer = the_db.GetContainer("CandleTicks_NIKKEI");
                         trade_container = the_app_db.GetContainer("TradingBrainTrades");
-
+                        candles_RSI_container = the_db.GetContainer("Candles_RSI");
                         break;
 
                     default:
@@ -188,6 +189,7 @@ namespace TradingBrain.Models
                         chart_container = the_db.GetContainer("CandleTicks");
                         TicksContainer = the_db.GetContainer("CandleTicks");
                         trade_container = the_app_db.GetContainer("TradingBrainTrades");
+                        candles_RSI_container = the_db.GetContainer("Candles_RSI");
                         break;
                 }
 
@@ -203,21 +205,24 @@ namespace TradingBrain.Models
                     pms.strategy == "CASEYCEQUITIES")
                 {
                     minute_container = the_db.GetContainer("Candles_RSI");
+                    candles_RSI_container = the_db.GetContainer("Candles_RSI");
                 }
                 else
                 {
                     if (pms.epic == "IX.D.NIKKEI.DAILY.IP")
                     {
                         minute_container = the_db.GetContainer("MinuteCandle_NIKKEI");
+                        candles_RSI_container = the_db.GetContainer("Candles_RSI");
                     }
                     else
                     {
                         minute_container = the_db.GetContainer("MinuteCandle");
+                        candles_RSI_container = the_db.GetContainer("Candles_RSI");
                     }
                 }
                     tbLog.Info("Initialising app");
 
-                _thisApp = new MainApp(the_db, the_app_db, container, chart_container, pms.epic, minute_container, TicksContainer, trade_container, pms.igContainer, pms.strategy, pms.resolution);
+                _thisApp = new MainApp(the_db, the_app_db, container, chart_container, pms.epic, minute_container, candles_RSI_container , TicksContainer, trade_container, pms.igContainer, pms.strategy, pms.resolution);
 
                 try
                 {
