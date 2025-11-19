@@ -251,24 +251,28 @@ namespace TradingBrain.Models
 
             //}
             //igContainer.workerList = workerList;
-            ILogger tbLog;
+ 
 
-         
+            //Database? the_db = IGModels.clsCommonFunctions.Get_Database(tbepic.epic).Result;
+            //Database? the_app_db = IGModels.clsCommonFunctions.Get_App_Database(tbepic.epic).Result;
+
+            Database? the_db = IGModels.clsCommonFunctions.Get_Database("IX.D.NASDAQ.CASH.IP").Result;
+            Database? the_app_db = IGModels.clsCommonFunctions.Get_App_Database("IX.D.NASDAQ.CASH.IP").Result;
+
+
             foreach (tbEpics tbepic in epcs)
             {
                 string jobId = IGModels.clsCommonFunctions.GetLogName(tbepic.epic, tbepic.strategy, tbepic.resolution);
                 MappedDiagnosticsLogicalContext.Set("jobId", jobId);
 
+                ILogger tbLog;
                 tbLog = LogManager.GetLogger(jobId);
 
                 tbLog.Info("-------------------------------------------------------------");
                 tbLog.Info($"-- TradingBrain started - strategy: {tbepic.strategy + " " + tbepic.resolution} : {tbepic.epic} --");
                 tbLog.Info("-------------------------------------------------------------");
 
-                tbLog.Info("Connecting to database....");
 
-                Database? the_db = IGModels.clsCommonFunctions.Get_Database(tbepic.epic).Result;
-                Database? the_app_db = IGModels.clsCommonFunctions.Get_App_Database(tbepic.epic).Result;
 
 
                 if (the_db != null)
@@ -374,7 +378,7 @@ namespace TradingBrain.Models
             string strat = "";
             foreach (MainApp app in workerList)
             {
-                app.GetPositions();
+                bool ret = await app.GetPositions();
 
                 Task<runRet> task;
                 switch (app.strategy){
@@ -411,17 +415,20 @@ namespace TradingBrain.Models
                         task = Task.Run(() => app.RunCode_VWAP(sender, e));
                         parallelTasks.Add(task);
                         break;
-
+                    case "BOLLI":
+                        task = Task.Run(() => app.RunCode_BOLLI(sender, e));
+                        parallelTasks.Add(task);
+                        break;
                     default:
-                        if (app.resolution == "")
-                        {
+                        //if (app.resolution == "")
+                        //{
   
-                            task = Task.Run(() => app.RunCode(sender, e));
-                        }
-                        else
-                        {
+                        //    task = Task.Run(() => app.RunCode(sender, e));
+                        //}
+                        //else
+                        //{
                             task = Task.Run(() => app.RunCodeV5(sender, e));
-                        }
+                        //}
                             //
                             
                         parallelTasks.Add(task);
