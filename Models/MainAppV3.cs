@@ -3202,7 +3202,7 @@ namespace TradingBrain.Models
             }
             return getStartDate;
         }
-        public async Task<runRet> iGUpdate (updateMessage msg)
+        public async Task<runRet> iGUpdate (UpdateMessage msg)
         {
             runRet taskRet = new runRet();
 
@@ -3210,17 +3210,17 @@ namespace TradingBrain.Models
             {
                 case "UPDATE":
                 AddStatusMessage($"Update Message: {msg.itemName} - {msg.updateData}","INFO");
-                    OPUUpdate(msg.updateData, msg.itemName);
+                    OpuUpdate(msg.updateData, msg.itemName);
                     break;
                 case "CONFIRM":
                     AddStatusMessage($"Confirm Message: {msg.itemName} - {msg.updateData}","INFO");
-                    CONFIRMUpdate(msg.updateData, msg.itemName);
+                    ConfirmUpdate(msg.updateData, msg.itemName);
                     break;
 
             }
             return taskRet;
         }
-        public async void OPUUpdate(string inputData, string itemName)
+        public async void OpuUpdate(string inputData, string itemName)
         {
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
 
@@ -4489,7 +4489,7 @@ namespace TradingBrain.Models
             }
         }
 
-        public  async void CONFIRMUpdate(string inputData, string itemName)
+        public  async void ConfirmUpdate(string inputData, string itemName)
         {
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);

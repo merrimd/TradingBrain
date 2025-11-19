@@ -670,17 +670,17 @@ namespace TradingBrain.Models
                         if (!(String.IsNullOrEmpty(opu)))
                         {
                             //clsCommonFunctions.AddStatusMessage("Trade update - OPU" + opu);
-                            await UpdateTsOPU(itemPos, update.ItemName, update, opu, TradeSubscriptionType.Opu);
+                            await UpdateTsOpu(itemPos, update.ItemName, update, opu, TradeSubscriptionType.Opu);
                         }
                         if (!(String.IsNullOrEmpty(wou)))
                         {
                             //clsCommonFunctions.AddStatusMessage("Trade update - WOU" + wou);
-                            await UpdateTsWOU(itemPos, update.ItemName, update, wou, TradeSubscriptionType.Wou);
+                            await UpdateTsWou(itemPos, update.ItemName, update, wou, TradeSubscriptionType.Wou);
                         }
                         if (!(String.IsNullOrEmpty(confirms)))
                         {
                             //clsCommonFunctions.AddStatusMessage("Trade update - CONFIRMS" + confirms);
-                           await UpdateTsCONFIRM(itemPos, update.ItemName, update, confirms, TradeSubscriptionType.Confirm);
+                           await UpdateTsConfirm(itemPos, update.ItemName, update, confirms, TradeSubscriptionType.Confirm);
                         }
 
                     }
@@ -706,7 +706,7 @@ namespace TradingBrain.Models
 
         }
 
-          private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsOPU(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
+          private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsOpu(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
         {
 
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
@@ -728,7 +728,7 @@ namespace TradingBrain.Models
                 //parm = wrk._thread.Name.Split("|").ToList();
                 if (wrk.epicName == tradeSubUpdate.epic)
                 {
-                    updateMessage msg = new updateMessage();
+                    UpdateMessage msg = new UpdateMessage();
                     msg.itemName = update.ItemName;
                     msg.updateData = inputData;
                     msg.updateType = "UPDATE";
@@ -742,7 +742,7 @@ namespace TradingBrain.Models
 
             return tsm;
         }
-        private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsWOU(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
+        private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsWou(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
         {
 
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
@@ -912,7 +912,7 @@ namespace TradingBrain.Models
             //}
             return tsm;
         }
-        private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsCONFIRM(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
+        private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsConfirm(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
         {
 
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
@@ -934,7 +934,7 @@ namespace TradingBrain.Models
                 //parm = wrk._thread.Name.Split("|").ToList();
                 if (wrk.epicName == tradeSubUpdate.epic)
                 {
-                    updateMessage msg = new updateMessage();
+                    UpdateMessage msg = new UpdateMessage();
                     msg.itemName = update.ItemName;
                     msg.updateData = inputData;
                     msg.updateType = "CONFIRM";

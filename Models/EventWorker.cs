@@ -41,28 +41,28 @@ namespace TradingBrain.Models
             igContainer = _igContainer;
         }
     }
-    public class updateMessage
+    public class UpdateMessage
     {
         public string updateType { get; set; }
         public string updateData { get; set; }
         public string itemName { get; set; }
-        public updateMessage()
+        public UpdateMessage()
         {
             updateData = "";
             itemName = "";
             updateType = "";
         }
     }
-    public class PrintOPUMessageEvent : IWorkerEvent
+    public class PrintOpuMessageEvent : IWorkerEvent
     {
-        public updateMessage Message { get; }
-        public PrintOPUMessageEvent(updateMessage message) => Message = message;
+        public UpdateMessage Message { get; }
+        public PrintOpuMessageEvent(UpdateMessage message) => Message = message;
     }
 
-    public class PrintCONFIRMMessageEvent : IWorkerEvent
+    public class PrintConfirmMessageEvent : IWorkerEvent
     {
-        public updateMessage Message { get; }
-        public PrintCONFIRMMessageEvent(updateMessage message) => Message = message;
+        public UpdateMessage Message { get; }
+        public PrintConfirmMessageEvent(UpdateMessage message) => Message = message;
     }
 
     public class EventWorker
@@ -71,14 +71,14 @@ namespace TradingBrain.Models
         public readonly Thread _thread;
         public MainApp _thisApp { get; set; } = null;
         public ILogger logger { get; set; }
-        public string logName { get; set; } = "";
+        public string logName { get; set; } 
 
         private static string tUpdate = "Trade update ";
         private static string updateTs = "UpdateTs";
 
         public EventWorker(EventParams pams )
         {
-            //_thread = new Thread(Run)
+ 
             _thread = new Thread(() => Run(pams))
 
             {
@@ -87,77 +87,17 @@ namespace TradingBrain.Models
             };
              _thread.Start();
             logName = IGModels.clsCommonFunctions.GetLogName(pams.epic, pams.strategy, pams.resolution);
-            //threads.Add(_thread);
+        
         }
         private void Run(EventParams pams)
         {
-            //Microsoft.Azure.Cosmos.Container? EpicContainer;
-            //Microsoft.Azure.Cosmos.Container? hourly_container;
-            //Microsoft.Azure.Cosmos.Container minute_container;
-            //Microsoft.Azure.Cosmos.Container? TicksContainer;
-            //Microsoft.Azure.Cosmos.Container? candlesContainer;
-            //Microsoft.Azure.Cosmos.Container? trade_container;
-            //Database? the_db;
-            //Database? the_app_db;
 
 
-            System.Timers.Timer t;
-
-            //MainApp? app = null;
             
            EventParams pms = (EventParams)pams;
-            //string nme = pms.strategy;
-            //if (pms.strategy == "RSI")
-            //{
-            //    nme += "_" + pms.resolution;
-            //}
-            //string logName = this.logName; // clsCommonFunctions.GetLogName(pms.epic, pms.strategy, pms.resolution);
+
             this.logger = LogManager.GetLogger(this.logName);
-            //string epic = "IX.D.NASDAQ.CASH.IP";
-            //string strategy = "SMA";
-            //string resolution = "";
-
-            //// See if an epic has been passed in. if not then default to NASDAQ
-            //if (Environment.GetCommandLineArgs().Length >= 2)
-            //{
-            //    epic = Environment.GetCommandLineArgs()[1].ToUpper();
-            //}
-
-
-            //// See if a strategy and resolution has been passed in, otherwise use default. //
-
-            //if (Environment.GetCommandLineArgs().Length >= 4)
-            //{
-            //    strategy = Environment.GetCommandLineArgs()[2].ToUpper();
-            //    resolution = Environment.GetCommandLineArgs()[3].ToUpper();
-            //}
-
-            // Set up the logging //
-
-            //var config = new NLog.Config.LoggingConfiguration();
-
-            //var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
-
-            //string nme = pms.strategy;
-            //if (pms.strategy == "RSI")
-            //{
-            //    nme += "_" + pms.resolution;
-            //}
-            //var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App." + pms.epic + "." + nme + ".${shortdate}.txt", MaxArchiveDays = 31, KeepFileOpen = false, Layout = "${longdate} [${threadid}] |${level:uppercase=true}|${message}|${exception:format=toString}" };
-            //var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
-            //logconsole.Layout = "${longdate} [${threadid}] |${level:uppercase=true}|${logger}|${message}|${exception:format=toString}";
-
-            //config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
-            //config.AddRule(LogLevel.Debug, LogLevel.Fatal, logfile);
-
-            //NLog.LogManager.Configuration = config;
-
-
-            //Logger tbLog = LogManager.GetCurrentClassLogger();
-           // tbLog = LogManager.GetCurrentClassLogger();
-
-
-
+            
             logger.Info("-------------------------------------------------------------");
             logger.Info($"-- TradingBrain started - strategy: {pms.strategy + " " + pms.resolution} : {pms.epic} --");
             logger.Info("-------------------------------------------------------------");
@@ -237,7 +177,8 @@ namespace TradingBrain.Models
                 }
                 catch (Exception ex)
                 {
-                    var a = 1;
+                    logger.Error(ex, "Unhandled exception in EventWorker.");
+                     
                 }
 
                 if (_thisApp != null)
@@ -308,13 +249,13 @@ namespace TradingBrain.Models
                     Console.WriteLine("StopEvent received.");
                     break;
 
-                case PrintOPUMessageEvent msg:
+                case PrintOpuMessageEvent msg:
                     Console.WriteLine($"Message: {msg.Message.itemName} - {msg.Message.updateData}");
-                    OPUUpdate(msg.Message.updateData, msg.Message.itemName);
+                    OpuUpdate(msg.Message.updateData, msg.Message.itemName);
                     break;
-                case PrintCONFIRMMessageEvent msg:
+                case PrintConfirmMessageEvent msg:
                     Console.WriteLine($"Message: {msg.Message.itemName} - {msg.Message.updateData}");
-                    CONFIRMUpdate(msg.Message.updateData, msg.Message.itemName);
+                    ConfirmUpdate(msg.Message.updateData, msg.Message.itemName);
                     break;
                 default:
                     Console.WriteLine("Unknown event type.");
@@ -328,17 +269,14 @@ namespace TradingBrain.Models
             _thread.Join();
         }
 
-        public void currentTickData()
-        {
-
-        }
-        public async void OPUUpdate(string inputData,string itemName)
+ 
+        public async void OpuUpdate(string inputData,string itemName)
         {
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
 
             try
             {
-                //    //var tradeSubUpdate = JsonConvert.DeserializeObject<LsTradeSubscriptionData>(inputData);
+ 
                 TradeSubUpdate tradeSubUpdate = (TradeSubUpdate)JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
                 tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString();
                 tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString();
@@ -1335,7 +1273,7 @@ namespace TradingBrain.Models
             }
         }
 
-        public async void CONFIRMUpdate( string inputData,string itemName)
+        public async void ConfirmUpdate( string inputData,string itemName)
         {
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
 
