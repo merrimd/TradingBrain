@@ -15,8 +15,8 @@ namespace TradingBrain.Models
         public const int STREAMING = 2;
         public const int STALLED = 3;
 
-        private TBStreamingClient slClient;
-        private int phase;
+        private readonly TBStreamingClient slClient;
+        private readonly int phase;
         public ChartConnectionListener(
         TBStreamingClient slClient,
         int phase)

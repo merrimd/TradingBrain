@@ -69,9 +69,13 @@ namespace TradingBrain.Models
     {
         private readonly BlockingCollection<IWorkerEvent> _queue = new();
         public readonly Thread _thread;
-        public MainApp _thisApp = null;
-        public ILogger tbLog ;
-        public string logName = "";
+        public MainApp _thisApp { get; set; } = null;
+        public ILogger logger { get; set; }
+        public string logName { get; set; } = "";
+
+        private static string tUpdate = "Trade update ";
+        private static string updateTs = "UpdateTs";
+
         public EventWorker(EventParams pams )
         {
             //_thread = new Thread(Run)
@@ -108,7 +112,7 @@ namespace TradingBrain.Models
             //    nme += "_" + pms.resolution;
             //}
             //string logName = this.logName; // clsCommonFunctions.GetLogName(pms.epic, pms.strategy, pms.resolution);
-            this.tbLog = LogManager.GetLogger(this.logName);
+            this.logger = LogManager.GetLogger(this.logName);
             //string epic = "IX.D.NASDAQ.CASH.IP";
             //string strategy = "SMA";
             //string resolution = "";
@@ -154,11 +158,11 @@ namespace TradingBrain.Models
 
 
 
-            tbLog.Info("-------------------------------------------------------------");
-            tbLog.Info($"-- TradingBrain started - strategy: {pms.strategy + " " + pms.resolution} : {pms.epic} --");
-            tbLog.Info("-------------------------------------------------------------");
+            logger.Info("-------------------------------------------------------------");
+            logger.Info($"-- TradingBrain started - strategy: {pms.strategy + " " + pms.resolution} : {pms.epic} --");
+            logger.Info("-------------------------------------------------------------");
 
-            tbLog.Info("Connecting to database....");
+            logger.Info("Connecting to database....");
 
             Database? the_db = IGModels.clsCommonFunctions.Get_Database(pms.epic).Result;
             Database? the_app_db = IGModels.clsCommonFunctions.Get_App_Database(pms.epic).Result;
@@ -195,32 +199,32 @@ namespace TradingBrain.Models
 
                 //SetupDB(pms.epic);
 
-                if (pms.strategy == "RSI" || 
-                    pms.strategy == "REI" || 
-                    pms.strategy == "RSI-ATR" ||
-                    pms.strategy == "RSI-CUML" ||
-                    pms.strategy == "CASEYC" ||
-                     pms.strategy == "VWAP" ||
-                    pms.strategy == "CASEYCSHORT" ||
-                    pms.strategy == "CASEYCEQUITIES")
-                {
-                    minute_container = the_db.GetContainer("Candles_RSI");
-                    candles_RSI_container = the_db.GetContainer("Candles_RSI");
-                }
-                else
-                {
-                    if (pms.epic == "IX.D.NIKKEI.DAILY.IP")
-                    {
-                        minute_container = the_db.GetContainer("MinuteCandle_NIKKEI");
-                        candles_RSI_container = the_db.GetContainer("Candles_RSI");
-                    }
-                    else
-                    {
-                        minute_container = the_db.GetContainer("MinuteCandle");
-                        candles_RSI_container = the_db.GetContainer("Candles_RSI");
-                    }
-                }
-                    tbLog.Info("Initialising app");
+                //if (pms.strategy == "RSI" || 
+                //    pms.strategy == "REI" || 
+                //    pms.strategy == "RSI-ATR" ||
+                //    pms.strategy == "RSI-CUML" ||
+                //    pms.strategy == "CASEYC" ||
+                //     pms.strategy == "VWAP" ||
+                //    pms.strategy == "CASEYCSHORT" ||
+                //    pms.strategy == "CASEYCEQUITIES")
+                //{
+                //    minute_container = the_db.GetContainer("Candles_RSI");
+                //    candles_RSI_container = the_db.GetContainer("Candles_RSI");
+                //}
+                //else
+                //{
+                //    if (pms.epic == "IX.D.NIKKEI.DAILY.IP")
+                //    {
+                //        minute_container = the_db.GetContainer("MinuteCandle_NIKKEI");
+                //        candles_RSI_container = the_db.GetContainer("Candles_RSI");
+                //    }
+                //    else
+                //    {
+                //        minute_container = the_db.GetContainer("MinuteCandle");
+                //        candles_RSI_container = the_db.GetContainer("Candles_RSI");
+                //    }
+                //}
+                logger.Info("Initialising app");
 
                 _thisApp = new MainApp(the_db, the_app_db, container, chart_container, pms.epic, minute_container, candles_RSI_container , TicksContainer, trade_container, pms.igContainer, pms.strategy, pms.resolution);
 
@@ -238,12 +242,12 @@ namespace TradingBrain.Models
 
                 if (_thisApp != null)
                 {
-                    tbLog.Info("Waiting for changes...");
+                    logger.Info("Waiting for changes...");
 
                     int i = _thisApp.WaitForChanges().Result;
                 }
 
-                tbLog.Info("Exiting...");
+                logger.Info("Exiting...");
 
                 Environment.Exit(0);
 
@@ -383,7 +387,7 @@ namespace TradingBrain.Models
                                 if (tsm.DealId == _thisApp.currentTrade.dealId)
                                 {
                                     clsCommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
-                                    clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
+                                    clsCommonFunctions.SaveLog("TradeUpdate", updateTs, tUpdate + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
                                     clsCommonFunctions.AddStatusMessage("Updating  - " + tsm.DealId + " - Current Deal = " + _thisApp.currentTrade.dealId, "INFO");
                                     await _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
                                     _thisApp.model.thisModel.currentTrade.candleSold = null;
@@ -476,7 +480,7 @@ namespace TradingBrain.Models
                             else
                             {
                                 clsCommonFunctions.AddStatusMessage("UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
-                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
+                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", updateTs, "UPDATE failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
                                 await tradeSubUpdate.Add(_thisApp.the_app_db);
                             }
 
@@ -495,7 +499,7 @@ namespace TradingBrain.Models
                                     if (thisTrade != null)  
                                     {
                                         clsCommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
-                                        clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
+                                        clsCommonFunctions.SaveLog("TradeUpdate", updateTs, tUpdate + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
                                         clsCommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + thisTrade.tbDealId, "INFO");
                                         DateTime dtNow = DateTime.UtcNow;
                                         await _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
@@ -602,7 +606,7 @@ namespace TradingBrain.Models
                                         if (tsm.DealId == _thisApp.currentTrade.dealId)
                                         {
                                             clsCommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
-                                            clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
+                                            clsCommonFunctions.SaveLog("TradeUpdate", updateTs, tUpdate + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
                                             clsCommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + _thisApp.currentTrade.dealId, "INFO");
                                             DateTime dtNow = DateTime.UtcNow;
                                             await _thisApp.GetTradeFromDB(tsm.DealId, _thisApp.strategy, _thisApp.resolution);
@@ -963,7 +967,7 @@ namespace TradingBrain.Models
                             else
                             {
                                 clsCommonFunctions.AddStatusMessage("DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
-                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
+                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", updateTs, "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
                                 await tradeSubUpdate.Add(_thisApp.the_app_db);
                             }
                             //tradeSubUpdate.Add(_thisApp.the_app_db);
@@ -980,7 +984,7 @@ namespace TradingBrain.Models
                                 if (tsm.DealReference == _thisApp.newDealReference)
                                 {
                                     clsCommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
-                                    clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
+                                    clsCommonFunctions.SaveLog("TradeUpdate", updateTs, tUpdate + tsm.TradeType + " - " + inputData, _thisApp.the_app_db);
                                     _thisApp.newDealReference = "";
                                     // First see if this is a supplementary trade triggered from an order
                                     if (_thisApp.model.onMarket == true)
@@ -1318,7 +1322,7 @@ namespace TradingBrain.Models
                             else
                             {
                                 clsCommonFunctions.AddStatusMessage("OPEN failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], "ERROR");
-                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
+                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", updateTs, "DELETED failed - " + tsm.Reason + " - " + _thisApp.TradeErrors[tsm.Reason], _thisApp.the_app_db);
                                 await tradeSubUpdate.Add(_thisApp.the_app_db);
                             }
                             //tradeSubUpdate.Add(_thisApp.the_app_db);

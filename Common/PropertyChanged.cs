@@ -12,7 +12,7 @@ namespace TradingBrain.Common
         /// Notify any listeners that the property value has changed.
         /// </summary>
         /// <param name="propertyName">The property name.</param>
-        public void RaisePropertyChanged(string propertyName)
+        public static void RaisePropertyChanged(string propertyName)
         {
             RaisePropertyChanged(propertyName, ref eventDispatcher);
         }

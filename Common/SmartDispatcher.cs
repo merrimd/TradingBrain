@@ -28,7 +28,7 @@ namespace TradingBrain.Common
 
         public void BeginInvoke(Action a)
         {
-            //BeginInvoke(a, false);
+      
 
 
         }
@@ -36,7 +36,7 @@ namespace TradingBrain.Common
 
         public void addEventMessage(string message)
         {
-            //instance.addEventMessage(message);
+        
         }
     }
 }

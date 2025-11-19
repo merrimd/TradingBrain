@@ -9,8 +9,8 @@ namespace TradingBrain.Models
 {
      class ChartSubscriptionListener :SubscriptionListener
     {
-        private int phase;
-        private TBStreamingClient slClient;
+        private readonly int phase;
+        private readonly TBStreamingClient slClient;
         public ChartSubscriptionListener(TBStreamingClient slClient, int phase)
         {
 
