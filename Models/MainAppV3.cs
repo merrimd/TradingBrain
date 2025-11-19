@@ -1902,10 +1902,24 @@ namespace TradingBrain.Models
                             highPrice.ask = ticks.Max(x => x.offer);
                             lowPrice.bid = ticks.Min(x => x.bid);
                             lowPrice.ask = ticks.Min(x => x.offer);
-                            openPrice.bid = ticks.OrderBy(x => x.UTM).FirstOrDefault().bid;
-                            openPrice.ask = ticks.OrderBy(x => x.UTM).FirstOrDefault().offer;
-                            closePrice.bid = ticks.OrderByDescending(x => x.UTM).FirstOrDefault().bid;
-                            closePrice.ask  = ticks.OrderByDescending(x => x.UTM).FirstOrDefault().offer;
+
+                            tick thisOpenTick = ticks.OrderBy(x => x.UTM).FirstOrDefault();
+                            if (thisOpenTick != null)
+                            {
+                                openPrice.bid = thisOpenTick.bid;
+                                openPrice.ask = thisOpenTick.offer;
+                            }
+                            //openPrice.bid = ticks.OrderBy(x => x.UTM).FirstOrDefault().bid;
+                            //openPrice.ask = ticks.OrderBy(x => x.UTM).FirstOrDefault().offer;
+
+                            tick thisCloseTick = ticks.OrderByDescending(x => x.UTM).FirstOrDefault();
+                            if (thisCloseTick != null)
+                            {
+                                closePrice.bid = thisCloseTick.bid;
+                                closePrice.ask = thisCloseTick.offer;
+                            }
+                            //closePrice.bid = ticks.OrderByDescending(x => x.UTM).FirstOrDefault().bid;
+                            //closePrice.ask  = ticks.OrderByDescending(x => x.UTM).FirstOrDefault().offer;
 
                             thisPrice.startDate = tickStart;
                             thisPrice.endDate = tickeEnd;
