@@ -94,7 +94,7 @@ namespace TradingBrain.Models
 
 
             
-           EventParams pms = (EventParams)pams;
+           EventParams pms =  pams;
 
             this.logger = LogManager.GetLogger(this.logName);
             
@@ -137,7 +137,7 @@ namespace TradingBrain.Models
                         break;
                 }
 
-                //SetupDB(pms.epic);
+           
 
                 //if (pms.strategy == "RSI" || 
                 //    pms.strategy == "REI" || 
@@ -195,10 +195,7 @@ namespace TradingBrain.Models
                 static void Exiting(Exception exception, MainApp app)
                 {
                     //Put common cleanup code here (or at the end of the method)
-                    if (app != null)
-                    {
-                        //app.UnsubscribeTidyUp();
-                    }
+ 
 
                     if (exception == null)
                     {
@@ -213,20 +210,7 @@ namespace TradingBrain.Models
 
 
 
-                //static double GetInterval()
-                //{
-                //    DateTime now = DateTime.Now;
-                //    //return ((60 - now.Second) * 1000 - now.Millisecond);
-                //    return ((now.Second > 30 ? 120 : 60) - now.Second) * 1000 - now.Millisecond;
-                //}
-
-                //static void t_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-                //{
-                //    //Console.WriteLine(DateTime.Now.ToString("o"));
-                //    t.Interval = GetInterval();
-                //    t.Start();
-                //}
-
+ 
 
             }
 
@@ -270,14 +254,14 @@ namespace TradingBrain.Models
         }
 
  
-        public async void OpuUpdate(string inputData,string itemName)
+        public async Task OpuUpdate(string inputData,string itemName)
         {
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
 
             try
             {
  
-                TradeSubUpdate tradeSubUpdate = (TradeSubUpdate)JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
+                TradeSubUpdate tradeSubUpdate =  JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
                 tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString();
                 tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString();
                 tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString();
@@ -305,12 +289,11 @@ namespace TradingBrain.Models
                     tsm.StopDistance = tradeSubUpdate.stopDistance;
 
                     tsm.TradeType = "OPU";
-                    if (tsm.Reason != null)
+                    if (tsm.Reason != null && tsm.Reason != "")
                     {
-                        if (tsm.Reason != "")
-                        {
+ 
                             tradeSubUpdate.reasonDescription = _thisApp.TradeErrors[tsm.Reason];
-                        }
+                 
                     }
 
                     if (tsm.Epic == _thisApp.epicName)
@@ -1273,7 +1256,7 @@ namespace TradingBrain.Models
             }
         }
 
-        public async void ConfirmUpdate( string inputData,string itemName)
+        public async Task ConfirmUpdate( string inputData,string itemName)
         {
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
 
@@ -1324,8 +1307,7 @@ namespace TradingBrain.Models
                     {
 
                         // Find this trade from the list of requested trades to tie in with the requested type (position or order)
-                        requestedTrade reqTrade = new requestedTrade();
-                        reqTrade = _thisApp.requestedTrades.Where(i => i.dealReference == tsm.DealReference).FirstOrDefault();
+                        requestedTrade reqTrade = _thisApp.requestedTrades.Where(i => i.dealReference == tsm.DealReference).FirstOrDefault();
 
                         if (reqTrade != null)
                         {
@@ -1362,7 +1344,7 @@ namespace TradingBrain.Models
                                 }
                             }
 
-                            if (tsm.Status == null & tsm.Reason != "SUCCESS")
+                            if (tsm.Status == null && tsm.Reason != "SUCCESS")
                             {
                                 // trade/order not successful (could be update or open or delete)
                                 clsCommonFunctions.AddStatusMessage($"CONFIRM - failed - deal type = {reqTrade.dealType} - {tsm.Reason} - {_thisApp.TradeErrors[tsm.Reason]}", "INFO");

@@ -732,7 +732,7 @@ namespace TradingBrain.Models
                     msg.itemName = update.ItemName;
                     msg.updateData = inputData;
                     msg.updateType = "UPDATE";
-                    runRet taskRet = await wrk.iGUpdate(msg);
+                    RunRet taskRet = await wrk.iGUpdate(msg);
 
                     clsCommonFunctions.SendBroadcast("UpdateOPU", inputData, _igContainer.the_app_db);
                     //Console.WriteLine("UpdateOPU: " + inputData);
@@ -938,7 +938,7 @@ namespace TradingBrain.Models
                     msg.itemName = update.ItemName;
                     msg.updateData = inputData;
                     msg.updateType = "CONFIRM";
-                    runRet taskRet = await wrk.iGUpdate(msg);
+                    RunRet taskRet = await wrk.iGUpdate(msg);
                     clsCommonFunctions.SendBroadcast("UpdateConfirm", inputData, _igContainer.the_app_db);
                     //Console.WriteLine("updateConfirm: " + inputData);
                 }

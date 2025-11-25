@@ -18,7 +18,6 @@ using IGCandleCreator.Models;
 using IGModels;
 using IGModels.ModellingModels;
 using IGModels.RSI_Models;
-//using TradingBrain.Common;
 using IGWebApiClient;
 using IGWebApiClient.Common;
 using IGWebApiClient.Models;
@@ -66,37 +65,30 @@ using static TradingBrain.Models.clsCommonFunctions;
 using Timer = System.Timers.Timer;
 
 
-//using System.ComponentModel;
-
 namespace TradingBrain.Models
 {
-    public class runRet
+    public class RunRet
     {
         public string ret { get; set; }
-        public runRet()
+        public RunRet()
         {
             ret = "OK";
         }
     }
     public class MainApp
     {
-        public event EventHandler igUpdate;
+        //public event EventHandler igUpdate;
         public StatusMessage currentStatus;
-        //public  IgRestApiClient? igRestApiClient;
         public delegate void StopDelegate();
-        //public static bool LoggedIn { get; set; }
-        //public ObservableCollection<IgPublicApiData.AccountModel>? Accounts { get; set; }
-        //public static string? CurrentAccountId;
         public Database? the_db;
         public Database? the_app_db;
-
         public Microsoft.Azure.Cosmos.Container? the_container;
         public Microsoft.Azure.Cosmos.Container? the_chart_container;
         public Microsoft.Azure.Cosmos.Container? minute_container;
         public Microsoft.Azure.Cosmos.Container? candles_RSI_container;
         public Microsoft.Azure.Cosmos.Container? TicksContainer;
         public Microsoft.Azure.Cosmos.Container? trade_container;
-        //public List<clsEpicList> EpicList;
+
         public string epicName;
 
         private long _lngTickCount;
@@ -354,11 +346,11 @@ namespace TradingBrain.Models
             }
         }
 
-        public void onIgUpdate()
-        {
-            EventHandler handler = igUpdate;
-            if (null != handler) handler(this, EventArgs.Empty);
-        }
+        //public void onIgUpdate()
+        //{
+        //    EventHandler handler = igUpdate;
+        //    if (null != handler) handler(this, EventArgs.Empty);
+        //}
 
         public async Task<string> PlaceOrder(string direction, double quantity, double stopLoss, string accountId, decimal dealPrice)
         {
@@ -917,9 +909,9 @@ namespace TradingBrain.Models
         }
 
 
-       public async Task<runRet> RunCode(object sender, System.Timers.ElapsedEventArgs e)
+       public async Task<RunRet> RunCode(object sender, System.Timers.ElapsedEventArgs e)
         {
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             bool liveMode = true;
@@ -1722,9 +1714,9 @@ namespace TradingBrain.Models
             //}
             return taskRet;
         }
-        public async Task<runRet> RunCodeV5(object sender, System.Timers.ElapsedEventArgs e)
+        public async Task<RunRet> RunCodeV5(object sender, System.Timers.ElapsedEventArgs e)
         {
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             bool liveMode = true;
@@ -2670,9 +2662,9 @@ namespace TradingBrain.Models
             //}
             return taskRet;
         }
-        public async Task<runRet> RunCode_BOLLI(object sender, System.Timers.ElapsedEventArgs e)
+        public async Task<RunRet> RunCode_BOLLI(object sender, System.Timers.ElapsedEventArgs e)
         {
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             bool liveMode = true;
@@ -2854,6 +2846,7 @@ namespace TradingBrain.Models
                             AddStatusMessage("Getting rsi quotes from DB.......");
                             List<modQuote> rsiQuotes = new List<modQuote>();
                             List<modQuote> indCandles = await RSI_LoadPrices.GetPriceDataSMA(the_db, epicName, "MINUTE", 0, _startTime, _endTime, strategy, true, 50);
+                            List<modQuote> indCandles5Mins = await RSI_LoadPrices.GetPriceDataSMA5Mins(the_db, epicName, "MINUTE", 0, _startTime, _endTime, strategy, true, 5000);
 
                             indCandles.Add(thisCandle);
 
@@ -2871,8 +2864,8 @@ namespace TradingBrain.Models
                             model.candles.currentCandle.candleStart = thisPrice.startDate;
                             model.candles.currentCandle.thisQuote = indCandles[numNewCandles - 1];
 
-                            model.candles.currentCandle.bolli_avg = Convert.ToDouble(indCandles.TakeLast((int)thisInput.var1).Average(s => s.Close));
-                            model.candles.currentCandle.bolli_avgPrev = Convert.ToDouble(indCandles.SkipLast((int)thisInput.var4).TakeLast((int)thisInput.var1).Average(s => s.Close));
+                            model.candles.currentCandle.bolli_avg = Convert.ToDouble(indCandles5Mins.TakeLast((int)thisInput.var1).Average(s => s.Close));
+                            model.candles.currentCandle.bolli_avgPrev = Convert.ToDouble(indCandles5Mins.SkipLast((int)thisInput.var4).TakeLast((int)thisInput.var1).Average(s => s.Close));
                             model.candles.currentCandle.bolli_mid = Convert.ToDouble(indCandles.TakeLast((int)thisInput.var2).Average(s => s.Close));
 
                             model.candles.currentCandle.bolli_sigma = Convert.ToDouble(indCandles.GetStdDev((int)thisInput.var2).LastOrDefault().StdDev);
@@ -2922,9 +2915,19 @@ namespace TradingBrain.Models
                             clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
                             clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
 
-                            clsCommonFunctions.AddStatusMessage($"current bolliID = {this.bolliID}", "DEBUG", logName);   
+                            clsCommonFunctions.AddStatusMessage($"current bolliID = {this.bolliID}", "DEBUG", logName);
 
-                            //clsCommonFunctions.AddStatusMessage("Force buy");
+                            // Check for stop
+                            if (model.onMarket)
+                            {
+                                //clsCommonFunctions.AddStatusMessage($"checking - (positionPrice - (double)candles.currentCandle.thisQuote.Close) * sumQuantities > (thisInput.var0 * modelVar.quantity)");
+                                clsCommonFunctions.AddStatusMessage("Checking Stop ......");
+                                clsCommonFunctions.AddStatusMessage($"positionPrice = {model.thisModel.bolliTrades.Average(s => s.buyPrice)}, candles.currentCandle.thisQuote.Close = {(double)model.candles.currentCandle.thisQuote.Close}, sumQuantities = {model.thisModel.bolliTrades.Sum(x => x.quantity)}, thisInput.var0 = {thisInput.var0}, modelVar.quantity = {model.modelVar.quantity}");
+                                clsCommonFunctions.AddStatusMessage($"current position = positionPrice ({model.thisModel.bolliTrades.Average(s => s.buyPrice)}) - close ({model.candles.currentCandle.thisQuote.Close}) * sumQuantites ({model.thisModel.bolliTrades.Sum(x => x.quantity)} = {((double)model.thisModel.bolliTrades.Average(s => s.buyPrice) - (double)model.candles.currentCandle.thisQuote.Close) * model.thisModel.bolliTrades.Sum(x => x.quantity)}");
+                                clsCommonFunctions.AddStatusMessage($"stop threshold = thisInput.var0 ({thisInput.var0}) * modelVar.quantity ({model.modelVar.quantity}) = {thisInput.var0 * model.modelVar.quantity}", "DEBUG", logName);
+                                clsCommonFunctions.AddStatusMessage($"calculation = {((double)model.thisModel.bolliTrades.Average(s => s.buyPrice) - (double)model.candles.currentCandle.thisQuote.Close) * model.thisModel.bolliTrades.Sum(x => x.quantity)} > {thisInput.var0 * model.modelVar.quantity} = {((double)model.thisModel.bolliTrades.Average(s => s.buyPrice) - (double)model.candles.currentCandle.thisQuote.Close) * model.thisModel.bolliTrades.Sum(x => x.quantity) > (thisInput.var0 * model.modelVar.quantity)}", "DEBUG", logName);
+                            }
+                                //clsCommonFunctions.AddStatusMessage("Force buy");
                             //model.buyLong = true;
                             //model.sellLong = false;
                             //model.buyLong = false;
@@ -3202,9 +3205,9 @@ namespace TradingBrain.Models
             }
             return getStartDate;
         }
-        public async Task<runRet> iGUpdate (UpdateMessage msg)
+        public async Task<RunRet> iGUpdate (UpdateMessage msg)
         {
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
 
             switch (msg.updateType)
             {
@@ -4603,7 +4606,7 @@ namespace TradingBrain.Models
                             //    }
                             //}
 
-                            if (tsm.Status == null & tsm.Reason != "SUCCESS")
+                            if (tsm.Status == null && tsm.Reason != "SUCCESS")
                             {
                                 // trade/order not successful (could be update or open or delete)
                                 clsCommonFunctions.AddStatusMessage($"CONFIRM - failed - - {tsm.Reason} - {this.TradeErrors[tsm.Reason]}", "INFO");
@@ -4636,13 +4639,13 @@ namespace TradingBrain.Models
                 await log.Save();
             }
         }
-        public async Task<runRet> RunCode_RSI(object sender, System.Timers.ElapsedEventArgs e)
+        public async Task<RunRet> RunCode_RSI(object sender, System.Timers.ElapsedEventArgs e)
         {
             ///////////////////////////////
             // Run the RSI strategy code //
             ///////////////////////////////
             ///
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
@@ -5198,13 +5201,13 @@ namespace TradingBrain.Models
 
             return taskRet;
         }
-        public async Task<runRet> RunCode_RSI_ATR(object sender, System.Timers.ElapsedEventArgs e)
+        public async Task<RunRet> RunCode_RSI_ATR(object sender, System.Timers.ElapsedEventArgs e)
         {
             ///////////////////////////////
             // Run the RSI strategy code //
             ///////////////////////////////
             ///
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
@@ -5693,13 +5696,13 @@ namespace TradingBrain.Models
 
             return taskRet;
         }
-        public async Task<runRet> RunCode_RSI_CUML(object sender, System.Timers.ElapsedEventArgs e)
+        public async Task<RunRet> RunCode_RSI_CUML(object sender, System.Timers.ElapsedEventArgs e)
         {
             ///////////////////////////////
             // Run the RSI strategy code //
             ///////////////////////////////
             ///
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
@@ -6203,7 +6206,7 @@ namespace TradingBrain.Models
 
             return taskRet;
         }
-        public async Task<runRet> RunCode_VWAP(object sender, System.Timers.ElapsedEventArgs e)
+        public async Task<RunRet> RunCode_VWAP(object sender, System.Timers.ElapsedEventArgs e)
         {
             ///////////////////////////////
             // Run the RSI strategy code //
@@ -6211,7 +6214,7 @@ namespace TradingBrain.Models
             ///
 
             AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
@@ -6787,7 +6790,7 @@ namespace TradingBrain.Models
 
             return taskRet;
         }
-        public async Task<runRet> RunCode_CASEYC(object sender, System.Timers.ElapsedEventArgs e)
+        public async Task<RunRet> RunCode_CASEYC(object sender, System.Timers.ElapsedEventArgs e)
         {
             ///////////////////////////////
             // Run the RSI strategy code //
@@ -6795,7 +6798,7 @@ namespace TradingBrain.Models
             ///
 
             AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
@@ -7374,7 +7377,7 @@ namespace TradingBrain.Models
 
             return taskRet;
         }
-        public async Task<runRet> RunCode_CASEYCv2(object sender, System.Timers.ElapsedEventArgs e)
+        public async Task<RunRet> RunCode_CASEYCv2(object sender, System.Timers.ElapsedEventArgs e)
         {
             ///////////////////////////////
             // Run the RSI strategy code //
@@ -7382,7 +7385,7 @@ namespace TradingBrain.Models
             ///
 
             AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
@@ -8038,7 +8041,7 @@ namespace TradingBrain.Models
 
             return taskRet;
         }
-        public async Task<runRet> RunCode_CASEYCSHORT(object sender, System.Timers.ElapsedEventArgs e)
+        public async Task<RunRet> RunCode_CASEYCSHORT(object sender, System.Timers.ElapsedEventArgs e)
         {
             ///////////////////////////////
             // Run the RSI strategy code //
@@ -8046,7 +8049,7 @@ namespace TradingBrain.Models
             ///
 
             AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;
@@ -8571,13 +8574,13 @@ namespace TradingBrain.Models
 
             return taskRet;
         }
-        public async Task<runRet> RunCode_REI(object sender, System.Timers.ElapsedEventArgs e)
+        public async Task<RunRet> RunCode_REI(object sender, System.Timers.ElapsedEventArgs e)
         {
             ///////////////////////////////
             // Run the RSI strategy code //
             ///////////////////////////////
             ///
-            runRet taskRet = new runRet();
+            RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
             int resMod = 0;

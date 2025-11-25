@@ -373,14 +373,14 @@ namespace TradingBrain.Models
 
         public static async void RunMainAppCode(object sender, System.Timers.ElapsedEventArgs e)
         {
-            var parallelTasks = new List<Task<runRet>>();
+            var parallelTasks = new List<Task<RunRet>>();
             var t = (System.Timers.Timer)sender;
             string strat = "";
             foreach (MainApp app in workerList)
             {
                 bool ret = await app.GetPositions();
 
-                Task<runRet> task;
+                Task<RunRet> task;
                 switch (app.strategy){
                     case "RSI":
                         task = Task.Run(() => app.RunCode_RSI(sender, e));
