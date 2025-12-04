@@ -132,26 +132,6 @@ namespace TradingBrain.Models
         //public System.Timers.Timer ti = new System.Timers.Timer();
         static async Task Main(string[] args)
         {
-            //var parallelTasks = new List<Task>();
-
-            //string epic = "IX.D.NASDAQ.CASH.IP";
-            //string strategy = "SMA";
-            //string resolution = "";
-
-            //// See if an epic has been passed in. if not then default to NASDAQ
-            //if (Environment.GetCommandLineArgs().Length >= 2)
-            //{
-            //    epic = Environment.GetCommandLineArgs()[1].ToUpper();
-            //}
-
-
-            //// See if a strategy and resolution has been passed in, otherwise use default. //
-
-            //if (Environment.GetCommandLineArgs().Length >= 4)
-            //{
-            //    strategy = Environment.GetCommandLineArgs()[2].ToUpper();
-            //    resolution = Environment.GetCommandLineArgs()[3].ToUpper();
-            //}
 
             // Set up the logging //
 
@@ -159,18 +139,8 @@ namespace TradingBrain.Models
 
             var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
 
-            //foreach (tbEpics tbepic in epcs)
-            //{
-
-
             var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App.${mdlc:item=jobId}.${shortdate}.txt", MaxArchiveDays = 31, KeepFileOpen = false, Layout = "${longdate} [${mdlc:item=jobId}] |${level:uppercase=true}|${message}|${exception:format=toString}" };
             config.AddRule(LogLevel.Debug, LogLevel.Fatal, logfile);
-
-            //var logfile2 = new NLog.Targets.FileTarget("IX.D.NIKKEI.DAILY.IP.SMA") { FileName = "c:/tblogs/App.IX.D.NIKKEI.DAILY.IP.SMA.${shortdate}.txt", MaxArchiveDays = 31, KeepFileOpen = false, Layout = "${longdate} [${logger}] |${level:uppercase=true}|${message}|${exception:format=toString}" };
-
-            //config.AddRule(LogLevel.Debug, LogLevel.Fatal, logfile2);
-
-            //}
 
             var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
             logconsole.Layout = "${longdate} [${threadid}] |${level:uppercase=true}|${mdlc:item=jobId}|${message}|${exception:format=toString}";
@@ -183,82 +153,79 @@ namespace TradingBrain.Models
             MappedDiagnosticsLogicalContext.Set("jobId", "default");
 
             //Connect to IG & Lightstreamer
-            IGContainer igContainer = new IGContainer();
+
+
+            object v = ConfigurationManager.GetSection("appSettings");
+            NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
+
+            //Get list of epics from config
 
             List<tbEpics> epcs = new List<tbEpics>();
 
-
-            //igContainer.tbClient.ConnectToRest();
-
-             object v = ConfigurationManager.GetSection("appSettings");
-            if (v != null)
+            region = igWebApiConnectionConfig["region"] ?? "test";
+            string settingEpics = igWebApiConnectionConfig["epics"] ?? "IX.D.NASDAQ.CASH.IP|SMA";
+            List<string> epicList = new List<string>();
+            if (settingEpics != "IX.D.NASDAQ.CASH.IP|SMA")
             {
-
-                
-                NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
-
-                if (igWebApiConnectionConfig != null)
+                foreach (string tmp in settingEpics.Split(",").ToList())
                 {
-
-                    region = igWebApiConnectionConfig["region"] ?? "test";
-                    string settingEpics = igWebApiConnectionConfig["epics"] ?? "IX.D.NASDAQ.CASH.IP|SMA";
-                    List<string> epicList = new List<string>();
-                    if (settingEpics != "IX.D.NASDAQ.CASH.IP|SMA")
-                    {
-                        foreach (string tmp in settingEpics.Split(",").ToList())
-                        {
-                            epcs.Add(new tbEpics(tmp));
-                            epicList.Add(tmp);
-                        }
-                    }
-                    else
-                    {
-                        epcs.Add(new tbEpics("IX.D.NASDAQ.CASH.IP|SMA"));
-                        epicList.Add("IX.D.NASDAQ.CASH.IP|SMA");
-                    }
-                    string[] epics = { epcs[0].epic };
-                    //string region = igWebApiConnectionConfig["region"] ?? "test";
-                    //igAccountId = igWebApiConnectionConfig["accountId." + region] ?? "";
-                    string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
-                    clsCommonFunctions.AddStatusMessage(env, "INFO");
-                    SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
-
-                    igContainer.igRestApiClient = new IgRestApiClient(env, smartDispatcher);
-
-                    // keep this bit
-                    //string[] epics = { epic };
-                    igContainer.EpicList = clsCommonFunctions.GetEpicList(epicList.ToArray());
-
-                    // Start the lightstreamer bits in a new thread
-
-                    clsCommonFunctions.AddStatusMessage("Starting lightstreamer in a new thread", "INFO");
-                    Thread t = new Thread(new ThreadStart(igContainer.StartLightstreamer));
-                    t.Start();
-
+                    epcs.Add(new tbEpics(tmp));
+                    epicList.Add(tmp);
                 }
             }
+            else
+            {
+                epcs.Add(new tbEpics("IX.D.NASDAQ.CASH.IP|SMA"));
+                epicList.Add("IX.D.NASDAQ.CASH.IP|SMA");
+            }
+            string[] epics = { epcs[0].epic };
 
-
-
-
-            // Create tasks 
-            //List<EventWorker> workerList = new List<EventWorker>();
-            //foreach (tbEpics tbepic in epcs)
-            //{
-            //    string jobId = clsCommonFunctions.GetLogName(tbepic.epic, tbepic.strategy, tbepic.resolution);
-            //    MappedDiagnosticsLogicalContext.Set("jobId", jobId);
-            //    workerList.Add(new EventWorker(new EventParams(tbepic.epic, tbepic.strategy,tbepic.resolution, igContainer)));
-
-            //}
-            //igContainer.workerList = workerList;
+            string strategy = epcs[0].strategy;
  
+            IGContainer igContainer = null;
+            IGContainer igContainer2 = null;
+            IgApiCreds creds = new IgApiCreds();
+            IgApiCreds creds2 = new IgApiCreds();
+            clsCommonFunctions.AddStatusMessage(igWebApiConnectionConfig["environment"] ?? "DEMO", "INFO");
+            SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
 
-            //Database? the_db = IGModels.clsCommonFunctions.Get_Database(tbepic.epic).Result;
-            //Database? the_app_db = IGModels.clsCommonFunctions.Get_App_Database(tbepic.epic).Result;
+            //Get credentials from config
+            creds.igEnvironment = igWebApiConnectionConfig["environment"] ?? "DEMO";
+            creds.igUsername = igWebApiConnectionConfig["username." + creds.igEnvironment] ?? "";
+            creds.igPassword = igWebApiConnectionConfig["password." + creds.igEnvironment] ?? "";
+            creds.igApiKey = igWebApiConnectionConfig["apikey." + creds.igEnvironment] ?? "";
+            creds.igAccountId = igWebApiConnectionConfig["accountId." + creds.igEnvironment] ?? "";
+            creds.primary = true;
+            igContainer = new IGContainer(creds);
+            igContainer.igRestApiClient = new IgRestApiClient(creds.igEnvironment, smartDispatcher);
+            igContainer.EpicList = clsCommonFunctions.GetEpicList(epicList.ToArray());
+            // Start the lightstreamer bits in a new thread
+            clsCommonFunctions.AddStatusMessage("Starting lightstreamer in a new thread", "INFO");
+            Thread t = new Thread(new ThreadStart(igContainer.StartLightstreamer));
+            t.Start();
+
+
+            if (strategy == "SIM")
+            {
+ 
+                //Get credentials from config
+                creds2.igEnvironment = igWebApiConnectionConfig["environment"] ?? "DEMO";
+                creds2.igUsername = igWebApiConnectionConfig["username2." + creds2.igEnvironment] ?? "";
+                creds2.igPassword = igWebApiConnectionConfig["password2." + creds2.igEnvironment] ?? "";
+                creds2.igApiKey = igWebApiConnectionConfig["apikey2." + creds2.igEnvironment] ?? "";
+                creds2.igAccountId = igWebApiConnectionConfig["accountId2." + creds2.igEnvironment] ?? "";
+                creds2.primary = false;
+                igContainer2 = new IGContainer(creds2);
+                igContainer2.igRestApiClient = new IgRestApiClient(creds2.igEnvironment, smartDispatcher);
+                igContainer2.EpicList = clsCommonFunctions.GetEpicList(epicList.ToArray());
+                // Start the lightstreamer bits in a new thread
+                clsCommonFunctions.AddStatusMessage("Starting second lightstreamer in a new thread", "INFO");
+                Thread u = new Thread(new ThreadStart(igContainer2.StartLightstreamer));
+                u.Start();
+            }
 
             Database? the_db = IGModels.clsCommonFunctions.Get_Database("IX.D.NASDAQ.CASH.IP").Result;
             Database? the_app_db = IGModels.clsCommonFunctions.Get_App_Database("IX.D.NASDAQ.CASH.IP").Result;
-
 
             foreach (tbEpics tbepic in epcs)
             {
@@ -271,9 +238,6 @@ namespace TradingBrain.Models
                 tbLog.Info("-------------------------------------------------------------");
                 tbLog.Info($"-- TradingBrain started - strategy: {tbepic.strategy + " " + tbepic.resolution} : {tbepic.epic} --");
                 tbLog.Info("-------------------------------------------------------------");
-
-
-
 
                 if (the_db != null)
                 {
@@ -332,13 +296,16 @@ namespace TradingBrain.Models
                     }
                     tbLog.Info("Initialising app");
 
-                    workerList.Add(new MainApp(the_db, the_app_db, container, chart_container, tbepic.epic, minute_container, candles_RSI_container, TicksContainer, trade_container, igContainer, tbepic.strategy, tbepic.resolution));
+                    workerList.Add(new MainApp(the_db, the_app_db, container, chart_container, tbepic.epic, minute_container, candles_RSI_container, TicksContainer, trade_container, igContainer,igContainer2, tbepic.strategy, tbepic.resolution));
                     /* workerList.Add(new EventWorker(new EventParams(tbepic.epic, tbepic.strategy, tbepic.resolution, igContainer)))*/
                     ;
 
                 }
                 igContainer.workerList = workerList;
-
+                if (igContainer2 != null)
+                {
+                    igContainer2.workerList = workerList;
+                }
             }
             System.Timers.Timer ti = new System.Timers.Timer();
             ti.AutoReset = false;
@@ -360,7 +327,12 @@ namespace TradingBrain.Models
             {
 
                 ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
-                ti.Interval = GetInterval(epcs[0].strategy);
+                if (epcs[0].strategy == "SIM")
+                {
+                    ti.Interval = GetIntervalSecond();
+                }
+                else
+                    ti.Interval = GetInterval(epcs[0].strategy);
             }
 
             ti.Start();
@@ -419,6 +391,10 @@ namespace TradingBrain.Models
                         task = Task.Run(() => app.RunCode_BOLLI(sender, e));
                         parallelTasks.Add(task);
                         break;
+                    case "SIM":
+                        task = Task.Run(() => app.RunCode_SIM(sender, e));
+                        parallelTasks.Add(task);
+                        break;
                     default:
                         //if (app.resolution == "")
                         //{
@@ -445,10 +421,10 @@ namespace TradingBrain.Models
             {
                 var exc = ex;
             }
-            if (workerList[0].strategy == "RSI" || 
-                workerList[0].strategy == "REI" || 
-                workerList[0].strategy == "RSI-ATR" || 
-                workerList[0].strategy == "RSI-CUML" || 
+            if (workerList[0].strategy == "RSI" ||
+                workerList[0].strategy == "REI" ||
+                workerList[0].strategy == "RSI-ATR" ||
+                workerList[0].strategy == "RSI-CUML" ||
                 workerList[0].strategy == "CASEYC" ||
                  workerList[0].strategy == "VWAP" ||
                 workerList[0].strategy == "CASEYCSHORT" ||
@@ -458,7 +434,13 @@ namespace TradingBrain.Models
             }
             else
             {
-                t.Interval = GetInterval(strat);
+                if (workerList[0].strategy == "SIM")
+                {
+                    t.Interval = GetIntervalSecond();
+                }
+                else
+                    t.Interval = GetInterval(strat);
+           
             }
             t.Start();
         }
@@ -597,7 +579,16 @@ namespace TradingBrain.Models
             }
             return ((now.Second > 30 ? 120 : 60) - now.Second + testOffset) * 1000 - now.Millisecond;
         }
+        public static double GetIntervalSecond(string strat = "")
+        {
 
+            var now = DateTime.UtcNow;
+            var next = now.AddSeconds(1).AddMilliseconds(-50);
+            var delay = (next - now).TotalMilliseconds - now.Millisecond;
+            if (delay < 0) { delay = 1;
+            }
+            return delay;
+        }
         public static async Task<int> WaitForChanges()
         {
             int ret = 1;
@@ -720,7 +711,7 @@ namespace TradingBrain.Models
 
                 tbLog.Info("Initialising app");
 
-                app = new MainApp(the_db, the_app_db, container, chart_container, epic, minute_container, candles_RSI_container , TicksContainer, trade_container,igContainer, strategy, resolution);
+                app = new MainApp(the_db, the_app_db, container, chart_container, epic, minute_container, candles_RSI_container , TicksContainer, trade_container,igContainer, igContainer, strategy, resolution);
 
 
 

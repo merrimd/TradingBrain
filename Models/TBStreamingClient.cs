@@ -44,12 +44,12 @@ namespace TradingBrain.Models
         //private DemoForm demoForm;
         private Delegates.LightstreamerUpdateDelegate updateDelegate;
         private Delegates.LightstreamerStatusChangedDelegate statusChangeDelegate;
-   
+
         public LightstreamerClient client;
         private Subscription subscription;
         //private Dictionary<ChartQuotes, Subscription> charts = new Dictionary<ChartQuotes, Subscription>();
 
-  
+
         public ObservableCollection<IgPublicApiData.AccountModel>? Accounts { get; set; }
         public static string? CurrentAccountId;
         public bool LoggedIn;
@@ -73,19 +73,7 @@ namespace TradingBrain.Models
                 updateDelegate = lsUpdateDelegate;
                 statusChangeDelegate = lsStatusChangeDelegate;
                 FirstConfirmUpdate = true;
-                //var config = new NLog.Config.LoggingConfiguration();
 
-                //var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
-                //var logfile = new NLog.Targets.FileTarget("logfile") { FileName = filename };
-                //var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
-
-
-                //config.AddRule(LogLevel.Warn, LogLevel.Fatal, logconsole);
-                //config.AddRule(LogLevel.Trace, LogLevel.Fatal, logfile);
-
-                //NLog.LogManager.Configuration = config;
-
-                //LightstreamerClient.setLoggerProvider(new Log4NetLoggerProviderWrapper());
 
                 bool connectionEstablished = false;
 
@@ -113,15 +101,20 @@ namespace TradingBrain.Models
 
         public async void ConnectToRest()
         {
-            object v = ConfigurationManager.GetSection("appSettings");
-            NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
-            //string env = igWebApiConnectionConfig["environment"] ?? "";
-            string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
+            //object v = ConfigurationManager.GetSection("appSettings");
+            //NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
 
-            string userName = igWebApiConnectionConfig["username." + env] ?? "";
-            string password = igWebApiConnectionConfig["password." + env] ?? "";
-            string apiKey = igWebApiConnectionConfig["apikey." + env] ?? "";
-            string accountId = igWebApiConnectionConfig["accountId." + env] ?? "";
+            //string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
+            //string userName = igWebApiConnectionConfig["username." + env] ?? "";
+            //string password = igWebApiConnectionConfig["password." + env] ?? "";
+            //string apiKey = igWebApiConnectionConfig["apikey." + env] ?? "";
+            //string accountId = igWebApiConnectionConfig["accountId." + env] ?? "";
+
+            string env = _igContainer.creds.igEnvironment;
+            string userName = _igContainer.creds.igUsername;
+            string password = _igContainer.creds.igPassword;
+            string apiKey = _igContainer.creds.igApiKey;
+            string accountId = _igContainer.creds.igAccountId;
 
             var ar = new AuthenticationRequest { identifier = userName, password = password };
             _igContainer.Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
@@ -149,7 +142,7 @@ namespace TradingBrain.Models
 
                         _igContainer.Accounts.Add(igAccount);
 
-                        clsCommonFunctions.AddStatusMessage("Account:" + igAccount.ClientId + " " + account.accountName,"INFO");
+                        clsCommonFunctions.AddStatusMessage("Account:" + igAccount.ClientId + " " + account.accountName, "INFO");
                     }
 
                     LoggedIn = true;
@@ -184,23 +177,29 @@ namespace TradingBrain.Models
                       response.StatusCode, "ERROR");
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                clsCommonFunctions.AddStatusMessage("ConnectToRest failed - " + e.ToString,"ERROR");
-                
+                clsCommonFunctions.AddStatusMessage("ConnectToRest failed - " + e.ToString, "ERROR");
+
             }
         }
         public async void LogIn()
         {
-            object v = ConfigurationManager.GetSection("appSettings");
-            NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
-            //string env = igWebApiConnectionConfig["environment"] ?? "";
-            string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
+            //object v = ConfigurationManager.GetSection("appSettings");
+            //NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
 
-            string userName = igWebApiConnectionConfig["username." + env] ?? "";
-            string password = igWebApiConnectionConfig["password." + env] ?? "";
-            string apiKey = igWebApiConnectionConfig["apikey." + env] ?? "";
-            string accountId = igWebApiConnectionConfig["accountId." + env] ?? "";
+            //string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
+            //string userName = igWebApiConnectionConfig["username." + env] ?? "";
+            //string password = igWebApiConnectionConfig["password." + env] ?? "";
+            //string apiKey = igWebApiConnectionConfig["apikey." + env] ?? "";
+            //string accountId = igWebApiConnectionConfig["accountId." + env] ?? "";
+
+            string env = _igContainer.creds.igEnvironment;
+            string userName = _igContainer.creds.igUsername;
+            string password = _igContainer.creds.igPassword;
+            string apiKey = _igContainer.creds.igApiKey;
+            string accountId = _igContainer.creds.igAccountId;
+
             var ar = new AuthenticationRequest { identifier = userName, password = password };
             _igContainer.Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
 
@@ -285,7 +284,7 @@ namespace TradingBrain.Models
                     // Run a timer for every 10 mins to keep the connection alive.
 
                     // set a timeout to run this again in 30 mins. this will keep the session active.
-                    clsCommonFunctions.AddStatusMessage("Setting a timer so we can re run the AccountDetails after 10 mins to stop it expiring.", "INFO" );
+                    clsCommonFunctions.AddStatusMessage("Setting a timer so we can re run the AccountDetails after 10 mins to stop it expiring.", "INFO");
                     System.Timers.Timer timer = new System.Timers.Timer(600000); // 10 mins
                     timer.Elapsed += OnTimedEvent;
                     timer.AutoReset = true; // Run only once
@@ -298,7 +297,7 @@ namespace TradingBrain.Models
                 else
                 {
                     clsCommonFunctions.AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
-                                        response.StatusCode,"ERROR");
+                                        response.StatusCode, "ERROR");
                     //Log log = new Log(_thisApp.the_app_db);
                     //log.Log_Message = "Failed to login. HttpResponse StatusCode = " + response.StatusCode;
                     //log.Log_Type = "Error";
@@ -403,17 +402,22 @@ namespace TradingBrain.Models
         }
         private void Execute(int ph)
         {
-            try { 
-            if (ph != this.phase)
+            try
             {
-                return;
-            }
-            ph = Interlocked.Increment(ref this.phase);
-            this.LogIn();
-            this.Connect(ph);
-            this.ChartSubscribe();
-            this.TradeSubscribe(CurrentAccountId);
-            this._igContainer.igAccountId = CurrentAccountId;
+                if (ph != this.phase)
+                {
+                    return;
+                }
+                ph = Interlocked.Increment(ref this.phase);
+                this.LogIn();
+                this.Connect(ph);
+                if (this._igContainer.creds.primary)
+                {
+                    //ony subscribe to charts on primary connection
+                    this.ChartSubscribe();
+                }
+                this.TradeSubscribe(this._igContainer.igAccountId);
+                //this._igContainer.igAccountId = CurrentAccountId;
                 // this.subscribeChart()
             }
             catch (Exception ex)
@@ -430,23 +434,24 @@ namespace TradingBrain.Models
 
         public void StatusChanged(int ph, int cStatus, string status)
         {
-             if (ph != this.phase)
+            if (ph != this.phase)
                 return;
-            try { 
-
-            clsCommonFunctions.AddStatusMessage("Status changed to " + status + " (" + cStatus + ")", "INFO");
-            if (cStatus == 0)
+            try
             {
-                if (Interlocked.CompareExchange(ref this.reset, 0, 1) == 1)
+
+                clsCommonFunctions.AddStatusMessage("Status changed to " + status + " (" + cStatus + ")", "INFO");
+                if (cStatus == 0)
                 {
-                    int phs = Interlocked.Increment(ref this.phase);
-                    Thread t = new Thread(new ThreadStart(delegate ()
+                    if (Interlocked.CompareExchange(ref this.reset, 0, 1) == 1)
                     {
-                        Execute(phs);
-                    }));
-                    t.Start();
+                        int phs = Interlocked.Increment(ref this.phase);
+                        Thread t = new Thread(new ThreadStart(delegate ()
+                        {
+                            Execute(phs);
+                        }));
+                        t.Start();
+                    }
                 }
-            }
             }
             catch (Exception ex)
             {
@@ -471,7 +476,7 @@ namespace TradingBrain.Models
             var epic = update.ItemName.Replace("L1:", "").Replace("CHART:", "").Replace(":1MINUTE", "").Replace(":TICK", "").Replace(":SECOND", "");
             try
             {
-                var wlmUpdate = update ;
+                var wlmUpdate = update;
 
 
 
@@ -574,7 +579,7 @@ namespace TradingBrain.Models
                 }
 
 
-           
+
 
 
 
@@ -619,8 +624,8 @@ namespace TradingBrain.Models
                 //            //Console.WriteLine("PriceChange: " + JsonConvert.SerializeObject(currentTick));
                 //            currentSecond = thisSecond;
                 //        }
-    
-                        
+
+
                 //        //Console.WriteLine("PriceChange: " + JsonConvert.SerializeObject(currentTick));
                 //    }
 
@@ -662,7 +667,7 @@ namespace TradingBrain.Models
                     //clsCommonFunctions.AddStatusMessage("Trade Subscription Update", "INFO");
                     try
                     {
-                  
+
                         var confirms = update.getValue("CONFIRMS");
                         var opu = update.getValue("OPU");
                         var wou = update.getValue("WOU");
@@ -680,7 +685,7 @@ namespace TradingBrain.Models
                         if (!(String.IsNullOrEmpty(confirms)))
                         {
                             //clsCommonFunctions.AddStatusMessage("Trade update - CONFIRMS" + confirms);
-                           await UpdateTsConfirm(itemPos, update.ItemName, update, confirms, TradeSubscriptionType.Confirm);
+                            await UpdateTsConfirm(itemPos, update.ItemName, update, confirms, TradeSubscriptionType.Confirm);
                         }
 
                     }
@@ -706,7 +711,7 @@ namespace TradingBrain.Models
 
         }
 
-          private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsOpu(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
+        private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsOpu(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
         {
 
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
@@ -897,7 +902,7 @@ namespace TradingBrain.Models
             //            }
             //        }
 
- 
+
             //    }
 
             //}
@@ -1142,7 +1147,7 @@ namespace TradingBrain.Models
 
                 List<string> epics = new List<string>();
 
-                foreach(clsEpicList epic in _igContainer.EpicList)
+                foreach (clsEpicList epic in _igContainer.EpicList)
                 {
                     string tmpEpic = "";
                     if (epic.Epic.Contains("|"))
@@ -1155,14 +1160,14 @@ namespace TradingBrain.Models
                         tmpEpic = epic.Epic;
                     }
                     epics.Add("CHART:" + tmpEpic + ":TICK");
-                    _igContainer.PriceEpicList.Add(new LOepic(tmpEpic) );
+                    _igContainer.PriceEpicList.Add(new LOepic(tmpEpic));
                 }
                 //if (_igContainer.ep != "")
                 //{
                 //    chartName = "CHART:" + _igContainer.epicName + ":TICK";
                 //}
                 //subscription = new Subscription("DISTINCT", new string[1] { chartName }, new string[11] { "BID", "OFR", "LTP", "LTV", "TTV", "UTM", "DAY_OPEN_MID", "DAY_NET_CHG_MID", "DAY_PERC_CHG_MID", "DAY_HIGH", "DAY_LOW" });
-                subscription = new Subscription("DISTINCT", epics.ToArray(), new string[3] { "UTM", "BID", "OFR"  });
+                subscription = new Subscription("DISTINCT", epics.ToArray(), new string[3] { "UTM", "BID", "OFR" });
 
 
                 //subscription = new Subscription("MERGE", new string[30] { "item1", "item2", "item3", "item4", "item5", "item6", "item7", "item8", "item9", "item10", "item11", "item12", "item13", "item14", "item15", "item16", "item17", "item18", "item19", "item20", "item21", "item22", "item23", "item24", "item25", "item26", "item27", "item28", "item29", "item30" },
@@ -1295,10 +1300,27 @@ namespace TradingBrain.Models
         public Database? the_db { get; set; }
         public Database? the_app_db { get; set; }
         public List<MainApp> workerList { get; set; }
+        public IgApiCreds creds { get; set; }
         public IGContainer()
         {
             igRestApiClient = null;
             CurrentAccountId = "";
+            igAccountId = "";
+            Accounts = null;
+            EpicList = new List<clsEpicList>();
+            PriceEpicList = new List<LOepic>();
+            LoggedIn = false;
+            the_db = null;
+            the_app_db = null;
+            tbClient = null;
+            workerList = new List<MainApp>();
+            creds = new IgApiCreds();
+        }
+        public IGContainer(IgApiCreds _creds)
+        {
+            igRestApiClient = null;
+            CurrentAccountId = _creds.igAccountId;
+            creds = _creds;
             igAccountId = "";
             Accounts = null;
             EpicList = new List<clsEpicList>();
@@ -1351,7 +1373,7 @@ namespace TradingBrain.Models
         public clsChartMinUpdate lastUpdate { get; set; }
         public DateTime lastUTM { get; set; }
         public List<double> closePrices { get; set; }
-    public tbPrice latestCandle { get; set; }
+        public tbPrice latestCandle { get; set; }
         public List<tick> ticks { get; set; }
         public LOepic()
         {
@@ -1545,5 +1567,33 @@ namespace TradingBrain.Models
             return ret;
         }
 
+    }
+
+    public class IgApiCreds
+    {
+        public string igEnvironment { get; set; }
+        public string igApiKey { get; set; }
+        public string igUsername { get; set; }
+        public string igPassword { get; set; }
+        public string igAccountId { get; set; }
+        public bool primary { get; set; }
+        public IgApiCreds()
+        {
+            igEnvironment = "";
+            igApiKey = "";
+            igUsername = "";
+            igPassword = "";
+            igAccountId = "";
+            primary = false;
+        }
+        public IgApiCreds(string environment,string apiKey, string username, string password, string accountId,bool _primary)
+        {
+            igEnvironment = environment;
+            igApiKey = apiKey;
+            igUsername = username;
+            igPassword = password;
+            igAccountId = accountId;
+            primary = _primary;
+        }
     }
 }
