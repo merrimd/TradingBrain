@@ -25,6 +25,8 @@ using Microsoft.AspNetCore.SignalR.Client;
 using com.lightstreamer.client;
 
 using NLog;
+using NLog.Extensions.AzureBlobStorage;
+using NLog.Targets;
 
 using IGWebApiClient;
 using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
@@ -36,6 +38,8 @@ using MimeKit.Encodings;
 using Org.BouncyCastle.Tsp;
 using System.Timers;
 using System.Runtime.CompilerServices;
+using Azure.Storage.Blobs;
+
 
 namespace TradingBrain.Models
 {
@@ -133,28 +137,6 @@ namespace TradingBrain.Models
         static async Task Main(string[] args)
         {
 
-            // Set up the logging //
-
-            var config = new NLog.Config.LoggingConfiguration();
-
-            var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
-
-            var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App.${mdlc:item=jobId}.${shortdate}.txt", MaxArchiveDays = 31, KeepFileOpen = false, Layout = "${longdate} [${mdlc:item=jobId}] |${level:uppercase=true}|${message}|${exception:format=toString}" };
-            config.AddRule(LogLevel.Debug, LogLevel.Fatal, logfile);
-
-            var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
-            logconsole.Layout = "${longdate} [${threadid}] |${level:uppercase=true}|${mdlc:item=jobId}|${message}|${exception:format=toString}";
-
-            config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
-
-
-            NLog.LogManager.Configuration = config;
-
-            MappedDiagnosticsLogicalContext.Set("jobId", "default");
-
-            //Connect to IG & Lightstreamer
-
-
             object v = ConfigurationManager.GetSection("appSettings");
             NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
 
@@ -163,6 +145,62 @@ namespace TradingBrain.Models
             List<tbEpics> epcs = new List<tbEpics>();
 
             region = igWebApiConnectionConfig["region"] ?? "test";
+
+
+
+            // Set up the logging //
+
+            var config = new NLog.Config.LoggingConfiguration();
+
+            BlobStorageTarget azureBlobTarget = new BlobStorageTarget()
+            {
+                Name = "azureBlob",
+
+                // Your Azure Blob connection string
+                ConnectionString = "DefaultEndpointsProtocol=https;AccountName=mikewardig;AccountKey=RwdizLFFqzdH7VkjssHQtlXyyPc/WitD5lWPl67XEqvObt1wFSFI6amn2mc/DPmMTXeoIkMxoRPo+ASts6Rm/Q==;EndpointSuffix=core.windows.net",
+
+                // Container and blob path
+                Container = "tb-logs-" + region,
+                BlobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}app-log.log",
+
+                // How log messages are rendered
+                Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${message}|${exception:format=toString}",
+
+                BatchSize = 20,
+            };
+
+            config.AddTarget(azureBlobTarget);
+            config.AddRule(LogLevel.Debug, LogLevel.Fatal, azureBlobTarget);
+
+
+
+
+
+
+            //var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
+
+            //var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App.${mdlc:item=jobId}.${shortdate}.txt", MaxArchiveDays = 31, KeepFileOpen = false, Layout = "${longdate} [${mdlc:item=jobId}] |${level:uppercase=true}|${message}|${exception:format=toString}" };
+            //config.AddRule(LogLevel.Debug, LogLevel.Fatal, logfile);
+
+            var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
+            //logconsole.Layout = "${longdate} [${threadid}] |${level:uppercase=true}|${mdlc:item=jobId}|${message}|${exception:format=toString}";
+            logconsole.Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${message}|${exception:format=toString}";
+
+            config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
+
+
+            NLog.LogManager.Configuration = config;
+
+            //MappedDiagnosticsLogicalContext.Set("jobId", "default");
+
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", "DEFAULT/");
+            ScopeContext.PushProperty("strategy", "");
+            ScopeContext.PushProperty("resolution", "");
+            //Connect to IG & Lightstreamer
+
+
+
             string settingEpics = igWebApiConnectionConfig["epics"] ?? "IX.D.NASDAQ.CASH.IP|SMA";
             List<string> epicList = new List<string>();
             if (settingEpics != "IX.D.NASDAQ.CASH.IP|SMA")
@@ -230,7 +268,11 @@ namespace TradingBrain.Models
             foreach (tbEpics tbepic in epcs)
             {
                 string jobId = IGModels.clsCommonFunctions.GetLogName(tbepic.epic, tbepic.strategy, tbepic.resolution);
-                MappedDiagnosticsLogicalContext.Set("jobId", jobId);
+                //MappedDiagnosticsLogicalContext.Set("jobId", jobId);
+                ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+                ScopeContext.PushProperty("epic", tbepic.epic + "/") ;
+                ScopeContext.PushProperty("strategy", tbepic.strategy + "/");
+                ScopeContext.PushProperty("resolution", tbepic.resolution + "/");
 
                 ILogger tbLog;
                 tbLog = LogManager.GetLogger(jobId);

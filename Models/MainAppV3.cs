@@ -155,7 +155,19 @@ namespace TradingBrain.Models
             try
             {
                 this.logName = IGModels.clsCommonFunctions.GetLogName(epic, strategy, resolution);
-                MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+
+                ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+                ScopeContext.PushProperty("epic", epic + "/");
+                ScopeContext.PushProperty("strategy", strategy + "/");
+                ScopeContext.PushProperty("resolution", resolution + "/");
+
+
+                //MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+
+
+
+
+
                 this._igContainer = igContainer;
                 this._igContainer2 = igContainer2;
                 this.ti = new System.Timers.Timer();
@@ -1791,15 +1803,22 @@ namespace TradingBrain.Models
         }
         public async Task<RunRet> RunCodeV5(object sender, System.Timers.ElapsedEventArgs e)
         {
-            RunRet taskRet = new RunRet();
-            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+
             bool liveMode = true;
             bool marketOpen = false;
 
             DateTime dtNow = DateTime.UtcNow;
             DateTime _startTime;
             resolution = "MINUTE";
+
+
+            RunRet taskRet = new RunRet();
+            this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", this.epicName + "/");
+            ScopeContext.PushProperty("strategy", strategy + "/");
+            ScopeContext.PushProperty("resolution", resolution + "/");
+
 
             // Sometimes the timer that runs the RunCode will actually start at :59.xxx rather than at :00.000. This then means the minute candle is incorrect.
             int seconds = dtNow.Second;
@@ -2741,7 +2760,10 @@ namespace TradingBrain.Models
         {
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", this.epicName + "/");
+            ScopeContext.PushProperty("strategy", strategy + "/");
+            ScopeContext.PushProperty("resolution", resolution + "/");
             bool liveMode = true;
             bool marketOpen = false;
 
@@ -3253,7 +3275,10 @@ namespace TradingBrain.Models
         {
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", this.epicName + "/");
+            ScopeContext.PushProperty("strategy", strategy + "/");
+            ScopeContext.PushProperty("resolution", resolution + "/");
             bool liveMode = true;
             bool marketOpen = false;
 
@@ -5373,7 +5398,10 @@ namespace TradingBrain.Models
             ///
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", this.epicName + "/");
+            ScopeContext.PushProperty("strategy", strategy + "/");
+            ScopeContext.PushProperty("resolution", resolution + "/");
             int resMod = 0;
 
             bool liveMode = true;
@@ -5935,7 +5963,10 @@ namespace TradingBrain.Models
             ///
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", this.epicName + "/");
+            ScopeContext.PushProperty("strategy", strategy + "/");
+            ScopeContext.PushProperty("resolution", resolution + "/");
             int resMod = 0;
 
             bool liveMode = true;
@@ -6430,7 +6461,10 @@ namespace TradingBrain.Models
             ///
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", this.epicName + "/");
+            ScopeContext.PushProperty("strategy", strategy + "/");
+            ScopeContext.PushProperty("resolution", resolution + "/");
             int resMod = 0;
 
             bool liveMode = true;
@@ -6942,7 +6976,10 @@ namespace TradingBrain.Models
             AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", this.epicName + "/");
+            ScopeContext.PushProperty("strategy", strategy + "/");
+            ScopeContext.PushProperty("resolution", resolution + "/");
             int resMod = 0;
 
             bool liveMode = true;
@@ -7527,6 +7564,9 @@ namespace TradingBrain.Models
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
             MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+
+
+
             int resMod = 0;
 
             bool liveMode = true;
@@ -8113,7 +8153,10 @@ namespace TradingBrain.Models
             AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", this.epicName + "/");
+            ScopeContext.PushProperty("strategy", strategy + "/");
+            ScopeContext.PushProperty("resolution", resolution + "/");
             int resMod = 0;
 
             bool liveMode = true;
@@ -8777,7 +8820,10 @@ namespace TradingBrain.Models
             AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", this.epicName + "/");
+            ScopeContext.PushProperty("strategy", strategy + "/");
+            ScopeContext.PushProperty("resolution", resolution + "/");
             int resMod = 0;
 
             bool liveMode = true;
@@ -9308,7 +9354,10 @@ namespace TradingBrain.Models
             ///
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("app", "TRADINGBRAIN/");
+            ScopeContext.PushProperty("epic", this.epicName + "/");
+            ScopeContext.PushProperty("strategy", strategy + "/");
+            ScopeContext.PushProperty("resolution", resolution + "/");
             int resMod = 0;
 
             bool liveMode = true;
