@@ -146,11 +146,34 @@ namespace TradingBrain.Models
 
             region = igWebApiConnectionConfig["region"] ?? "test";
 
+            string settingEpics = igWebApiConnectionConfig["epics"] ?? "IX.D.NASDAQ.CASH.IP|SMA";
+            List<string> epicList = new List<string>();
+            if (settingEpics != "IX.D.NASDAQ.CASH.IP|SMA")
+            {
+                foreach (string tmp in settingEpics.Split(",").ToList())
+                {
+                    epcs.Add(new tbEpics(tmp));
+                    epicList.Add(tmp);
+                }
+            }
+            else
+            {
+                epcs.Add(new tbEpics("IX.D.NASDAQ.CASH.IP|SMA"));
+                epicList.Add("IX.D.NASDAQ.CASH.IP|SMA");
+            }
+            string[] epics = { epcs[0].epic };
 
+            string strategy = epcs[0].strategy;
 
             // Set up the logging //
 
             var config = new NLog.Config.LoggingConfiguration();
+
+            string blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}app-log.log";
+            if (strategy == "GRID")
+            {
+                blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}${date:format=HH}/app-log.log";
+            }
 
             BlobStorageTarget azureBlobTarget = new BlobStorageTarget()
             {
@@ -161,7 +184,7 @@ namespace TradingBrain.Models
 
                 // Container and blob path
                 Container = "tb-logs-" + region,
-                BlobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}app-log.log",
+                BlobName = blobName,
 
                 // How log messages are rendered
                 Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${message}|${exception:format=toString}",
@@ -201,24 +224,7 @@ namespace TradingBrain.Models
 
 
 
-            string settingEpics = igWebApiConnectionConfig["epics"] ?? "IX.D.NASDAQ.CASH.IP|SMA";
-            List<string> epicList = new List<string>();
-            if (settingEpics != "IX.D.NASDAQ.CASH.IP|SMA")
-            {
-                foreach (string tmp in settingEpics.Split(",").ToList())
-                {
-                    epcs.Add(new tbEpics(tmp));
-                    epicList.Add(tmp);
-                }
-            }
-            else
-            {
-                epcs.Add(new tbEpics("IX.D.NASDAQ.CASH.IP|SMA"));
-                epicList.Add("IX.D.NASDAQ.CASH.IP|SMA");
-            }
-            string[] epics = { epcs[0].epic };
 
-            string strategy = epcs[0].strategy;
  
             IGContainer igContainer = null;
             IGContainer igContainer2 = null;
@@ -243,7 +249,7 @@ namespace TradingBrain.Models
             t.Start();
 
 
-            if (strategy == "SIM")
+            if (strategy == "GRID")
             {
  
                 //Get credentials from config
@@ -351,40 +357,73 @@ namespace TradingBrain.Models
             }
             System.Timers.Timer ti = new System.Timers.Timer();
             ti.AutoReset = false;
+            //if (epcs[0].strategy == "GRID")
+            //{
+            //    await RunSecondAlignedTimer(async () =>
+            //    {
+            //        RunGridMainAppCode();
+            //        await Task.CompletedTask;
+            //    });
 
-            if (epcs[0].strategy == "RSI" || 
-                epcs[0].strategy == "REI" || 
-                epcs[0].strategy == "RSI-ATR" || 
-                epcs[0].strategy == "RSI-CUML" || 
+            //}
+            //else
+            //{
+                if (epcs[0].strategy == "RSI" ||
+                epcs[0].strategy == "REI" ||
+                epcs[0].strategy == "RSI-ATR" ||
+                epcs[0].strategy == "RSI-CUML" ||
                 epcs[0].strategy == "CASEYC" ||
                 epcs[0].strategy == "CASEYCSHORT" ||
                 epcs[0].strategy == "VWAP" ||
-                epcs[0].strategy == "CASEYCEQUITIES") 
-            {
-                ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
-                ti.Interval = GetIntervalWithResolution("HOUR");
-                //ti.Interval = 1000;
-            }
-            else
-            {
-
-                ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
-                if (epcs[0].strategy == "SIM")
+                epcs[0].strategy == "CASEYCEQUITIES")
                 {
-                    ti.Interval = GetIntervalSecond();
+                    ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
+                    ti.Interval = GetIntervalWithResolution("HOUR");
+                    //ti.Interval = 1000;
                 }
                 else
-                    ti.Interval = GetInterval(epcs[0].strategy);
-            }
+                {
 
-            ti.Start();
+                    ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
+                    if (epcs[0].strategy == "GRID")
+                    {
 
 
+                        ti.Interval = GetIntervalSecond();
+
+                        //var now = DateTime.UtcNow;
+                        ////var next = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second , 100).AddSeconds(1);// now.AddSeconds(1).AddMilliseconds(-50);
+                        //var next = now.AddSeconds(1);
+                        ////var delay = (next - now).TotalMilliseconds - now.Millisecond;
+                        //ti.Interval = (next - now).TotalMilliseconds;
+
+                    }
+                    else
+                        ti.Interval = GetInterval(epcs[0].strategy);
+                }
+
+                ti.Start();
+
+            //}
             int i = await WaitForChanges();
 
 
         }
+            static async Task RunSecondAlignedTimer(Func<Task> action)
+            {
+                while (true)
+                {
+          
+                DateTime now = DateTime.UtcNow;
+                    double msToNextSecond = 1000 - now.Millisecond   - (now.Ticks % TimeSpan.TicksPerMillisecond) / 10000.0;
 
+                    if (msToNextSecond < 0) msToNextSecond =0;
+
+                    await Task.Delay((int)msToNextSecond);
+                await action();
+                //await action();
+            }
+            }
         public static async void RunMainAppCode(object sender, System.Timers.ElapsedEventArgs e)
         {
             var parallelTasks = new List<Task<RunRet>>();
@@ -433,8 +472,8 @@ namespace TradingBrain.Models
                         task = Task.Run(() => app.RunCode_BOLLI(sender, e));
                         parallelTasks.Add(task);
                         break;
-                    case "SIM":
-                        task = Task.Run(() => app.RunCode_SIM(sender, e));
+                    case "GRID":
+                        task = Task.Run(() => app.RunCode_GRID(sender, e));
                         parallelTasks.Add(task);
                         break;
                     default:
@@ -476,9 +515,15 @@ namespace TradingBrain.Models
             }
             else
             {
-                if (workerList[0].strategy == "SIM")
+                if (workerList[0].strategy == "GRID")
                 {
                     t.Interval = GetIntervalSecond();
+                    clsCommonFunctions.AddStatusMessage($"Next GRID interval set to : {t.Interval} ms", "INFO");
+                    //var now = DateTime.UtcNow;
+                    ////var next = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second , 100).AddSeconds(1);// now.AddSeconds(1).AddMilliseconds(-50);
+                    //var next = now.AddSeconds(1);
+                    ////var delay = (next - now).TotalMilliseconds - now.Millisecond;
+                    //t.Interval = (next - now).TotalMilliseconds;
                 }
                 else
                     t.Interval = GetInterval(strat);
@@ -486,8 +531,23 @@ namespace TradingBrain.Models
             }
             t.Start();
         }
+        //public static async void RunGridMainAppCode()
+        //{
+        //    var parallelTasks = new List<Task<RunRet>>();
+        //    //var t = (System.Timers.Timer)sender;
+        //    string strat = "";
+        //    foreach (MainApp app in workerList)
+        //    {
+        //        bool ret = await app.GetPositions();
 
-       public static double GetIntervalWithResolution(string resolution)
+        //        Task<RunRet> task;
+ 
+        //        task = Task.Run(() => app.RunCode_GRID());
+        //        parallelTasks.Add(task);
+        //        break;                 
+        //    }
+        //}
+        public static double GetIntervalWithResolution(string resolution)
         {
             DateTime now = DateTime.Now;
             DateTime nextRun = DateTime.MinValue;
@@ -625,10 +685,13 @@ namespace TradingBrain.Models
         {
 
             var now = DateTime.UtcNow;
-            var next = now.AddSeconds(1).AddMilliseconds(-50);
+            //var next = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second , 100).AddSeconds(1);// now.AddSeconds(1).AddMilliseconds(-50);
+            var next = now.AddSeconds(1);
+            //var delay = (next - now).TotalMilliseconds - now.Millisecond;
             var delay = (next - now).TotalMilliseconds - now.Millisecond;
-            if (delay < 0) { delay = 1;
+            if (delay <= 0) { delay = 50;
             }
+            clsCommonFunctions.AddStatusMessage($"Interval set : now = {now.Second}:{now.Millisecond}, next = {next.Second}:{next.Millisecond}, delay = {delay}", "INFO");
             return delay;
         }
         public static async Task<int> WaitForChanges()
