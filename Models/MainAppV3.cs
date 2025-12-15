@@ -173,7 +173,6 @@ namespace TradingBrain.Models
 
 
 
-
                 this._igContainer = igContainer;
                 this._igContainer2 = igContainer2;
                 this.ti = new System.Timers.Timer();
@@ -341,9 +340,10 @@ namespace TradingBrain.Models
 
 
 
+                bool ret = GetPositions().Result;
 
                 // set up timer here perhaps
-                
+
 
             }
             catch (Exception ex)
@@ -4065,7 +4065,7 @@ namespace TradingBrain.Models
                             }
                                 //clsCommonFunctions.AddStatusMessage("Force buy");
                             //model.buyLong = true;
-                            //model.sellLong = false;
+                            model.sellLong = false;
                             //model.buyLong = false;
                             //model.sellLong = true;
 
@@ -11858,10 +11858,13 @@ namespace TradingBrain.Models
             {
                 if (this.strategy == "GRID")
                 {
-
+                    IgResponse<PositionsResponse> ret;
                     //Do longs first
+                    try
+                    {
 
-                    IgResponse<PositionsResponse> ret = await _igContainer.igRestApiClient.getOTCOpenPositionsV1();
+
+                    ret = await _igContainer.igRestApiClient.getOTCOpenPositionsV1();
 
                     foreach (OpenPosition obj in ret.Response.positions)
                     {
@@ -11940,8 +11943,13 @@ namespace TradingBrain.Models
                         }
                     }
 
-                    //then do shorts
-
+                        //then do shorts
+                    }
+                    catch (Exception ex)
+                    {
+                        clsCommonFunctions.AddStatusMessage($"Error in Long GetPositions - {ex.ToString()}", "ERROR");
+                    }
+                    try { 
                     ret = await _igContainer2.igRestApiClient.getOTCOpenPositionsV1();
 
                     foreach (OpenPosition obj in ret.Response.positions)
@@ -12017,6 +12025,11 @@ namespace TradingBrain.Models
                                 //AddStatusMessage($"Trade with DealID {tsm.dealId} not found in DB for BOLLI strategy.");
                             }
                         }
+                    }
+                    }
+                    catch (Exception ex)
+                    {
+                        clsCommonFunctions.AddStatusMessage($"Error in Short GetPositions - {ex.ToString()}", "ERROR");
                     }
                 }
                 else

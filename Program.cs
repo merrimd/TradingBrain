@@ -43,7 +43,7 @@ using Azure.Storage.Blobs;
 
 namespace TradingBrain.Models
 {
-    partial class Program
+    partial class ProgramV2
     {
         public static Microsoft.Azure.Cosmos.Container? EpicContainer;
         public static Microsoft.Azure.Cosmos.Container? hourly_container;
@@ -345,7 +345,7 @@ namespace TradingBrain.Models
                     tbLog.Info("Initialising app");
 
                     workerList.Add(new MainApp(the_db, the_app_db, container, chart_container, tbepic.epic, minute_container, candles_RSI_container, TicksContainer, trade_container, igContainer,igContainer2, tbepic.strategy, tbepic.resolution));
-                    /* workerList.Add(new EventWorker(new EventParams(tbepic.epic, tbepic.strategy, tbepic.resolution, igContainer)))*/
+         
                     ;
 
                 }
@@ -431,43 +431,43 @@ namespace TradingBrain.Models
             string strat = "";
             foreach (MainApp app in workerList)
             {
-                bool ret = await app.GetPositions();
+                //bool ret = await app.GetPositions();
 
                 Task<RunRet> task;
                 switch (app.strategy){
-                    case "RSI":
-                        task = Task.Run(() => app.RunCode_RSI(sender, e));
-                        parallelTasks.Add(task);
-                        break;
-                    case "RSI-ATR":
-                        task = Task.Run(() => app.RunCode_RSI_ATR(sender, e));
-                        parallelTasks.Add(task);
-                        break;
-                    case "RSI-CUML":
-                        task = Task.Run(() => app.RunCode_RSI_CUML(sender, e));
-                        parallelTasks.Add(task);
-                        break;
-                    case "CASEYC":
-                        //task = Task.Run(() => app.RunCode_CASEYC(sender, e));
-                        task = Task.Run(() => app.RunCode_CASEYCv2(sender, e));
-                        parallelTasks.Add(task);
-                        break;
-                    case "CASEYCEQUITIES":
-                        task = Task.Run(() => app.RunCode_CASEYC(sender, e));
-                        parallelTasks.Add(task);
-                        break;
-                    case "CASEYCSHORT":
-                        task = Task.Run(() => app.RunCode_CASEYCSHORT(sender, e));
-                        parallelTasks.Add(task);
-                        break;
-                    case "REI":
-                        task = Task.Run(() => app.RunCode_REI(sender, e));
-                        parallelTasks.Add(task);
-                        break;
-                    case "VWAP":
-                        task = Task.Run(() => app.RunCode_VWAP(sender, e));
-                        parallelTasks.Add(task);
-                        break;
+                    //case "RSI":
+                    //    task = Task.Run(() => app.RunCode_RSI(sender, e));
+                    //    parallelTasks.Add(task);
+                    //    break;
+                    //case "RSI-ATR":
+                    //    task = Task.Run(() => app.RunCode_RSI_ATR(sender, e));
+                    //    parallelTasks.Add(task);
+                    //    break;
+                    //case "RSI-CUML":
+                    //    task = Task.Run(() => app.RunCode_RSI_CUML(sender, e));
+                    //    parallelTasks.Add(task);
+                    //    break;
+                    //case "CASEYC":
+                    //    //task = Task.Run(() => app.RunCode_CASEYC(sender, e));
+                    //    task = Task.Run(() => app.RunCode_CASEYCv2(sender, e));
+                    //    parallelTasks.Add(task);
+                    //    break;
+                    //case "CASEYCEQUITIES":
+                    //    task = Task.Run(() => app.RunCode_CASEYC(sender, e));
+                    //    parallelTasks.Add(task);
+                    //    break;
+                    //case "CASEYCSHORT":
+                    //    task = Task.Run(() => app.RunCode_CASEYCSHORT(sender, e));
+                    //    parallelTasks.Add(task);
+                    //    break;
+                    //case "REI":
+                    //    task = Task.Run(() => app.RunCode_REI(sender, e));
+                    //    parallelTasks.Add(task);
+                    //    break;
+                    //case "VWAP":
+                    //    task = Task.Run(() => app.RunCode_VWAP(sender, e));
+                    //    parallelTasks.Add(task);
+                    //    break;
                     case "BOLLI":
                         task = Task.Run(() => app.RunCode_BOLLI(sender, e));
                         parallelTasks.Add(task);
@@ -477,17 +477,7 @@ namespace TradingBrain.Models
                         parallelTasks.Add(task);
                         break;
                     default:
-                        //if (app.resolution == "")
-                        //{
-  
-                        //    task = Task.Run(() => app.RunCode(sender, e));
-                        //}
-                        //else
-                        //{
-                            task = Task.Run(() => app.RunCodeV5(sender, e));
-                        //}
-                            //
-                            
+                        task = Task.Run(() => app.RunCodeV5(sender, e));
                         parallelTasks.Add(task);
                         break;
 
@@ -692,7 +682,7 @@ namespace TradingBrain.Models
             if (delay <= 0) { delay = 50;
             }
             clsCommonFunctions.AddStatusMessage($"Interval set : now = {now.Second}:{now.Millisecond}, next = {next.Second}:{next.Millisecond}, delay = {delay}", "INFO");
-            return delay;
+            return delay + 75;
         }
         public static async Task<int> WaitForChanges()
         {
@@ -816,7 +806,7 @@ namespace TradingBrain.Models
 
                 tbLog.Info("Initialising app");
 
-                app = new MainApp(the_db, the_app_db, container, chart_container, epic, minute_container, candles_RSI_container , TicksContainer, trade_container,igContainer, igContainer, strategy, resolution);
+                //app = new MainApp(the_db, the_app_db, container, chart_container, epic, minute_container, candles_RSI_container , TicksContainer, trade_container,igContainer, igContainer, strategy, resolution);
 
 
 
@@ -904,34 +894,5 @@ namespace TradingBrain.Models
 
         }
     }
-    public class tbEpics
-    {
-        public string epic { get; set; }
-        public string resolution { get; set; }
-        public string strategy { get; set; }
-        public tbEpics()
-        {
-            epic = "";
-            resolution = "";
-            strategy = "";
-        }
-        public tbEpics(string input)
-        {
-            List<string> tmp = input.Split("|").ToList();
-            epic = tmp[0];
-            if (tmp.Count == 2)
-            {
-                strategy = tmp[1];
-                resolution = "";
-            }
-            else
-            {
-                if (tmp.Count == 3)
-                {
-                    strategy = tmp[1];
-                    resolution = tmp[2];
-                }
-            }
-        }
-    }
+
 }

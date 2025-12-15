@@ -5,6 +5,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <StartupObject>TradingBrain.Models.ProgramV2</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +15,13 @@
     <Compile Remove="Models\IgPublicApiData.cs" />
     <Compile Remove="Models\MainApp.cs" />
     <Compile Remove="Models\MainAppV2.cs" />
+    <Compile Remove="Models\MainAppV4.cs" />
+    <Compile Remove="Producer.cs" />
+    <Compile Remove="ProgramV2.cs" />
+    <Compile Remove="WorkChannel.cs" />
+    <Compile Remove="Worker.cs" />
+    <Compile Remove="WorkerManager.cs" />
+    <Compile Remove="WorkerPool.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,6 +33,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NLog" Version="6.0.1" />
     <PackageReference Include="NLog.Extensions.AzureBlobStorage" Version="4.7.1" />
+    <PackageReference Include="NLog.Extensions.Logging" Version="6.0.1" />
     <PackageReference Include="PCLCrypto" Version="2.0.147" />
   </ItemGroup>
 
