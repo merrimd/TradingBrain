@@ -5685,6 +5685,7 @@ namespace TradingBrain.Models
                                         {
                                             this.currentGRIDLTrade = thisTrade.DeepCopy();
                                             this.model.thisModel.currentGRIDLTrade = thisModelTrade.DeepCopy();
+                                            this.model.thisModel.gridLTrades.Add(thisModelTrade.DeepCopy());
                                             clsCommonFunctions.AddStatusMessage($"Current long trade set in model - DealID: {this.model.thisModel.currentGRIDLTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDLTrade.tbDealReference}", "INFO", logName);
                                             clsCommonFunctions.AddStatusMessage($"Current long trade set in local - DealID: {this.currentGRIDLTrade.dealId}, DealRef: {this.currentGRIDLTrade.dealReference}", "INFO", logName);
                                         }
@@ -5692,6 +5693,7 @@ namespace TradingBrain.Models
                                         {
                                             this.currentGRIDSTrade = thisTrade.DeepCopy();
                                             this.model.thisModel.currentGRIDSTrade = thisModelTrade.DeepCopy();
+                                            this.model.thisModel.gridSTrades.Add(thisModelTrade.DeepCopy());
                                             clsCommonFunctions.AddStatusMessage($"Current short trade set in model - DealID: {this.model.thisModel.currentGRIDSTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDSTrade.tbDealReference}", "INFO", logName);
                                             clsCommonFunctions.AddStatusMessage($"Current short trade set in local - DealID: {this.currentGRIDSTrade.dealId}, DealRef: {this.currentGRIDSTrade.dealReference}", "INFO", logName);
                                         }
