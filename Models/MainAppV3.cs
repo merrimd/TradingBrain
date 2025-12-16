@@ -5685,6 +5685,7 @@ namespace TradingBrain.Models
                                         {
                                             this.currentGRIDLTrade = thisTrade.DeepCopy();
                                             this.model.thisModel.currentGRIDLTrade = thisModelTrade.DeepCopy();
+                                            this.model.thisModel.gridLTrades.Add(this.model.thisModel.currentGRIDLTrade.DeepCopy());
                                             clsCommonFunctions.AddStatusMessage($"Current long trade set in model - DealID: {this.model.thisModel.currentGRIDLTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDLTrade.tbDealReference}", "INFO", logName);
                                             clsCommonFunctions.AddStatusMessage($"Current long trade set in local - DealID: {this.currentGRIDLTrade.dealId}, DealRef: {this.currentGRIDLTrade.dealReference}", "INFO", logName);
                                         }
@@ -5692,12 +5693,18 @@ namespace TradingBrain.Models
                                         {
                                             this.currentGRIDSTrade = thisTrade.DeepCopy();
                                             this.model.thisModel.currentGRIDSTrade = thisModelTrade.DeepCopy();
+                                            this.model.thisModel.gridSTrades.Add(this.model.thisModel.currentGRIDSTrade.DeepCopy());
                                             clsCommonFunctions.AddStatusMessage($"Current short trade set in model - DealID: {this.model.thisModel.currentGRIDSTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDSTrade.tbDealReference}", "INFO", logName);
                                             clsCommonFunctions.AddStatusMessage($"Current short trade set in local - DealID: {this.currentGRIDSTrade.dealId}, DealRef: {this.currentGRIDSTrade.dealReference}", "INFO", logName);
                                         }
                                     }
                                     else
                                     {
+                                        if (strategy == "BOLLI")
+                                        {
+                                            this.bolliID = thisModelTrade.BOLLI_ID;
+                                            this.model.thisModel.bolliTrades.Add(thisModelTrade.DeepCopy());
+                                        }
                                         this.currentTrade = thisTrade.DeepCopy();
                                         this.model.thisModel.currentTrade = thisModelTrade.DeepCopy();
                                         clsCommonFunctions.AddStatusMessage($"Current trade set in model - DealID: {this.model.thisModel.currentTrade.tbDealId}, DealRef: {this.model.thisModel.currentTrade.tbDealReference}", "INFO", logName);
@@ -11865,7 +11872,7 @@ namespace TradingBrain.Models
 
 
                     ret = await _igContainer.igRestApiClient.getOTCOpenPositionsV1();
-
+                        clsCommonFunctions.AddStatusMessage($"Long GetPositions returned {ret.Response.positions.Count} positions for epic {this.epicName}.","DEBUG");
                     foreach (OpenPosition obj in ret.Response.positions)
                     {
                         if (obj.market.epic == this.epicName)
@@ -11951,8 +11958,8 @@ namespace TradingBrain.Models
                     }
                     try { 
                     ret = await _igContainer2.igRestApiClient.getOTCOpenPositionsV1();
-
-                    foreach (OpenPosition obj in ret.Response.positions)
+                        clsCommonFunctions.AddStatusMessage($"Short GetPositions returned {ret.Response.positions.Count} positions for epic {this.epicName}.", "DEBUG");
+                        foreach (OpenPosition obj in ret.Response.positions)
                     {
                         if (obj.market.epic == this.epicName)
                         {
