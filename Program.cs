@@ -508,7 +508,7 @@ namespace TradingBrain.Models
                 if (workerList[0].strategy == "GRID")
                 {
                     t.Interval = GetIntervalSecond();
-                    clsCommonFunctions.AddStatusMessage($"Next GRID interval set to : {t.Interval} ms", "INFO");
+                    //clsCommonFunctions.AddStatusMessage($"Next GRID interval set to : {t.Interval} ms", "INFO");
                     //var now = DateTime.UtcNow;
                     ////var next = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second , 100).AddSeconds(1);// now.AddSeconds(1).AddMilliseconds(-50);
                     //var next = now.AddSeconds(1);
@@ -681,7 +681,7 @@ namespace TradingBrain.Models
             var delay = (next - now).TotalMilliseconds - now.Millisecond;
             if (delay <= 0) { delay = 50;
             }
-            clsCommonFunctions.AddStatusMessage($"Interval set : now = {now.Second}:{now.Millisecond}, next = {next.Second}:{next.Millisecond}, delay = {delay}", "INFO");
+            //clsCommonFunctions.AddStatusMessage($"Interval set : now = {now.Second}:{now.Millisecond}, next = {next.Second}:{next.Millisecond}, delay = {delay}", "INFO");
             return delay + 75;
         }
         public static async Task<int> WaitForChanges()

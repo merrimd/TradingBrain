@@ -6166,11 +6166,11 @@ namespace TradingBrain.Models
                                 }
                             }
                         }
-                    }                    
+                    }
                     catch (Exception ex)
-            {
-                string err = ex.ToString();
-            }
+                    {
+                        string err = ex.ToString();
+                    }
             //then do shorts
 
             ret = await _igContainer2.igRestApiClient.getOTCOpenPositionsV1();

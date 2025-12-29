@@ -39,7 +39,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\IGModelsDTM\IGModels\IGModels.csproj" />
-    <ProjectReference Include="..\IGStreamingAppDTM\IGWebApiClient\IGWebApiClient.csproj" />
   </ItemGroup>
 
   <ItemGroup>
