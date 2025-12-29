@@ -665,15 +665,18 @@ namespace TradingBrain.Models
             try
             {
                 string url = "";
-                var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
-                if (igWebApiConnectionConfig != null)
+                url = Environment.GetEnvironmentVariable("MessagingEndPoint") ?? "";
+                if (url == "")
                 {
-                    if (igWebApiConnectionConfig.Count > 0)
+                    var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
+                    if (igWebApiConnectionConfig != null)
                     {
-                        url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                        if (igWebApiConnectionConfig.Count > 0)
+                        {
+                            url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                        }
                     }
                 }
-
                 IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
                 newMsg.messageType = messageType;
                 newMsg.messageValue = messageValue;
@@ -729,15 +732,18 @@ namespace TradingBrain.Models
             try
             {
                 string url = "";
-                var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
-                if (igWebApiConnectionConfig != null)
+                url = Environment.GetEnvironmentVariable("MessagingEndPoint") ?? "";
+                if (url == "")
                 {
-                    if (igWebApiConnectionConfig.Count > 0)
+                    var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
+                    if (igWebApiConnectionConfig != null)
                     {
-                        url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                        if (igWebApiConnectionConfig.Count > 0)
+                        {
+                            url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                        }
                     }
                 }
-
                 IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
                 newMsg.messageType = messageType;
                 newMsg.messageValue = messageValue;

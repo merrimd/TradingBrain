@@ -78,9 +78,13 @@ namespace TradingBrain.Models
                 bool connectionEstablished = false;
 
                 SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
-                object v = ConfigurationManager.GetSection("appSettings");
-                NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
-                string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
+
+                string env = Environment.GetEnvironmentVariable("environment") ?? "";
+                if (env == "") {
+                    object v = ConfigurationManager.GetSection("appSettings");
+                    NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
+                    env = igWebApiConnectionConfig["environment"] ?? "DEMO";
+                }
                 _igContainer.igRestApiClient = new IgRestApiClient(env, smartDispatcher);
                 //_thisApp.igAccountId = this.client.connectionDetails.User;
             }

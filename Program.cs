@@ -139,15 +139,29 @@ namespace TradingBrain.Models
 
             object v = ConfigurationManager.GetSection("appSettings");
             NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
+            bool useEnvironment = false;
 
             //Get list of epics from config
 
             List<tbEpics> epcs = new List<tbEpics>();
-
-            region = igWebApiConnectionConfig["region"] ?? "test";
-
-            string settingEpics = igWebApiConnectionConfig["epics"] ?? "IX.D.NASDAQ.CASH.IP|SMA";
             List<string> epicList = new List<string>();
+            string settingEpics = "";
+
+            region = Environment.GetEnvironmentVariable("Region") ?? "";
+
+            if (region == "")
+            {
+                // not found in environment variables so get from config
+                region = igWebApiConnectionConfig["region"] ?? "test";
+                settingEpics = igWebApiConnectionConfig["epics"] ?? "IX.D.NASDAQ.CASH.IP|SMA";
+            }
+            else
+            {
+                useEnvironment = true;
+                settingEpics = Environment.GetEnvironmentVariable("epics") ?? "IX.D.NASDAQ.CASH.IP|SMA";
+            }
+
+
             if (settingEpics != "IX.D.NASDAQ.CASH.IP|SMA")
             {
                 foreach (string tmp in settingEpics.Split(",").ToList())
@@ -221,28 +235,39 @@ namespace TradingBrain.Models
             ScopeContext.PushProperty("strategy", "");
             ScopeContext.PushProperty("resolution", "");
             //Connect to IG & Lightstreamer
-
-
-
-
- 
+                         
             IGContainer igContainer = null;
             IGContainer igContainer2 = null;
             IgApiCreds creds = new IgApiCreds();
             IgApiCreds creds2 = new IgApiCreds();
-            clsCommonFunctions.AddStatusMessage(igWebApiConnectionConfig["environment"] ?? "DEMO", "INFO");
+
             SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
 
-            //Get credentials from config
-            creds.igEnvironment = igWebApiConnectionConfig["environment"] ?? "DEMO";
-            creds.igUsername = igWebApiConnectionConfig["username." + creds.igEnvironment] ?? "";
-            creds.igPassword = igWebApiConnectionConfig["password." + creds.igEnvironment] ?? "";
-            creds.igApiKey = igWebApiConnectionConfig["apikey." + creds.igEnvironment] ?? "";
-            creds.igAccountId = igWebApiConnectionConfig["accountId." + creds.igEnvironment] ?? "";
+            if (useEnvironment)
+            {
+                clsCommonFunctions.AddStatusMessage(Environment.GetEnvironmentVariable("environment") ?? "DEMO", "INFO");
+                creds.igEnvironment = Environment.GetEnvironmentVariable("environment") ?? "DEMO";
+                creds.igUsername = Environment.GetEnvironmentVariable("username." + creds.igEnvironment) ?? "";
+                creds.igPassword = Environment.GetEnvironmentVariable("password." + creds.igEnvironment) ?? "";
+                creds.igApiKey = Environment.GetEnvironmentVariable("apikey." + creds.igEnvironment) ?? "";
+                creds.igAccountId = Environment.GetEnvironmentVariable("accountId." + creds.igEnvironment) ?? "";
+            }
+            else
+            {
+                //Get credentials from config
+                clsCommonFunctions.AddStatusMessage(igWebApiConnectionConfig["environment"] ?? "DEMO", "INFO");
+                creds.igEnvironment = igWebApiConnectionConfig["environment"] ?? "DEMO";
+                creds.igUsername = igWebApiConnectionConfig["username." + creds.igEnvironment] ?? "";
+                creds.igPassword = igWebApiConnectionConfig["password." + creds.igEnvironment] ?? "";
+                creds.igApiKey = igWebApiConnectionConfig["apikey." + creds.igEnvironment] ?? "";
+                creds.igAccountId = igWebApiConnectionConfig["accountId." + creds.igEnvironment] ?? "";
+            }
+
             creds.primary = true;
             igContainer = new IGContainer(creds);
             igContainer.igRestApiClient = new IgRestApiClient(creds.igEnvironment, smartDispatcher);
             igContainer.EpicList = clsCommonFunctions.GetEpicList(epicList.ToArray());
+
             // Start the lightstreamer bits in a new thread
             clsCommonFunctions.AddStatusMessage("Starting lightstreamer in a new thread", "INFO");
             Thread t = new Thread(new ThreadStart(igContainer.StartLightstreamer));
@@ -251,17 +276,30 @@ namespace TradingBrain.Models
 
             if (strategy == "GRID")
             {
- 
-                //Get credentials from config
-                creds2.igEnvironment = igWebApiConnectionConfig["environment"] ?? "DEMO";
-                creds2.igUsername = igWebApiConnectionConfig["username2." + creds2.igEnvironment] ?? "";
-                creds2.igPassword = igWebApiConnectionConfig["password2." + creds2.igEnvironment] ?? "";
-                creds2.igApiKey = igWebApiConnectionConfig["apikey2." + creds2.igEnvironment] ?? "";
-                creds2.igAccountId = igWebApiConnectionConfig["accountId2." + creds2.igEnvironment] ?? "";
+
+                if (useEnvironment)
+                {
+                    creds2.igEnvironment = Environment.GetEnvironmentVariable("environment") ?? "DEMO";
+                    creds2.igUsername = Environment.GetEnvironmentVariable("username." + creds2.igEnvironment) ?? "";
+                    creds2.igPassword = Environment.GetEnvironmentVariable("password." + creds2.igEnvironment) ?? "";
+                    creds2.igApiKey = Environment.GetEnvironmentVariable("apikey." + creds2.igEnvironment) ?? "";
+                    creds2.igAccountId = Environment.GetEnvironmentVariable("accountId." + creds2.igEnvironment) ?? "";
+                }
+                else
+                {
+                    //Get credentials from config
+                    creds2.igEnvironment = igWebApiConnectionConfig["environment"] ?? "DEMO";
+                    creds2.igUsername = igWebApiConnectionConfig["username2." + creds2.igEnvironment] ?? "";
+                    creds2.igPassword = igWebApiConnectionConfig["password2." + creds2.igEnvironment] ?? "";
+                    creds2.igApiKey = igWebApiConnectionConfig["apikey2." + creds2.igEnvironment] ?? "";
+                    creds2.igAccountId = igWebApiConnectionConfig["accountId2." + creds2.igEnvironment] ?? "";
+                }
+
                 creds2.primary = false;
                 igContainer2 = new IGContainer(creds2);
                 igContainer2.igRestApiClient = new IgRestApiClient(creds2.igEnvironment, smartDispatcher);
                 igContainer2.EpicList = clsCommonFunctions.GetEpicList(epicList.ToArray());
+
                 // Start the lightstreamer bits in a new thread
                 clsCommonFunctions.AddStatusMessage("Starting second lightstreamer in a new thread", "INFO");
                 Thread u = new Thread(new ThreadStart(igContainer2.StartLightstreamer));
