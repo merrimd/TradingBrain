@@ -478,7 +478,7 @@ namespace TradingBrain.Models
             {
                 var wlmUpdate = update;
 
-
+                //clsCommonFunctions.AddStatusMessage($"Chart update received for {epic} - UTM:{(DateTime)EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"))} BID:{wlmUpdate.getValue("BID")} OFR:{wlmUpdate.getValue("OFR")}", "INFO");
 
                 if (wlmUpdate.getValue("BID") != "" && wlmUpdate.getValue("OFR") != "" && wlmUpdate.getValue("BID") != "0" && wlmUpdate.getValue("OFR") != "0" && wlmUpdate.getValue("BID") != null && wlmUpdate.getValue("OFR") != null)
                 {
