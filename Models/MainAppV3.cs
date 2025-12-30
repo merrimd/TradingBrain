@@ -35,7 +35,7 @@ using Newtonsoft.Json.Linq;
 using NLog;
 using Org.BouncyCastle.Ocsp;
 using Org.BouncyCastle.Pqc.Crypto.Saber;
-using PInvoke;
+//using PInvoke;
 using Skender.Stock.Indicators;
 using System;
 using System.Collections;

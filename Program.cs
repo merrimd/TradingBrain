@@ -183,10 +183,10 @@ namespace TradingBrain.Models
 
             var config = new NLog.Config.LoggingConfiguration();
 
-            string blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}app-log.log";
+            string blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}container/${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}app-log.log";
             if (strategy == "GRID")
             {
-                blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}${date:format=HH}/app-log.log";
+                blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}container/${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}${date:format=HH}/app-log.log";
             }
 
             BlobStorageTarget azureBlobTarget = new BlobStorageTarget()

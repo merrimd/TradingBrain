@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35122.118
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingBrain", "TradingBrain.csproj", "{AD93D920-47F0-4C91-BA33-F4E6FB59B5D7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBrain", "TradingBrain.csproj", "{AD93D920-47F0-4C91-BA33-F4E6FB59B5D7}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IGModels", "..\IGModelsDTM\IGModels\IGModels.csproj", "{F3F5CD03-5B92-474B-84E0-76D17FAFE338}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IGModels", "..\IGModelsDTM\IGModels\IGModels.csproj", "{7F8E2619-20A5-4375-8A82-9C1154F2A5D4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,10 +17,10 @@ Global
 		{AD93D920-47F0-4C91-BA33-F4E6FB59B5D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AD93D920-47F0-4C91-BA33-F4E6FB59B5D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AD93D920-47F0-4C91-BA33-F4E6FB59B5D7}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F3F5CD03-5B92-474B-84E0-76D17FAFE338}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F3F5CD03-5B92-474B-84E0-76D17FAFE338}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F3F5CD03-5B92-474B-84E0-76D17FAFE338}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F3F5CD03-5B92-474B-84E0-76D17FAFE338}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F8E2619-20A5-4375-8A82-9C1154F2A5D4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F8E2619-20A5-4375-8A82-9C1154F2A5D4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F8E2619-20A5-4375-8A82-9C1154F2A5D4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F8E2619-20A5-4375-8A82-9C1154F2A5D4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

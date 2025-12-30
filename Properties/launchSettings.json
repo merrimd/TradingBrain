@@ -3,6 +3,9 @@
     "TradingBrain": {
       "commandName": "Project",
       "commandLineArgs": "IX.D.NASDAQ.CASH.IP GRID SECOND"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
     }
   }
 }
