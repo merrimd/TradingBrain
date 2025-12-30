@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace TradingBrain.Models
 {
-    public class GetIntervals
+    public static class GetIntervals
     {
  
 
@@ -52,25 +52,25 @@ namespace TradingBrain.Models
             switch (resUnit)
             {
                 case "MINUTE":
-                    if (resNum == 2)
-                    {
-                        nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, 0).AddMinutes(2 - (now.Minute % 2)); // Next minute
-                    }
-                    else
-                    {
+                    //if (resNum == 2)
+                    //{
+                    //    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, 0).AddMinutes(2 - (now.Minute % 2)); // Next minute
+                    //}
+                    //else
+                    //{
                         if (now.Minute < 30)
-                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0); // Next half-hour
+                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0, DateTimeKind.Utc); // Next half-hour
                         else
-                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0).AddHours(1); // Next hour
-                    }
+                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0, DateTimeKind.Utc).AddHours(1); // Next hour
+                    //}
                     break;
 
                 case "HOUR":
-                    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0).AddHours(resNum - (now.Hour % resNum)); // Next x hour
+                    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0, DateTimeKind.Utc).AddHours(resNum - (now.Hour % resNum)); // Next x hour
                     break;
 
                 case "DAY":
-                    nextRun = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, 0).AddDays(resNum - (now.Day % resNum)); // Next x day
+                    nextRun = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, 0, DateTimeKind.Utc).AddDays(resNum - (now.Day % resNum)); // Next x day
                     break;
 
             }
@@ -84,39 +84,19 @@ namespace TradingBrain.Models
             //else
             //    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour + 1, 0, 0, 0); // Next hour
 
-            if (region == "test")
-            {
-                //if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
-                //{
-                //    nextRun = nextRun.AddSeconds(45);
-                //}
-                //else
-                //{
-
-                // nextRun = nextRun.AddSeconds(10);
 
                 nextRun = nextRun.AddSeconds(150);
 
 
 
-                //}
-            }
-            else
-            {
-                nextRun = nextRun.AddSeconds(150);
-                // Make the hour_2, hour_3 and hour_4 resolutions run 15 seconds later to ensure all the candles have been created.
-                //if (resolution == "HOUR_2" || resolution == "HOUR_3" || resolution == "HOUR_4")
-                //{
-                //    nextRun = nextRun.AddSeconds(15);
-                //}
-            }
+
 
 
 
             // Calculate the precise interval in milliseconds
             double interval = (nextRun - now).TotalMilliseconds;
 
-            clsCommonFunctions.AddStatusMessage($"Next run scheduled at: {nextRun:yyyy-MM-dd HH:mm:ss.fff}");
+            CommonFunctions.AddStatusMessage($"Next run scheduled at: {nextRun:yyyy-MM-dd HH:mm:ss.fff}");
             return interval;
 
         }

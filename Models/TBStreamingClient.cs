@@ -33,7 +33,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using TradingBrain.Models;
 using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
-using static TradingBrain.Models.clsCommonFunctions;
+using static TradingBrain.Models.CommonFunctions;
 using Container = Microsoft.Azure.Cosmos.Container;
 using LogLevel = NLog.LogLevel;
 namespace TradingBrain.Models
@@ -146,7 +146,7 @@ namespace TradingBrain.Models
 
                         _igContainer.Accounts.Add(igAccount);
 
-                        clsCommonFunctions.AddStatusMessage("Account:" + igAccount.ClientId + " " + account.accountName, "INFO");
+                        CommonFunctions.AddStatusMessage("Account:" + igAccount.ClientId + " " + account.accountName, "INFO");
                     }
 
                     LoggedIn = true;
@@ -160,16 +160,16 @@ namespace TradingBrain.Models
 
                         if (response2 != null)
                         {
-                            clsCommonFunctions.AddStatusMessage("Logged in, current account: " + accountId, "INFO");
+                            CommonFunctions.AddStatusMessage("Logged in, current account: " + accountId, "INFO");
                         }
                         else
                         {
-                            clsCommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
+                            CommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
                         }
                     }
                     else
                     {
-                        clsCommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
+                        CommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
                     }
 
                     _igContainer.context = _igContainer.igRestApiClient.GetConversationContext();
@@ -177,13 +177,13 @@ namespace TradingBrain.Models
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
+                    CommonFunctions.AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
                       response.StatusCode, "ERROR");
                 }
             }
             catch (Exception e)
             {
-                clsCommonFunctions.AddStatusMessage("ConnectToRest failed - " + e.ToString(), "ERROR");
+                CommonFunctions.AddStatusMessage("ConnectToRest failed - " + e.ToString(), "ERROR");
 
             }
         }
@@ -231,7 +231,7 @@ namespace TradingBrain.Models
 
                         _igContainer.Accounts.Add(igAccount);
 
-                        clsCommonFunctions.AddStatusMessage("Account:" + igAccount.ClientId + " " + account.accountName, "INFO");
+                        CommonFunctions.AddStatusMessage("Account:" + igAccount.ClientId + " " + account.accountName, "INFO");
                     }
                     LoggedIn = true;
 
@@ -244,24 +244,24 @@ namespace TradingBrain.Models
 
                         if (response2 != null)
                         {
-                            clsCommonFunctions.AddStatusMessage("Logged in, current account: " + accountId, "INFO");
+                            CommonFunctions.AddStatusMessage("Logged in, current account: " + accountId, "INFO");
                             _igContainer.igAccountId = accountId;
                         }
                         else
                         {
-                            clsCommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
+                            CommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
                             _igContainer.igAccountId = response.Response.currentAccountId;
                         }
                     }
                     else
                     {
-                        clsCommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
+                        CommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
                         _igContainer.igAccountId = response.Response.currentAccountId;
                     }
 
                     _igContainer.context = _igContainer.igRestApiClient.GetConversationContext();
 
-                    clsCommonFunctions.AddStatusMessage("establishing datastream connection", "INFO");
+                    CommonFunctions.AddStatusMessage("establishing datastream connection", "INFO");
 
                     if ((_igContainer.context != null) && (response.Response.lightstreamerEndpoint != null) &&
                         (_igContainer.context.apiKey != null) && (_igContainer.context.xSecurityToken != null) && (_igContainer.context.cst != null))
@@ -280,7 +280,7 @@ namespace TradingBrain.Models
                         }
                         catch (Exception ex)
                         {
-                            clsCommonFunctions.AddStatusMessage(ex.Message, "ERROR");
+                            CommonFunctions.AddStatusMessage(ex.Message, "ERROR");
                         }
                     }
 
@@ -288,7 +288,7 @@ namespace TradingBrain.Models
                     // Run a timer for every 10 mins to keep the connection alive.
 
                     // set a timeout to run this again in 30 mins. this will keep the session active.
-                    clsCommonFunctions.AddStatusMessage("Setting a timer so we can re run the AccountDetails after 10 mins to stop it expiring.", "INFO");
+                    CommonFunctions.AddStatusMessage("Setting a timer so we can re run the AccountDetails after 10 mins to stop it expiring.", "INFO");
                     System.Timers.Timer timer = new System.Timers.Timer(600000); // 10 mins
                     timer.Elapsed += OnTimedEvent;
                     timer.AutoReset = true; // Run only once
@@ -300,7 +300,7 @@ namespace TradingBrain.Models
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
+                    CommonFunctions.AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
                                         response.StatusCode, "ERROR");
                     //Log log = new Log(_thisApp.the_app_db);
                     //log.Log_Message = "Failed to login. HttpResponse StatusCode = " + response.StatusCode;
@@ -326,13 +326,13 @@ namespace TradingBrain.Models
         }
         public void OnTimedEvent(object source, ElapsedEventArgs e)
         {
-            clsCommonFunctions.AddStatusMessage("Calling the AccountDetails API to ensure token doesn't expire", "INFO");
+            CommonFunctions.AddStatusMessage("Calling the AccountDetails API to ensure token doesn't expire", "INFO");
             try
             {
                 IgResponse<dto.endpoint.accountbalance.AccountDetailsResponse> ret = _igContainer.igRestApiClient.accountBalance().Result;
                 if (ret != null)
                 {
-                    clsCommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO");
+                    CommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO");
 
                     if (ret.StatusCode.ToString() == "Forbidden")
                     {
@@ -443,7 +443,7 @@ namespace TradingBrain.Models
             try
             {
 
-                clsCommonFunctions.AddStatusMessage("Status changed to " + status + " (" + cStatus + ")", "INFO");
+                CommonFunctions.AddStatusMessage("Status changed to " + status + " (" + cStatus + ")", "INFO");
                 if (cStatus == 0)
                 {
                     if (Interlocked.CompareExchange(ref this.reset, 0, 1) == 1)
@@ -599,11 +599,11 @@ namespace TradingBrain.Models
                 //        item.counter++;
                 //    }
                 //}
-                //clsChartUpdateMini currentTick = new clsChartUpdateMini();
+                //ChartUpdateMini currentTick = new ChartUpdateMini();
 
                 //if (wlmUpdate.getValue("BID") != "" && wlmUpdate.getValue("OFR") != "")
                 //{
-                //    //clsChartUpdateMini objUpdate = new clsChartUpdateMini();
+                //    //ChartUpdateMini objUpdate = new ChartUpdateMini();
                 //    if (wlmUpdate.getValue("BID") != null && wlmUpdate.getValue("OFR") != null)
                 //    {
                 //       currentTick.Epic = epic;
@@ -655,11 +655,11 @@ namespace TradingBrain.Models
         {
 
             // Deal with Trade updates here
-            clsCommonFunctions.AddStatusMessage($"Trade update received: ph={ph}, this.phase={this.phase}, FirstConfirmUpdate={this.FirstConfirmUpdate}", "INFO");
+            CommonFunctions.AddStatusMessage($"Trade update received: ph={ph}, this.phase={this.phase}, FirstConfirmUpdate={this.FirstConfirmUpdate}", "INFO");
 
             if (ph != this.phase)
             {
-                clsCommonFunctions.AddStatusMessage("Trade not updated as ph <> this.phase", "INFO");
+                CommonFunctions.AddStatusMessage("Trade not updated as ph <> this.phase", "INFO");
                 return;
             }
             try
@@ -743,7 +743,7 @@ namespace TradingBrain.Models
                     msg.updateType = "UPDATE";
                     RunRet taskRet = await wrk.iGUpdate(msg);
 
-                    clsCommonFunctions.SendBroadcast("UpdateOPU", inputData, _igContainer.the_app_db);
+                    CommonFunctions.SendBroadcast("UpdateOPU", inputData, _igContainer.the_app_db);
                     //Console.WriteLine("UpdateOPU: " + inputData);
                 }
             }
@@ -948,7 +948,7 @@ namespace TradingBrain.Models
                     msg.updateData = inputData;
                     msg.updateType = "CONFIRM";
                     RunRet taskRet = await wrk.iGUpdate(msg);
-                    clsCommonFunctions.SendBroadcast("UpdateConfirm", inputData, _igContainer.the_app_db);
+                    CommonFunctions.SendBroadcast("UpdateConfirm", inputData, _igContainer.the_app_db);
                     //Console.WriteLine("updateConfirm: " + inputData);
                 }
             }
@@ -1151,7 +1151,7 @@ namespace TradingBrain.Models
 
                 List<string> epics = new List<string>();
 
-                foreach (clsEpicList epic in _igContainer.EpicList)
+                foreach (EpicList epic in _igContainer.EpicList)
                 {
                     string tmpEpic = "";
                     if (epic.Epic.Contains("|"))
@@ -1292,7 +1292,7 @@ namespace TradingBrain.Models
         public ObservableCollection<IgPublicApiData.AccountModel>? Accounts { get; set; }
         public string CurrentAccountId { get; set; }
         public string igAccountId { get; set; }
-        public List<clsEpicList> EpicList { get; set; }
+        public List<EpicList> EpicList { get; set; }
         public List<LOepic> PriceEpicList { get; set; }
         public static bool LoggedIn { get; set; }
         public TBStreamingClient? tbClient { get; set; }
@@ -1311,7 +1311,7 @@ namespace TradingBrain.Models
             CurrentAccountId = "";
             igAccountId = "";
             Accounts = null;
-            EpicList = new List<clsEpicList>();
+            EpicList = new List<EpicList>();
             PriceEpicList = new List<LOepic>();
             LoggedIn = false;
             the_db = null;
@@ -1329,7 +1329,7 @@ namespace TradingBrain.Models
             creds = _creds;
             igAccountId = "";
             Accounts = null;
-            EpicList = new List<clsEpicList>();
+            EpicList = new List<EpicList>();
             PriceEpicList = new List<LOepic>();
             LoggedIn = false;
             the_db = null;
@@ -1534,16 +1534,16 @@ namespace TradingBrain.Models
                     .WithParameter("@epicName", this.Epic)
                     .WithParameter("@UTM", this.UTM);
 
-                    using FeedIterator<clsChartUpdate> filteredFeed = container.GetItemQueryIterator<clsChartUpdate>(
+                    using FeedIterator<ChartUpdate> filteredFeed = container.GetItemQueryIterator<ChartUpdate>(
                         queryDefinition: parameterizedQuery
                     );
 
                     while (filteredFeed.HasMoreResults)
                     {
-                        FeedResponse<clsChartUpdate> response = await filteredFeed.ReadNextAsync();
+                        FeedResponse<ChartUpdate> response = await filteredFeed.ReadNextAsync();
 
                         // Iterate query results
-                        foreach (clsChartUpdate item in response)
+                        foreach (ChartUpdate item in response)
                         {
                             if (item.Epic == this.Epic && this.Bid_Open == item.Bid)
                             {

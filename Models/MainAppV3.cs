@@ -63,7 +63,7 @@ using static DotNetty.Common.ThreadLocalPool;
 using static IGModels.ModellingModels.GetModelClass;
 using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
 using static System.Runtime.InteropServices.JavaScript.JSType;
-using static TradingBrain.Models.clsCommonFunctions;
+using static TradingBrain.Models.CommonFunctions;
 using Timer = System.Timers.Timer;
 
 
@@ -95,14 +95,14 @@ namespace TradingBrain.Models
 
        // private long _lngTickCount;
 
-        public clsChartUpdate currentTick { get; set; }
+        public ChartUpdate currentTick { get; set; }
         public clsTradeUpdate currentTrade { get; set; }
         public clsTradeUpdate currentSIMLTrade { get; set; }
         public clsTradeUpdate currentSIMSTrade { get; set; }
         public clsTradeUpdate currentGRIDLTrade { get; set; }
         public clsTradeUpdate currentGRIDSTrade { get; set; }
         public clsTradeUpdate suppTrade { get; set; }
-        public clsCandleUpdate currentCandle { get; set; }
+        public CandleUpdate currentCandle { get; set; }
 
         public TradingBrainSettings tb;
         public Dictionary<string, string> TradeErrors = new Dictionary<string, string>();
@@ -152,17 +152,36 @@ namespace TradingBrain.Models
         public TradingBrainSettings setInitialModelVar()
         {
             //firstTB = await clsCommonFunctions.GetTradingBrainSettings(this.the_db, this.epicName);
-            Task<TradingBrainSettings> tb = Task.Run<TradingBrainSettings>(async () => await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution));
+            Task<TradingBrainSettings> tb = Task.Run<TradingBrainSettings>(async () => await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution));
             //return tb.Result;
 
             return tb.Result;
 
         }
         public string logName { get; set; }
-        public MainApp(Database db, Database appDb, Container container, Container chart_container, string epic, Container _minute_container,Container _candles_RSI_container, Container _TicksContainer, Container _trade_container, IGContainer igContainer, IGContainer igContainer2, string strategy = "SMA", string resolution = "")
+        public MainApp(Database db, Database appDb,  string epic,  IGContainer igContainer, IGContainer igContainer2, string strategy = "SMA", string resolution = "")
         {
             try
             {
+
+                //Get DBcontainers
+                //Container? _container = null;
+                //Container? _chart_container = null;
+                //Container? _trade_container = null;
+                //Container? _minute_container = null;
+                //Container? _TicksContainer = null;
+                //Container? _candles_RSI_container = null;
+                the_db = db;
+                the_app_db = appDb;
+                candles_RSI_container = the_db.GetContainer("Candles_RSI");
+                the_container = the_db.GetContainer("CandleUpdate");
+                the_chart_container = the_db.GetContainer("CandleTicks");
+                TicksContainer = the_db.GetContainer("CandleTicks");
+                trade_container = the_app_db.GetContainer("TradingBrainTrades");
+                minute_container = the_db.GetContainer("Candles_RSI");
+                //SetupDB(pms.epic);
+
+ 
                 this.logName = IGModels.clsCommonFunctions.GetLogName(epic, strategy, resolution);
                 ScopeContext.PushProperty("app", "TRADINGBRAIN/");
                 ScopeContext.PushProperty("epic", epic + "/");
@@ -187,7 +206,7 @@ namespace TradingBrain.Models
                 this.newGRIDSDealReference = "";
                 this.candleList = new List<modQuote>();
 
-                IG_Epic epicObj =  clsCommonFunctions.Get_IG_Epic(appDb, epic).Result;
+                IG_Epic epicObj =  CommonFunctions.Get_IG_Epic(appDb, epic).Result;
                 this.futures = epicObj.futures;
 
                 bolliID = "";
@@ -208,7 +227,7 @@ namespace TradingBrain.Models
                 retryOrder = false;
                 retryOrderLimit = 10;
 
-                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "MainApp", "TB Started - " + igAccountId, appDb);
+                TradingBrain.Models.CommonFunctions.SaveLog("Info", "MainApp", "TB Started - " + igAccountId, appDb);
 
                 lastTradeDeleted = false;
                 lastTradeSuppValue = 0;
@@ -220,17 +239,16 @@ namespace TradingBrain.Models
                 setupTradeErrors();
                 setupMessaging();
 
-                currentTick = new clsChartUpdate();
-                currentCandle = new clsCandleUpdate();
+                currentTick = new ChartUpdate();
+                currentCandle = new CandleUpdate();
                 //_lngTickCount = 0;
-                the_db = db;
-                the_app_db = appDb;
-                the_container = container;
-                the_chart_container = chart_container;
-                minute_container = _minute_container;
-                TicksContainer = _TicksContainer;
-                trade_container = _trade_container;
-                candles_RSI_container = _candles_RSI_container;
+
+                //the_container = container;
+                //the_chart_container = chart_container;
+                //minute_container = _minute_container;
+                //TicksContainer = _TicksContainer;
+                //trade_container = _trade_container;
+                //candles_RSI_container = _candles_RSI_container;
 
 
                 tb = new TradingBrainSettings();
@@ -265,17 +283,16 @@ namespace TradingBrain.Models
                 // move this to the beginning of run code.
 
                 marketOpen = IGModels.clsCommonFunctions.IsTradingOpen(model.modelLogs.modelRunDate, model.exchangeClosedDates,epicName,futures).Result;   //IGModels.clsCommonFunctions.IsTradingOpen(model.modelLogs.modelRunDate);
-                clsCommonFunctions.AddStatusMessage($"Market open = {marketOpen}", "INFO", logName);
+                CommonFunctions.AddStatusMessage($"Market open = {marketOpen}", "INFO", logName);
 
-                clsCommonFunctions.AddStatusMessage("Model Run ID = " + modelID, "INFO", logName);
+                CommonFunctions.AddStatusMessage("Model Run ID = " + modelID, "INFO", logName);
 
                 currentStatus.calcAvgWinningTrade = tb.lastRunVars.calcAvgWinningTrade;
 
                 //Work out the calculated average winning trade value
                 if (this.strategy == "CASEYC" && tb.lastRunVars.calcAvgWinningTrade == 0)
                 {
-                    AccumulatedValues accumValues = new AccumulatedValues();
-                    accumValues = IGModels.clsCommonFunctions.GetAccumulatedValues(this.the_app_db, this.epicName, this.strategy, this.resolution).Result;
+                    AccumulatedValues accumValues =  IGModels.clsCommonFunctions.GetAccumulatedValues(this.the_app_db, this.epicName, this.strategy, this.resolution).Result;
                     if (accumValues != null)
                     {
                         if (accumValues.accumQuantity > 0)
@@ -335,7 +352,7 @@ namespace TradingBrain.Models
                 currentStatus.status = "running";
                 currentStatus.strategy = this.strategy;
                 currentStatus.resolution = this.resolution;
-                Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
 
                 AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
 
@@ -390,12 +407,12 @@ namespace TradingBrain.Models
                 else
                 {
                     // account ID not found
-                    clsCommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
+                    CommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
                     return ret;
                 }
 
-                    clsCommonFunctions.AddStatusMessage($"Placing new order = direction = {direction}, quantity = {quantity}, stopLoss = {stopLoss}, dealPrice = {dealPrice}, accountId = {accountId}", "INFO");
-                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "PlaceOrder", "Placing order - direction = " + direction + ", quantity = " + quantity + ", stopLoss = " + stopLoss + ", accountID = " + accountId, the_app_db);
+                    CommonFunctions.AddStatusMessage($"Placing new order = direction = {direction}, quantity = {quantity}, stopLoss = {stopLoss}, dealPrice = {dealPrice}, accountId = {accountId}", "INFO");
+                TradingBrain.Models.CommonFunctions.SaveLog("Info", "PlaceOrder", "Placing order - direction = " + direction + ", quantity = " + quantity + ", stopLoss = " + stopLoss + ", accountID = " + accountId, the_app_db);
 
                 dto.endpoint.workingorders.create.v2.CreateWorkingOrderRequest pos = new dto.endpoint.workingorders.create.v2.CreateWorkingOrderRequest();
 
@@ -421,8 +438,8 @@ namespace TradingBrain.Models
                 if (req != null)
                 {
                     ret = req.Response.dealReference;
-                    clsCommonFunctions.AddStatusMessage("Place order - " + direction + " - Status: " + req.StatusCode + " - account = " + accountId + " - deal reference = " + req.Response.dealReference, "INFO");
-                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "PlaceOrder", "Place order - " + direction + " - Status: " + req.StatusCode + " - AccountId: " + accountId + " - deal reference = " + req.Response.dealReference, the_app_db);
+                    CommonFunctions.AddStatusMessage("Place order - " + direction + " - Status: " + req.StatusCode + " - account = " + accountId + " - deal reference = " + req.Response.dealReference, "INFO");
+                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "PlaceOrder", "Place order - " + direction + " - Status: " + req.StatusCode + " - AccountId: " + accountId + " - deal reference = " + req.Response.dealReference, the_app_db);
                     if (req.StatusCode.ToString() == "Unauthorized")
                     {
                         newsession = true;
@@ -436,8 +453,8 @@ namespace TradingBrain.Models
                     if (req != null)
                     {
                         ret = req.Response.dealReference;
-                        clsCommonFunctions.AddStatusMessage("Place order - " + direction + " - Status: " + req.StatusCode + " - account = " + accountId + " - deal reference = " + req.Response.dealReference, "INFO");
-                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "PlaceOrder", "Place order - " + direction + " - Status: " + req.StatusCode + " - AccountId: " + accountId + " - deal reference = " + req.Response.dealReference, the_app_db);
+                        CommonFunctions.AddStatusMessage("Place order - " + direction + " - Status: " + req.StatusCode + " - account = " + accountId + " - deal reference = " + req.Response.dealReference, "INFO");
+                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "PlaceOrder", "Place order - " + direction + " - Status: " + req.StatusCode + " - AccountId: " + accountId + " - deal reference = " + req.Response.dealReference, the_app_db);
                     }
                 }
             }
@@ -452,7 +469,7 @@ namespace TradingBrain.Models
 
             return ret;
         }
-        public async void DeleteOrder(string direction, double quantity, string dealID, string accountId)
+        public async Task DeleteOrder(string direction, double quantity, string dealID, string accountId)
         {
             try
             {
@@ -468,12 +485,12 @@ namespace TradingBrain.Models
                 else
                 {
                     // account ID not found
-                    clsCommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
+                    CommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
                     
                 }
 
                 bool newsession = false;
-                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "DeleteOrder", "Deleting order", the_app_db);
+                TradingBrain.Models.CommonFunctions.SaveLog("Info", "DeleteOrder", "Deleting order", the_app_db);
 
                 // create new pos which is basically a blank object
                 dto.endpoint.workingorders.delete.v1.DeleteWorkingOrderRequest pos = new dto.endpoint.workingorders.delete.v1.DeleteWorkingOrderRequest();
@@ -483,8 +500,8 @@ namespace TradingBrain.Models
 
                 if (ret != null)
                 {
-                    clsCommonFunctions.AddStatusMessage("Delete order - " + direction + " - Status: " + ret.StatusCode, "INFO");
-                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "DeleteOrder", "Delete order - " + direction + " - Status: " + ret.StatusCode, the_app_db);
+                    CommonFunctions.AddStatusMessage("Delete order - " + direction + " - Status: " + ret.StatusCode, "INFO");
+                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "DeleteOrder", "Delete order - " + direction + " - Status: " + ret.StatusCode, the_app_db);
                     if (ret.StatusCode.ToString() == "Unauthorized")
                     {
                         newsession = true;
@@ -497,8 +514,8 @@ namespace TradingBrain.Models
                     ret = await _igContainerToUse.igRestApiClient.deleteWorkingOrder(dealID, pos);
                     if (ret != null)
                     {
-                        clsCommonFunctions.AddStatusMessage("Delete order - " + direction + " - Status: " + ret.StatusCode, "INFO");
-                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "DeleteOrder", "Delete order - " + direction + " - Status: " + ret.StatusCode, the_app_db);
+                        CommonFunctions.AddStatusMessage("Delete order - " + direction + " - Status: " + ret.StatusCode, "INFO");
+                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "DeleteOrder", "Delete order - " + direction + " - Status: " + ret.StatusCode, the_app_db);
                     }
                 }
 
@@ -531,13 +548,13 @@ namespace TradingBrain.Models
                 else
                 {
                     // account ID not found
-                    clsCommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
+                    CommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
                     return ret;
                 }
 
                 bool newsession = false;
-                clsCommonFunctions.AddStatusMessage($"Placing new deal = direction = {direction}, quantity = {quantity}, stopLoss = {stopLoss}, target = {target}, accountId = {accountId} ", "INFO");
-                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "PlaceDeal", "Placing deal - direction = " + direction + ", quantity = " + quantity + ", stopLoss = " + stopLoss + ", target = " + target + ", accountID = " + accountId, the_app_db);
+                CommonFunctions.AddStatusMessage($"Placing new deal = direction = {direction}, quantity = {quantity}, stopLoss = {stopLoss}, target = {target}, accountId = {accountId} ", "INFO");
+                TradingBrain.Models.CommonFunctions.SaveLog("Info", "PlaceDeal", "Placing deal - direction = " + direction + ", quantity = " + quantity + ", stopLoss = " + stopLoss + ", target = " + target + ", accountID = " + accountId, the_app_db);
 
                 dto.endpoint.positions.create.otc.v2.CreatePositionRequest pos = new dto.endpoint.positions.create.otc.v2.CreatePositionRequest();
                 //pos.epic = "IX.D.NASDAQ.CASH.IP";
@@ -619,8 +636,8 @@ namespace TradingBrain.Models
                     }
                     //clsCommonFunctions.AddStatusMessage("Here e", "ERROR");
                     ret = resp.Response.dealReference;
-                    clsCommonFunctions.AddStatusMessage("Place deal - " + direction + " - Status: " + resp.StatusCode + " - account = " + accountId + " - deal reference = " + resp.Response.dealReference, "INFO");
-                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "PlaceDeal", "Place deal - " + direction + " - Status: " + resp.StatusCode + " - AccountId: " + accountId, the_app_db);
+                    CommonFunctions.AddStatusMessage("Place deal - " + direction + " - Status: " + resp.StatusCode + " - account = " + accountId + " - deal reference = " + resp.Response.dealReference, "INFO");
+                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "PlaceDeal", "Place deal - " + direction + " - Status: " + resp.StatusCode + " - AccountId: " + accountId, the_app_db);
                     if (resp.StatusCode.ToString() == "Unauthorized")
                     {
                         newsession = true;
@@ -628,18 +645,18 @@ namespace TradingBrain.Models
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Place deal response is null so setting the GRIDL ref to blank", "ERROR");
+                    CommonFunctions.AddStatusMessage("Place deal response is null so setting the GRIDL ref to blank", "ERROR");
                     if (this.strategy == "GRID")
                     {
                         // for SMI we need to save the deal reference for both long and short trades
                         if (direction == "long")
                         {
-                            clsCommonFunctions.AddStatusMessage($"Setting new GRIDL deal reference to BLANK (existing one is {this.newGRIDLDealReference}", "INFO");
+                            CommonFunctions.AddStatusMessage($"Setting new GRIDL deal reference to BLANK (existing one is {this.newGRIDLDealReference}", "INFO");
                             this.newGRIDLDealReference = "";
                         }
                         else
                         {
-                            clsCommonFunctions.AddStatusMessage($"Setting new GRIDS deal reference to BLANK (existing one is {this.newGRIDLDealReference}", "INFO");
+                            CommonFunctions.AddStatusMessage($"Setting new GRIDS deal reference to BLANK (existing one is {this.newGRIDLDealReference}", "INFO");
                             this.newGRIDSDealReference = "";
                         }
                     }
@@ -652,8 +669,8 @@ namespace TradingBrain.Models
                     if (ret != null)
                     {
                         ret = resp.Response.dealReference;
-                        clsCommonFunctions.AddStatusMessage("Place deal - " + direction + " - Status: " + resp.StatusCode + " - account = " + accountId + " - deal reference = " + resp.Response.dealReference, "INFO");
-                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "PlaceDeal", "Place deal - " + direction + " - Status: " + resp.StatusCode + " - AccountId: " + accountId, the_app_db);
+                        CommonFunctions.AddStatusMessage("Place deal - " + direction + " - Status: " + resp.StatusCode + " - account = " + accountId + " - deal reference = " + resp.Response.dealReference, "INFO");
+                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "PlaceDeal", "Place deal - " + direction + " - Status: " + resp.StatusCode + " - AccountId: " + accountId, the_app_db);
                     }
                 }
             }
@@ -685,7 +702,7 @@ namespace TradingBrain.Models
                 else
                 {
                     // account ID not found
-                    clsCommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
+                    CommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
                  
                 }
                 bool newsession = false;
@@ -716,7 +733,7 @@ namespace TradingBrain.Models
                 if (ret != null)
                 {
                     dealRef = ret.Response.dealReference;
-                    clsCommonFunctions.AddStatusMessage($"Close deal - {direction} - Status: { ret.StatusCode} deal reference {dealRef} ", "INFO");
+                    CommonFunctions.AddStatusMessage($"Close deal - {direction} - Status: { ret.StatusCode} deal reference {dealRef} ", "INFO");
                     //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "CloseDeal", "Close deal - " + direction + " - Status: " + ret.StatusCode + " - Deal ref: " + dealRef, the_app_db);
                     if (ret.StatusCode.ToString() == "Unauthorized")
                     {
@@ -731,7 +748,7 @@ namespace TradingBrain.Models
                     if (ret != null)
                     {
                         dealRef = ret.Response.dealReference;
-                        clsCommonFunctions.AddStatusMessage($"Close deal - {direction} - Status: {ret.StatusCode} deal reference {dealRef} ", "INFO");
+                        CommonFunctions.AddStatusMessage($"Close deal - {direction} - Status: {ret.StatusCode} deal reference {dealRef} ", "INFO");
                         //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "CloseDeal", "Close deal - " + direction + " - Status: " + ret.StatusCode + " - Deal ref: " + dealRef, the_app_db);
                     }
                 }
@@ -769,7 +786,7 @@ namespace TradingBrain.Models
                 else
                 {
                     // account ID not found
-                    clsCommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
+                    CommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
 
                 }
                 List<tradeItem> trades = new List<tradeItem>();
@@ -804,7 +821,7 @@ namespace TradingBrain.Models
                     if (ret != null && ret.Response != null)
                     {
                         dealRef = ret.Response.dealReference;
-                        clsCommonFunctions.AddStatusMessage($"Close epic {epic} - {direction} - Status: {ret.StatusCode} deal reference {dealRef} ", "INFO");
+                        CommonFunctions.AddStatusMessage($"Close epic {epic} - {direction} - Status: {ret.StatusCode} deal reference {dealRef} ", "INFO");
 
                         if (ret.StatusCode.ToString() == "Unauthorized")
                         {
@@ -819,7 +836,7 @@ namespace TradingBrain.Models
                         if (ret != null)
                         {
                             dealRef = ret.Response.dealReference;
-                            clsCommonFunctions.AddStatusMessage($"Close epic {epic} - {direction} - Status: {ret.StatusCode} deal reference {dealRef} ", "INFO");
+                            CommonFunctions.AddStatusMessage($"Close epic {epic} - {direction} - Status: {ret.StatusCode} deal reference {dealRef} ", "INFO");
                         }
                     }
                     Thread.Sleep(200);
@@ -857,12 +874,12 @@ namespace TradingBrain.Models
                 else
                 {
                     // account ID not found
-                    clsCommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
+                    CommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
                 }
 
-                clsCommonFunctions.AddStatusMessage("Editing deal. StopLoss = " + stopLoss + " - dealId = " + dealID, "INFO");
+                CommonFunctions.AddStatusMessage("Editing deal. StopLoss = " + stopLoss + " - dealId = " + dealID, "INFO");
                 bool newsession = false;
-                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "EditDeal", "Editing deal - " + dealID, the_app_db);
+                TradingBrain.Models.CommonFunctions.SaveLog("Info", "EditDeal", "Editing deal - " + dealID, the_app_db);
                 dto.endpoint.positions.edit.v2.EditPositionRequest pos = new dto.endpoint.positions.edit.v2.EditPositionRequest();
 
                 pos.stopLevel = Convert.ToDecimal(stopLoss);
@@ -892,8 +909,8 @@ namespace TradingBrain.Models
                 {
                     //dealRef = ret.Response.dealReference;
 
-                    clsCommonFunctions.AddStatusMessage($"Edit deal - Status: {ret.StatusCode} = stopLevel = {pos.stopLevel}, trailingStopDistance = {pos.trailingStopDistance}, trailingStopIncrement = {pos.trailingStopIncrement}, dealRef: {dealRef} " , "INFO");
-                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "EditDeal", $"Edit deal - Status: {ret.StatusCode} = stopLevel = {pos.stopLevel}, trailingStopDistance = {pos.trailingStopDistance}, trailingStopIncrement = {pos.trailingStopIncrement}, dealRef: {dealRef}", the_app_db);
+                    CommonFunctions.AddStatusMessage($"Edit deal - Status: {ret.StatusCode} = stopLevel = {pos.stopLevel}, trailingStopDistance = {pos.trailingStopDistance}, trailingStopIncrement = {pos.trailingStopIncrement}, dealRef: {dealRef} " , "INFO");
+                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "EditDeal", $"Edit deal - Status: {ret.StatusCode} = stopLevel = {pos.stopLevel}, trailingStopDistance = {pos.trailingStopDistance}, trailingStopIncrement = {pos.trailingStopIncrement}, dealRef: {dealRef}", the_app_db);
                     if (ret.StatusCode.ToString() == "Unauthorized")
                     {
                         newsession = true;
@@ -901,14 +918,14 @@ namespace TradingBrain.Models
                 }
                 if (newsession)
                 {
-                    clsCommonFunctions.AddStatusMessage("Trying to reconnect to REST", "INFO");
+                    CommonFunctions.AddStatusMessage("Trying to reconnect to REST", "INFO");
                     _igContainerToUse.tbClient.ConnectToRest();
                     ret = await _igContainerToUse.igRestApiClient.editPositionV2(dealID, pos);
                     if (ret != null)
                     {
                         //dealRef = ret.Response.dealReference;
-                        clsCommonFunctions.AddStatusMessage($"Edit deal - Status: {ret.StatusCode} = stopLevel = {pos.stopLevel}, trailingStopDistance = {pos.trailingStopDistance}, trailingStopIncrement = {pos.trailingStopIncrement}, dealRef: {dealRef} ", "INFO");
-                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "EditDeal", $"Edit deal - Status: {ret.StatusCode} = stopLevel = {pos.stopLevel}, trailingStopDistance = {pos.trailingStopDistance}, trailingStopIncrement = {pos.trailingStopIncrement}, dealRef: {dealRef}", the_app_db);
+                        CommonFunctions.AddStatusMessage($"Edit deal - Status: {ret.StatusCode} = stopLevel = {pos.stopLevel}, trailingStopDistance = {pos.trailingStopDistance}, trailingStopIncrement = {pos.trailingStopIncrement}, dealRef: {dealRef} ", "INFO");
+                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "EditDeal", $"Edit deal - Status: {ret.StatusCode} = stopLevel = {pos.stopLevel}, trailingStopDistance = {pos.trailingStopDistance}, trailingStopIncrement = {pos.trailingStopIncrement}, dealRef: {dealRef}", the_app_db);
 
                     }
                 }
@@ -928,9 +945,9 @@ namespace TradingBrain.Models
 
             try
             {
-                clsCommonFunctions.AddStatusMessage($"Editing order. orderLevel = {orderLevel}, stopDistance = {stopDistance} - dealId = {dealID}", "INFO");
+                CommonFunctions.AddStatusMessage($"Editing order. orderLevel = {orderLevel}, stopDistance = {stopDistance} - dealId = {dealID}", "INFO");
                 bool newsession = false;
-                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "Editorder", "Editing order - " + dealID, the_app_db);
+                TradingBrain.Models.CommonFunctions.SaveLog("Info", "Editorder", "Editing order - " + dealID, the_app_db);
                 dto.endpoint.workingorders.edit.v1.EditWorkingOrderRequest pos = new dto.endpoint.workingorders.edit.v1.EditWorkingOrderRequest();
                 pos.stopDistance = Convert.ToDecimal(stopDistance);
                 pos.level = orderLevel;
@@ -941,8 +958,8 @@ namespace TradingBrain.Models
 
                 if (ret != null)
                 {
-                    clsCommonFunctions.AddStatusMessage("Edit order - Status: " + ret.StatusCode, "INFO");
-                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "EditOrder", "Edit order - Status: " + ret.StatusCode, the_app_db);
+                    CommonFunctions.AddStatusMessage("Edit order - Status: " + ret.StatusCode, "INFO");
+                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "EditOrder", "Edit order - Status: " + ret.StatusCode, the_app_db);
                     if (ret.StatusCode.ToString() == "Unauthorized")
                     {
                         newsession = true;
@@ -950,13 +967,13 @@ namespace TradingBrain.Models
                 }
                 if (newsession)
                 {
-                    clsCommonFunctions.AddStatusMessage("Trying to reconnect to REST", "INFO");
+                    CommonFunctions.AddStatusMessage("Trying to reconnect to REST", "INFO");
                     _igContainer.tbClient.ConnectToRest();
                     ret = await _igContainer.igRestApiClient.editWorkingOrderV1(dealID, pos);
                     if (ret != null)
                     {
-                        clsCommonFunctions.AddStatusMessage("Edit order - Status: " + ret.StatusCode, "INFO");
-                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "EditOrder", "Edit order - Status: " + ret.StatusCode, the_app_db);
+                        CommonFunctions.AddStatusMessage("Edit order - Status: " + ret.StatusCode, "INFO");
+                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "EditOrder", "Edit order - Status: " + ret.StatusCode, the_app_db);
                     }
                 }
             }
@@ -1063,7 +1080,7 @@ namespace TradingBrain.Models
             // Calculate the precise interval in milliseconds
             double interval = (nextRun - now).TotalMilliseconds;
 
-            clsCommonFunctions.AddStatusMessage($"Next run scheduled at: {nextRun:yyyy-MM-dd HH:mm:ss.fff}");
+            CommonFunctions.AddStatusMessage($"Next run scheduled at: {nextRun:yyyy-MM-dd HH:mm:ss.fff}");
             return interval;
 
         }
@@ -1119,14 +1136,14 @@ namespace TradingBrain.Models
                     string param = "";
 
                     //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Running code");
-                    clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Epic       - {epicName}", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Strategy   - {strategy}", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Resolution - {resolution}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Epic       - {epicName}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Strategy   - {strategy}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Resolution - {resolution}", "INFO", logName);
 
-                    clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
                     //var watch = new System.Diagnostics.Stopwatch();
                     //var bigWatch = new System.Diagnostics.Stopwatch();
                     //bigWatch.Start();
@@ -1135,9 +1152,9 @@ namespace TradingBrain.Models
                         //watch.Start();
 
 
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy);
 
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
 
                         // If the trade has just been deleted then sort out the CFL
@@ -1190,12 +1207,12 @@ namespace TradingBrain.Models
 
                                 //await tb.SaveDocument(the_app_db);
 
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -1214,9 +1231,9 @@ namespace TradingBrain.Models
                         //tb.lastRunVars.doShortsVar = tb.doShorts;
                         //tb.lastRunVars.doSuppTradesVar = tb.doSuppTrades;
 
-                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
 
                         model.thisModel.inputs = this.tb.runDetails.inputs.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -1255,7 +1272,7 @@ namespace TradingBrain.Models
                             _endTime = new DateTime(2024, 11, 12, 14, 30, 00);
                             liveMode = false;
                         }
-                        modelInstanceInputs thisInput = new modelInstanceInputs();
+   
                         //while (_startTime <= _endTime)
                         //{
                         //bigWatch.Restart();
@@ -1269,21 +1286,21 @@ namespace TradingBrain.Models
                         // Get the last candle so we can get the spread
 
                         //clsMinuteCandle thisCandle = await Get_MinuteCandle(the_app_db, minute_container, epicName, _endTime);
-                        clsCommonFunctions.AddStatusMessage($"Checking Spread ", "INFO", logName);
+                        CommonFunctions.AddStatusMessage($"Checking Spread ", "INFO", logName);
                         double thisSpread = await Get_SpreadFromLastCandle(the_app_db, minute_container, _endTime);
 
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO", logName);
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO", logName);
                         //thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadv2(tb.runDetails.inputs, thisSpread);
-                        thisInput = tb.runDetails.inputs.FirstOrDefault(t => t.spread == thisSpread);
+                        modelInstanceInputs  thisInput = tb.runDetails.inputs.FirstOrDefault(t => t.spread == thisSpread);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}, trying spread 0" , "INFO", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}, trying spread 0" , "INFO", logName);
                             thisInput = tb.runDetails.inputs.FirstOrDefault(t => t.spread == 0);
                         }
                         //clsCommonFunctions.AddStatusMessage($"Checking A ", "INFO", logName);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
@@ -1319,13 +1336,13 @@ namespace TradingBrain.Models
                             model.candles.prevMACandle.mA30MinTypicalLongClose = prevMa.MovingAverages30Min[thisInput.var3 - 1].movingAverage.Close;
                             model.candles.prevMACandle.mA30MinTypicalShortClose = prevMa.MovingAverages30Min[thisInput.var13 - 1].movingAverage.Close;
                             //clsCommonFunctions.AddStatusMessage($"Checking H ", "INFO", logName);
-                            clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
                             //clsCommonFunctions.AddStatusMessage($"values before  run ctd... - doSuppTrades={model.doSuppTrades}, onSuppTrade={model.onSuppTrade}", "DEBUG");
 
-                            clsCommonFunctions.AddStatusMessage($"currentCandle.ma30MinTypicalLongClose:{model.candles.currentCandle.mA30MinTypicalLongClose} currentCandle.ma30MinTypicalLongClose:{model.candles.currentCandle.mA30MinTypicalShortClose}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"prevCandle.ma30MinTypicalLongClose:{model.candles.prevCandle.mA30MinTypicalLongClose} prevCandle.ma30MinTypicalLongClose:{model.candles.prevCandle.mA30MinTypicalShortClose}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalLongClose} prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalShortClose}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalLongClose} prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalShortClose}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"currentCandle.ma30MinTypicalLongClose:{model.candles.currentCandle.mA30MinTypicalLongClose} currentCandle.ma30MinTypicalLongClose:{model.candles.currentCandle.mA30MinTypicalShortClose}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"prevCandle.ma30MinTypicalLongClose:{model.candles.prevCandle.mA30MinTypicalLongClose} prevCandle.ma30MinTypicalLongClose:{model.candles.prevCandle.mA30MinTypicalShortClose}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalLongClose} prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalShortClose}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalLongClose} prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalShortClose}", "DEBUG");
 
 
 
@@ -1356,24 +1373,24 @@ namespace TradingBrain.Models
                             //model.RunProTrendCodeV2(model.candles);
                             model.RunProTrendCodeV3(model.candles);
 
-                            clsCommonFunctions.AddStatusMessage($"values after  run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"values after  run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
                             //clsCommonFunctions.AddStatusMessage($"values after  run ctd... - doSuppTrades={model.doSuppTrades}, onSuppTrade={model.onSuppTrade}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"Current standard deviation - {model.candles.currentCandle.candleData.StdDev}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"Current standard deviation - {model.candles.currentCandle.candleData.StdDev}", "DEBUG", logName);
 
-                            clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
                             //clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG");
                             //clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG");
 
 
-                            if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
-                            if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+                            if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                            if (this.suppTrade != null) { CommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
 
                             //model.sellShort = true;
 
@@ -1400,13 +1417,13 @@ namespace TradingBrain.Models
                                     newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
                                     currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.candles.currentCandle.candleData.Close);
 
-                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
 
 
                                     if (currentStop < newStop && currentPrice < newStop && currentPrice > currentStop)
                                     {
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
                                         model.sellLong = true;
                                     }
 
@@ -1417,13 +1434,13 @@ namespace TradingBrain.Models
                                     newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
                                     currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.candles.currentCandle.candleData.Close);
 
-                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop > newStop = {currentStop > newStop},  currentPrice > newStop = {currentPrice > newStop}, currentPrice < currentStop {currentPrice < currentStop}  ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[LONG] Current stop > newStop = {currentStop > newStop},  currentPrice > newStop = {currentPrice > newStop}, currentPrice < currentStop {currentPrice < currentStop}  ", "DEBUG", logName);
 
 
                                     if (currentStop > newStop && currentPrice > newStop && currentPrice < currentStop)
                                     {
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "buying short because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now higher than the new stop.", the_app_db);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "buying short because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now higher than the new stop.", the_app_db);
                                         model.buyShort = true;
                                     }
                                 }
@@ -1486,99 +1503,99 @@ namespace TradingBrain.Models
                                     if (stdDevSL < 4)
                                     {
                                         //stdDevOK = false;
-                                        clsCommonFunctions.AddStatusMessage($"Stop loss ({sL}) is not more than 4x the current std dev ({stdDev}) - stdDevSL = {stdDevSL}", "ERROR", logName);
+                                        CommonFunctions.AddStatusMessage($"Stop loss ({sL}) is not more than 4x the current std dev ({stdDev}) - stdDevSL = {stdDevSL}", "ERROR", logName);
                                         model.buyLong = false;
                                         model.sellShort = false;
                                     }
                                     else
                                     {
-                                        clsCommonFunctions.AddStatusMessage($"Stop loss ({sL}) is more than 4x the current std dev ({stdDev}) - stdDevSL = {stdDevSL}", "INFO", logName);
+                                        CommonFunctions.AddStatusMessage($"Stop loss ({sL}) is more than 4x the current std dev ({stdDev}) - stdDevSL = {stdDevSL}", "INFO", logName);
                                     }
                                 }
 
 
                                 if (model.buyLong && this.currentTrade == null)
                                 {
-                                    clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
-                                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                    CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                     model.stopLossVar = (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
                                     requestedTrade reqTrade = new requestedTrade();
                                     reqTrade.dealType = "POSITION";
                                     reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, model.stopLossVar, this.igAccountId);
                                     requestedTrades.Add(reqTrade);
-                                    if (reqTrade.dealReference != "")
-                                    {
-                                        //dealSent = true;
-                                        thisDealRef = reqTrade.dealReference;
-                                        //dealType = "PlaceDeal";
-                                    }
+                                    //if (reqTrade.dealReference != "")
+                                    //{
+                                    //    //dealSent = true;
+                                    //    thisDealRef = reqTrade.dealReference;
+                                    //    //dealType = "PlaceDeal";
+                                    //}
 
                                 }
                                 else
                                 {
                                     if (model.sellLong)
                                     {
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                        clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                        CommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
                                         //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                         string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId,this.igAccountId);
-                                        if (dealRef != "")
-                                        {
-                                            //dealSent = true;
-                                            thisDealRef = dealRef;
-                                            //dealType = "PlaceDeal";
-                                        }
+                                        //if (dealRef != "")
+                                        //{
+                                        //    //dealSent = true;
+                                        //    thisDealRef = dealRef;
+                                        //    //dealType = "PlaceDeal";
+                                        //}
 
                                         if (model.doSuppTrades && model.onSuppTrade)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong Supplementary", the_app_db);
-                                            clsCommonFunctions.AddStatusMessage("SellLong Supplementary activated", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong Supplementary", the_app_db);
+                                            CommonFunctions.AddStatusMessage("SellLong Supplementary activated", "INFO", logName);
                                             dealRef = await CloseDeal("long", (double)this.suppTrade.size, this.suppTrade.dealId, this.igAccountId);
-                                            if (dealRef != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = dealRef;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (dealRef != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = dealRef;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
                                         }
                                     }
                                 }
 
                                 if (model.sellShort && this.currentTrade == null)
                                 {
-                                    clsCommonFunctions.AddStatusMessage("SellShort activated", "INFO", logName);
-                                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellShort", the_app_db);
+                                    CommonFunctions.AddStatusMessage("SellShort activated", "INFO", logName);
+                                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellShort", the_app_db);
                                     model.stopLossVar = (double)thisInput.var5 * Math.Abs((double)targetVarShort * (double)model.candles.currentCandle.mATypicalShortTypical - (double)model.candles.currentCandle.mATypicalShortTypical);
                                     requestedTrade reqTrade = new requestedTrade();
                                     reqTrade.dealType = "POSITION";
                                     reqTrade.dealReference = await PlaceDeal("short", model.modelVar.quantity, model.stopLossVar, this.igAccountId);
                                     requestedTrades.Add(reqTrade);
-                                    if (reqTrade.dealReference != "")
-                                    {
-                                        //dealSent = true;
-                                        thisDealRef = reqTrade.dealReference;
-                                        //dealType = "PlaceDeal";
-                                    }
+                                    //if (reqTrade.dealReference != "")
+                                    //{
+                                    //    //dealSent = true;
+                                    //    thisDealRef = reqTrade.dealReference;
+                                    //    //dealType = "PlaceDeal";
+                                    //}
                                 }
                                 else
                                 {
                                     if (model.buyShort)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("BuyShort activated", "INFO", logName);
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyShort)", the_app_db);
+                                        CommonFunctions.AddStatusMessage("BuyShort activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyShort)", the_app_db);
                                         //CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId);
                                         string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                        if (dealRef != "")
-                                        {
-                                            //dealSent = true;
-                                            thisDealRef = dealRef;
-                                           // dealType = "PlaceDeal";
-                                        }
+                                        //if (dealRef != "")
+                                        //{
+                                        //    //dealSent = true;
+                                        //    thisDealRef = dealRef;
+                                        //   // dealType = "PlaceDeal";
+                                        //}
 
                                         if (model.doSuppTrades && model.onSuppTrade)
                                         {
-                                            clsCommonFunctions.AddStatusMessage("BuyShort Supplementary activated", "INFO", logName);
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyShort Supplementary", the_app_db);
+                                            CommonFunctions.AddStatusMessage("BuyShort Supplementary activated", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyShort Supplementary", the_app_db);
                                             string dealRefSupp = await CloseDeal("short", (double)this.suppTrade.size, this.suppTrade.dealId, this.igAccountId);
                                         }
                                     }
@@ -1587,7 +1604,7 @@ namespace TradingBrain.Models
 
                                 if (model.longOnmarket)
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"[LONG] Check if buyprice ({model.thisModel.currentTrade.buyPrice}) - stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[LONG] Check if buyprice ({model.thisModel.currentTrade.buyPrice}) - stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
 
                                     if ((IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)) && (IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.stopLossValue) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)))
                                     {
@@ -1601,21 +1618,21 @@ namespace TradingBrain.Models
 
 
                                             this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.buyPrice + (decimal)model.thisModel.currentTrade.stopLossValue;
-                                            clsCommonFunctions.AddStatusMessage($"EditLong activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal - BREAKEVEN", the_app_db);
+                                            CommonFunctions.AddStatusMessage($"EditLong activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal - BREAKEVEN", the_app_db);
                                             string dealRef = await EditDeal((double)model.thisModel.currentTrade.buyPrice + model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId,  model.thisModel.currentTrade.stopLossValue, this.igAccountId);
-                                            if (dealRef != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = dealRef;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (dealRef != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = dealRef;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
 
                                             //If on a supp trade then set that trades sl to be the same as the current trade
                                             if (model.onSuppTrade && this.suppTrade != null)
                                             {
-                                                clsCommonFunctions.AddStatusMessage($"EditLong SUPP activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Long Deal BREAKEVEN", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditLong SUPP activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Long Deal BREAKEVEN", the_app_db);
                                                 string dealRefSupp = await EditDeal((double)model.thisModel.currentTrade.buyPrice + model.thisModel.currentTrade.stopLossValue, this.suppTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                             }
                                         }
@@ -1630,22 +1647,22 @@ namespace TradingBrain.Models
                                                 this.model.thisModel.currentTrade.stopLossValue = (double)this.suppTrade.stopLevel;
                                                 this.currentTrade.stopLevel = this.suppTrade.stopLevel;
 
-                                                clsCommonFunctions.AddStatusMessage($"EditLong Long SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Long Deal ", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditLong Long SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Long Deal ", the_app_db);
                                                 string dealRefSupp = await EditDeal((double)this.currentTrade.stopLevel, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                             }
                                             else
                                             {
                                                 this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.buyPrice - (decimal)model.thisModel.currentTrade.stopLossValue;
-                                                clsCommonFunctions.AddStatusMessage($"EditLong Long activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal ", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditLong Long activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal ", the_app_db);
                                                 string dealRef = await EditDeal((double)model.thisModel.currentTrade.buyPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
-                                                if (dealRef != "")
-                                                {
-                                                    //dealSent = true;
-                                                    thisDealRef = dealRef;
-                                                    //dealType = "PlaceDeal";
-                                                }
+                                                //if (dealRef != "")
+                                                //{
+                                                //    //dealSent = true;
+                                                //    thisDealRef = dealRef;
+                                                //    //dealType = "PlaceDeal";
+                                                //}
                                             }
                                         }
 
@@ -1653,12 +1670,12 @@ namespace TradingBrain.Models
                                 }
                                 if (model.shortOnMarket)
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"[SHORT] Check if sellPrice ({model.thisModel.currentTrade.sellPrice}) + stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.sellPrice + Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[SHORT] Check if sellPrice ({model.thisModel.currentTrade.sellPrice}) + stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.sellPrice + Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
 
                                     if ((IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.sellPrice + Math.Abs(model.thisModel.currentTrade.stopLossValue)) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)) && (IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.stopLossValue) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)))
                                     {
-                                        clsCommonFunctions.AddStatusMessage("EditShort activated", "INFO", logName);
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Short Deal", the_app_db);
+                                        CommonFunctions.AddStatusMessage("EditShort activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit Short Deal", the_app_db);
 
 
                                         //EditDeal(Math.Abs( model.thisModel.currentTrade.stopLossValue), this.currentTrade.dealId);
@@ -1668,20 +1685,20 @@ namespace TradingBrain.Models
                                         {
 
                                             this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.sellPrice - (decimal)model.thisModel.currentTrade.stopLossValue;
-                                            clsCommonFunctions.AddStatusMessage($"EditShort activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Short Deal - BREAKEVEN", the_app_db);
+                                            CommonFunctions.AddStatusMessage($"EditShort activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit Short Deal - BREAKEVEN", the_app_db);
                                             string dealRef = await EditDeal((double)model.thisModel.currentTrade.sellPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
-                                            if (dealRef != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = dealRef;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (dealRef != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = dealRef;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
                                             //If on a supp trade then set that trades sl to be the same as the current trade
                                             if (model.onSuppTrade && this.suppTrade != null)
                                             {
-                                                clsCommonFunctions.AddStatusMessage($"EditShort SUPP activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Short SUPP Deal - BREAKEVEN", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditShort SUPP activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit Short SUPP Deal - BREAKEVEN", the_app_db);
                                                 string dealRefSupp = await EditDeal((double)model.thisModel.currentTrade.sellPrice - model.thisModel.currentTrade.stopLossValue, this.suppTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                             }
                                         }
@@ -1694,22 +1711,22 @@ namespace TradingBrain.Models
                                                 this.model.thisModel.currentTrade.stopLossValue = (double)this.suppTrade.stopLevel;
                                                 this.currentTrade.stopLevel = this.suppTrade.stopLevel;
 
-                                                clsCommonFunctions.AddStatusMessage($"EditShort SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Short Deal ", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditShort SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Short Deal ", the_app_db);
                                                 string dealRefSupp = await EditDeal((double)this.currentTrade.stopLevel, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                             }
                                             else
                                             {
                                                 this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.sellPrice + (decimal)model.thisModel.currentTrade.stopLossValue;
-                                                clsCommonFunctions.AddStatusMessage($"EditShort SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Short Deal ", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditShort SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Short Deal ", the_app_db);
                                                 string dealRef = await EditDeal((double)model.thisModel.currentTrade.sellPrice + model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
-                                                if (dealRef != "")
-                                                {
-                                                    //dealSent = true;
-                                                    thisDealRef = dealRef;
-                                                   // dealType = "PlaceDeal";
-                                                }
+                                                //if (dealRef != "")
+                                                //{
+                                                //    //dealSent = true;
+                                                //    thisDealRef = dealRef;
+                                                //   // dealType = "PlaceDeal";
+                                                //}
                                             }
                                         }
 
@@ -1812,8 +1829,8 @@ namespace TradingBrain.Models
                                 //currentStatus.epicName = this.epicName;
                                 //send log to the website
                                 model.modelLogs.logs[0].epicName = this.epicName;
-                                Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                 //save log to the database
                                 Container logContainer = the_app_db.GetContainer("ModelLogs");
                                 await log.SaveDocument(logContainer);
@@ -1842,18 +1859,18 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage( "Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
@@ -1932,14 +1949,14 @@ namespace TradingBrain.Models
                     string param = "";
 
                     //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Running code");
-                    clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Epic       - {epicName}", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Strategy   - {strategy}", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Resolution - {resolution}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Epic       - {epicName}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Strategy   - {strategy}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Resolution - {resolution}", "INFO", logName);
 
-                    clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
                     //var watch = new System.Diagnostics.Stopwatch();
                     //var bigWatch = new System.Diagnostics.Stopwatch();
                     //bigWatch.Start();
@@ -1948,9 +1965,9 @@ namespace TradingBrain.Models
                         //watch.Start();
 
 
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy);
 
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
 
                         // If the trade has just been deleted then sort out the CFL
@@ -1960,12 +1977,12 @@ namespace TradingBrain.Models
                             try
                             {
                                 double nettPosition = lastTradeValue + lastTradeSuppValue;
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -1984,9 +2001,9 @@ namespace TradingBrain.Models
                         //tb.lastRunVars.doShortsVar = tb.doShorts;
                         //tb.lastRunVars.doSuppTradesVar = tb.doSuppTrades;
 
-                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
 
                         model.thisModel.inputs = this.tb.runDetails.inputs.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -2037,25 +2054,25 @@ namespace TradingBrain.Models
                         //thisInput = IGModels.clsCommonFunctions.GetInputs(tb.runDetails.inputs, _startTime);
 
                         // Get the last candle so we can get the spread
-                        clsCommonFunctions.AddStatusMessage($"Checking Spread ", "INFO", logName);
+                        CommonFunctions.AddStatusMessage($"Checking Spread ", "INFO", logName);
                         //double thisSpread = await Get_SpreadFromLastCandle(the_app_db, minute_container, _endTime);
                         double thisSpread = await Get_SpreadFromLastCandleRSI(the_db, candles_RSI_container, _endTime,resolution,epicName);
 
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO", logName);
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO", logName);
                         thisInput = tb.runDetails.inputs.FirstOrDefault(t => t.spread == thisSpread);
 
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}, trying spread 0", "INFO", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}, trying spread 0", "INFO", logName);
                             thisInput = tb.runDetails.inputs.FirstOrDefault(t => t.spread == 0);
                         }
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
-                            clsCommonFunctions.AddStatusMessage("Getting current candle data");
+                            CommonFunctions.AddStatusMessage("Getting current candle data");
                             //Get the last tick from the list of ticks
                             LOepic thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epicName).FirstOrDefault();
                             DateTime tickStart = _startTime;
@@ -2277,32 +2294,32 @@ namespace TradingBrain.Models
                                 model.candles.prevMACandle = null;
                             }
 
-                            clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
                             
                             
-                            clsCommonFunctions.AddStatusMessage($"longLTTValue:{model.candles.currentCandle.mA30MinTypicalLongClose} ", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"shortLTTValue:{model.candles.currentCandle.mA30MinTypicalShortClose}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"longLTTPrevValue:{model.candles.prevCandle.mA30MinTypicalLongClose}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"shortLTTPrevValue:{model.candles.prevCandle.mA30MinTypicalShortClose}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"shortMAT:{model.candles.currentCandle.mATypicalShortTypical}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"shortPrevMAT:{model.candles.prevCandle.mATypicalShortTypical}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"longMAT:{model.candles.currentCandle.mATypicalLongTypical}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"longPrevMAT:{model.candles.prevCandle.mATypicalLongTypical}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"longLTTValue:{model.candles.currentCandle.mA30MinTypicalLongClose} ", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"shortLTTValue:{model.candles.currentCandle.mA30MinTypicalShortClose}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"longLTTPrevValue:{model.candles.prevCandle.mA30MinTypicalLongClose}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"shortLTTPrevValue:{model.candles.prevCandle.mA30MinTypicalShortClose}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"shortMAT:{model.candles.currentCandle.mATypicalShortTypical}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"shortPrevMAT:{model.candles.prevCandle.mATypicalShortTypical}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"longMAT:{model.candles.currentCandle.mATypicalLongTypical}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"longPrevMAT:{model.candles.prevCandle.mATypicalLongTypical}", "DEBUG");
 
-                            clsCommonFunctions.AddStatusMessage($"");
+                            CommonFunctions.AddStatusMessage($"");
 
-                            clsCommonFunctions.AddStatusMessage($"prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalLongClose}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"prevCandle2.mA30MinTypicalShortClose:{model.candles.prevCandle2.mA30MinTypicalShortClose}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"prevCandle2.ma30MinTypicalLongClose:{model.candles.prevCandle2.mA30MinTypicalLongClose}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"prevCandle2.mA30MinTypicalShortClose:{model.candles.prevCandle2.mA30MinTypicalShortClose}", "DEBUG");
 
 
                             if (model.candles.prevMACandle != null)
                             {
-                                clsCommonFunctions.AddStatusMessage($"prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalLongClose}", "DEBUG");
-                                clsCommonFunctions.AddStatusMessage($"prevMACandle.mA30MinTypicalShortClose:{model.candles.prevMACandle.mA30MinTypicalShortClose}", "DEBUG");
+                                CommonFunctions.AddStatusMessage($"prevMACandle.ma30MinTypicalLongClose:{model.candles.prevMACandle.mA30MinTypicalLongClose}", "DEBUG");
+                                CommonFunctions.AddStatusMessage($"prevMACandle.mA30MinTypicalShortClose:{model.candles.prevMACandle.mA30MinTypicalShortClose}", "DEBUG");
 
                             }
                             else { 
-                                clsCommonFunctions.AddStatusMessage($"prevMaCandle is null. getStartDate = {getStartDate}");
+                                CommonFunctions.AddStatusMessage($"prevMaCandle is null. getStartDate = {getStartDate}");
                             }
                                 //model.RunProTrendCodeV2(model.candles);
                                 //model.RunProTrendCodeV3(model.candles);
@@ -2310,30 +2327,30 @@ namespace TradingBrain.Models
 
 
 
-                            clsCommonFunctions.AddStatusMessage($"values after  run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"values after  run         - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
                             //clsCommonFunctions.AddStatusMessage($"values after  run ctd... - doSuppTrades={model.doSuppTrades}, onSuppTrade={model.onSuppTrade}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"Current standard deviation - {model.candles.currentCandle.thisQuote.stdDev}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"Current standard deviation - {model.candles.currentCandle.thisQuote.stdDev}", "DEBUG", logName);
 
-                            clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
                             //clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG");
                             //clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG");
 
 
-                            if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
-                            if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+                            if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                            if (this.suppTrade != null) { CommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
 
                             //model.sellShort = true;
 
                             if (param != "DEBUG")
                             {
-                                string thisDealRef = "";
+                                //string thisDealRef = "";
                                 string dealType = "";
                                 bool dealSent = false;
 
@@ -2354,13 +2371,13 @@ namespace TradingBrain.Models
                                     newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
                                     currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.candles.currentCandle.candleData.Close);
 
-                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
 
 
                                     if (currentStop < newStop && currentPrice < newStop && currentPrice > currentStop)
                                     {
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
                                         model.sellLong = true;
                                     }
 
@@ -2371,13 +2388,13 @@ namespace TradingBrain.Models
                                     newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
                                     currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.candles.currentCandle.candleData.Close);
 
-                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"[LONG] Current stop > newStop = {currentStop > newStop},  currentPrice > newStop = {currentPrice > newStop}, currentPrice < currentStop {currentPrice < currentStop}  ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[LONG] Current stop > newStop = {currentStop > newStop},  currentPrice > newStop = {currentPrice > newStop}, currentPrice < currentStop {currentPrice < currentStop}  ", "DEBUG", logName);
 
 
                                     if (currentStop > newStop && currentPrice > newStop && currentPrice < currentStop)
                                     {
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "buying short because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now higher than the new stop.", the_app_db);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "buying short because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now higher than the new stop.", the_app_db);
                                         model.buyShort = true;
                                     }
                                 }
@@ -2440,99 +2457,99 @@ namespace TradingBrain.Models
                                     if (stdDevSL < 4)
                                     {
                                         //stdDevOK = false;
-                                        clsCommonFunctions.AddStatusMessage($"Stop loss ({sL}) is not more than 4x the current std dev ({stdDev}) - stdDevSL = {stdDevSL}", "ERROR", logName);
+                                        CommonFunctions.AddStatusMessage($"Stop loss ({sL}) is not more than 4x the current std dev ({stdDev}) - stdDevSL = {stdDevSL}", "ERROR", logName);
                                         model.buyLong = false;
                                         model.sellShort = false;
                                     }
                                     else
                                     {
-                                        clsCommonFunctions.AddStatusMessage($"Stop loss ({sL}) is more than 4x the current std dev ({stdDev}) - stdDevSL = {stdDevSL}", "INFO", logName);
+                                        CommonFunctions.AddStatusMessage($"Stop loss ({sL}) is more than 4x the current std dev ({stdDev}) - stdDevSL = {stdDevSL}", "INFO", logName);
                                     }
                                 }
 
 
                                 if (model.buyLong && this.currentTrade == null)
                                 {
-                                    clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
-                                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                    CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                     model.stopLossVar = (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
                                     requestedTrade reqTrade = new requestedTrade();
                                     reqTrade.dealType = "POSITION";
                                     reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, model.stopLossVar, this.igAccountId);
                                     requestedTrades.Add(reqTrade);
-                                    if (reqTrade.dealReference != "")
-                                    {
-                                        dealSent = true;
-                                        thisDealRef = reqTrade.dealReference;
-                                        dealType = "PlaceDeal";
-                                    }
+                                    //if (reqTrade.dealReference != "")
+                                    //{
+                                    //    dealSent = true;
+                                    //    thisDealRef = reqTrade.dealReference;
+                                    //    dealType = "PlaceDeal";
+                                    //}
 
                                 }
                                 else
                                 {
                                     if (model.sellLong)
                                     {
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                        clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                        CommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
                                         //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                         string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                        if (dealRef != "")
-                                        {
-                                            dealSent = true;
-                                            thisDealRef = dealRef;
-                                            dealType = "PlaceDeal";
-                                        }
+                                        //if (dealRef != "")
+                                        //{
+                                        //    dealSent = true;
+                                        //    thisDealRef = dealRef;
+                                        //    dealType = "PlaceDeal";
+                                        //}
 
                                         if (model.doSuppTrades && model.onSuppTrade)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong Supplementary", the_app_db);
-                                            clsCommonFunctions.AddStatusMessage("SellLong Supplementary activated", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong Supplementary", the_app_db);
+                                            CommonFunctions.AddStatusMessage("SellLong Supplementary activated", "INFO", logName);
                                             dealRef = await CloseDeal("long", (double)this.suppTrade.size, this.suppTrade.dealId, this.igAccountId);
-                                            if (dealRef != "")
-                                            {
-                                                dealSent = true;
-                                                thisDealRef = dealRef;
-                                                dealType = "PlaceDeal";
-                                            }
+                                            //if (dealRef != "")
+                                            //{
+                                            //    dealSent = true;
+                                            //    thisDealRef = dealRef;
+                                            //    dealType = "PlaceDeal";
+                                            //}
                                         }
                                     }
                                 }
 
                                 if (model.sellShort && this.currentTrade == null)
                                 {
-                                    clsCommonFunctions.AddStatusMessage("SellShort activated", "INFO", logName);
-                                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellShort", the_app_db);
+                                    CommonFunctions.AddStatusMessage("SellShort activated", "INFO", logName);
+                                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellShort", the_app_db);
                                     model.stopLossVar = (double)thisInput.var5 * Math.Abs((double)targetVarShort * (double)model.candles.currentCandle.mATypicalShortTypical - (double)model.candles.currentCandle.mATypicalShortTypical);
                                     requestedTrade reqTrade = new requestedTrade();
                                     reqTrade.dealType = "POSITION";
                                     reqTrade.dealReference = await PlaceDeal("short", model.modelVar.quantity, model.stopLossVar, this.igAccountId);
                                     requestedTrades.Add(reqTrade);
-                                    if (reqTrade.dealReference != "")
-                                    {
-                                        dealSent = true;
-                                        thisDealRef = reqTrade.dealReference;
-                                        dealType = "PlaceDeal";
-                                    }
+                                    //if (reqTrade.dealReference != "")
+                                    //{
+                                    //    dealSent = true;
+                                    //    thisDealRef = reqTrade.dealReference;
+                                    //    dealType = "PlaceDeal";
+                                    //}
                                 }
                                 else
                                 {
                                     if (model.buyShort)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("BuyShort activated", "INFO", logName);
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyShort)", the_app_db);
+                                        CommonFunctions.AddStatusMessage("BuyShort activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyShort)", the_app_db);
                                         //CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId);
                                         string dealRef = await CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                        if (dealRef != "")
-                                        {
-                                            dealSent = true;
-                                            thisDealRef = dealRef;
-                                            dealType = "PlaceDeal";
-                                        }
+                                        //if (dealRef != "")
+                                        //{
+                                        //    dealSent = true;
+                                        //    thisDealRef = dealRef;
+                                        //    dealType = "PlaceDeal";
+                                        //}
 
                                         if (model.doSuppTrades && model.onSuppTrade)
                                         {
-                                            clsCommonFunctions.AddStatusMessage("BuyShort Supplementary activated", "INFO", logName);
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyShort Supplementary", the_app_db);
+                                            CommonFunctions.AddStatusMessage("BuyShort Supplementary activated", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyShort Supplementary", the_app_db);
                                             string dealRefSupp = await CloseDeal("short", (double)this.suppTrade.size, this.suppTrade.dealId, this.igAccountId);
                                         }
                                     }
@@ -2541,7 +2558,7 @@ namespace TradingBrain.Models
 
                                 if (model.longOnmarket)
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"[LONG] Check if buyprice ({model.thisModel.currentTrade.buyPrice}) - stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[LONG] Check if buyprice ({model.thisModel.currentTrade.buyPrice}) - stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
 
                                     if ((IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.buyPrice - Math.Abs(model.thisModel.currentTrade.stopLossValue)) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)) && (IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.stopLossValue) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)))
                                     {
@@ -2555,21 +2572,21 @@ namespace TradingBrain.Models
 
 
                                             this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.buyPrice + (decimal)model.thisModel.currentTrade.stopLossValue;
-                                            clsCommonFunctions.AddStatusMessage($"EditLong activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal - BREAKEVEN", the_app_db);
+                                            CommonFunctions.AddStatusMessage($"EditLong activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal - BREAKEVEN", the_app_db);
                                             string dealRef = await EditDeal((double)model.thisModel.currentTrade.buyPrice + model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
-                                            if (dealRef != "")
-                                            {
-                                                dealSent = true;
-                                                thisDealRef = dealRef;
-                                                dealType = "PlaceDeal";
-                                            }
+                                            //if (dealRef != "")
+                                            //{
+                                            //    dealSent = true;
+                                            //    thisDealRef = dealRef;
+                                            //    dealType = "PlaceDeal";
+                                            //}
 
                                             //If on a supp trade then set that trades sl to be the same as the current trade
                                             if (model.onSuppTrade && this.suppTrade != null)
                                             {
-                                                clsCommonFunctions.AddStatusMessage($"EditLong SUPP activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Long Deal BREAKEVEN", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditLong SUPP activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Long Deal BREAKEVEN", the_app_db);
                                                 string dealRefSupp = await EditDeal((double)model.thisModel.currentTrade.buyPrice + model.thisModel.currentTrade.stopLossValue, this.suppTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                             }
                                         }
@@ -2584,22 +2601,22 @@ namespace TradingBrain.Models
                                                 this.model.thisModel.currentTrade.stopLossValue = (double)this.suppTrade.stopLevel;
                                                 this.currentTrade.stopLevel = this.suppTrade.stopLevel;
 
-                                                clsCommonFunctions.AddStatusMessage($"EditLong Long SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Long Deal ", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditLong Long SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Long Deal ", the_app_db);
                                                 string dealRefSupp = await EditDeal((double)this.currentTrade.stopLevel, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                             }
                                             else
                                             {
                                                 this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.buyPrice - (decimal)model.thisModel.currentTrade.stopLossValue;
-                                                clsCommonFunctions.AddStatusMessage($"EditLong Long activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal ", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditLong Long activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit Long Deal ", the_app_db);
                                                 string dealRef = await EditDeal((double)model.thisModel.currentTrade.buyPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
-                                                if (dealRef != "")
-                                                {
-                                                    dealSent = true;
-                                                    thisDealRef = dealRef;
-                                                    dealType = "PlaceDeal";
-                                                }
+                                                //if (dealRef != "")
+                                                //{
+                                                //    dealSent = true;
+                                                //    thisDealRef = dealRef;
+                                                //    dealType = "PlaceDeal";
+                                                //}
                                             }
                                         }
 
@@ -2607,12 +2624,12 @@ namespace TradingBrain.Models
                                 }
                                 if (model.shortOnMarket)
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"[SHORT] Check if sellPrice ({model.thisModel.currentTrade.sellPrice}) + stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.sellPrice + Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"[SHORT] Check if sellPrice ({model.thisModel.currentTrade.sellPrice}) + stoplossvalue ({Math.Abs(model.thisModel.currentTrade.stopLossValue)}) ({(double)model.thisModel.currentTrade.sellPrice + Math.Abs(model.thisModel.currentTrade.stopLossValue)}) = currentTrade.stoplevel ({this.currentTrade.stopLevel}) - BreakEvenVar = {model.modelVar.breakEvenVar}", "DEBUG", logName);
 
                                     if ((IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.sellPrice + Math.Abs(model.thisModel.currentTrade.stopLossValue)) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)) && (IGModels.clsCommonFunctions.Dbl2DP((double)model.thisModel.currentTrade.stopLossValue) != IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel)))
                                     {
-                                        clsCommonFunctions.AddStatusMessage("EditShort activated", "INFO", logName);
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Short Deal", the_app_db);
+                                        CommonFunctions.AddStatusMessage("EditShort activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit Short Deal", the_app_db);
 
 
                                         //EditDeal(Math.Abs( model.thisModel.currentTrade.stopLossValue), this.currentTrade.dealId);
@@ -2622,20 +2639,20 @@ namespace TradingBrain.Models
                                         {
 
                                             this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.sellPrice - (decimal)model.thisModel.currentTrade.stopLossValue;
-                                            clsCommonFunctions.AddStatusMessage($"EditShort activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Short Deal - BREAKEVEN", the_app_db);
+                                            CommonFunctions.AddStatusMessage($"EditShort activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit Short Deal - BREAKEVEN", the_app_db);
                                             string dealRef = await EditDeal((double)model.thisModel.currentTrade.sellPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
-                                            if (dealRef != "")
-                                            {
-                                                dealSent = true;
-                                                thisDealRef = dealRef;
-                                                dealType = "PlaceDeal";
-                                            }
+                                            //if (dealRef != "")
+                                            //{
+                                            //    dealSent = true;
+                                            //    thisDealRef = dealRef;
+                                            //    dealType = "PlaceDeal";
+                                            //}
                                             //If on a supp trade then set that trades sl to be the same as the current trade
                                             if (model.onSuppTrade && this.suppTrade != null)
                                             {
-                                                clsCommonFunctions.AddStatusMessage($"EditShort SUPP activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit Short SUPP Deal - BREAKEVEN", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditShort SUPP activated BREAKEVEN set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit Short SUPP Deal - BREAKEVEN", the_app_db);
                                                 string dealRefSupp = await EditDeal((double)model.thisModel.currentTrade.sellPrice - model.thisModel.currentTrade.stopLossValue, this.suppTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                             }
                                         }
@@ -2648,22 +2665,22 @@ namespace TradingBrain.Models
                                                 this.model.thisModel.currentTrade.stopLossValue = (double)this.suppTrade.stopLevel;
                                                 this.currentTrade.stopLevel = this.suppTrade.stopLevel;
 
-                                                clsCommonFunctions.AddStatusMessage($"EditShort SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Short Deal ", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditShort SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Short Deal ", the_app_db);
                                                 string dealRefSupp = await EditDeal((double)this.currentTrade.stopLevel, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                             }
                                             else
                                             {
                                                 this.currentTrade.stopLevel = (decimal)model.thisModel.currentTrade.sellPrice + (decimal)model.thisModel.currentTrade.stopLossValue;
-                                                clsCommonFunctions.AddStatusMessage($"EditShort SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Short Deal ", the_app_db);
+                                                CommonFunctions.AddStatusMessage($"EditShort SUPP activated set - Current stop value = {currentStopLevel}, new stop value = {this.currentTrade.stopLevel}", "INFO", logName);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Edit SUPP Short Deal ", the_app_db);
                                                 string dealRef = await EditDeal((double)model.thisModel.currentTrade.sellPrice + model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
-                                                if (dealRef != "")
-                                                {
-                                                    dealSent = true;
-                                                    thisDealRef = dealRef;
-                                                    dealType = "PlaceDeal";
-                                                }
+                                                //if (dealRef != "")
+                                                //{
+                                                //    dealSent = true;
+                                                //    thisDealRef = dealRef;
+                                                //    dealType = "PlaceDeal";
+                                                //}
                                             }
                                         }
 
@@ -2766,8 +2783,8 @@ namespace TradingBrain.Models
                                 //currentStatus.epicName = this.epicName;
                                 //send log to the website
                                 model.modelLogs.logs[0].epicName = this.epicName;
-                                Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                 //save log to the database
                                 Container logContainer = the_app_db.GetContainer("ModelLogs");
                                 await log.SaveDocument(logContainer);
@@ -2797,18 +2814,18 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage( "Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
@@ -3391,18 +3408,18 @@ namespace TradingBrain.Models
                     //string param = "";
 
 
-                    clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Epic       - {epicName}", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Strategy   - {strategy}", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Resolution - {resolution}", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Epic       - {epicName}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Strategy   - {strategy}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Resolution - {resolution}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
 
                     try
                     {
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy,this.resolution);
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy,this.resolution);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
                         // If the trade has just been deleted then sort out the CFL
                         if (lastTradeDeleted)
@@ -3410,12 +3427,12 @@ namespace TradingBrain.Models
                             try
                             {
                                 double nettPosition = lastTradeValue + lastTradeSuppValue;
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -3458,12 +3475,12 @@ namespace TradingBrain.Models
                         thisInput = tb.runDetails.inputs_RSI.FirstOrDefault(t => t.spread == 0);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = 0", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = 0", "ERROR", logName);
                         }
 
                         else
                         {
-                            clsCommonFunctions.AddStatusMessage("Getting current candle data");
+                            CommonFunctions.AddStatusMessage("Getting current candle data");
 
                             bool gotCandle = false;
 
@@ -3574,8 +3591,8 @@ namespace TradingBrain.Models
                                 //clsCommonFunctions.AddStatusMessage($"ATR= {thisCandle.atr}");
 
                                 model.candles.currentGRIDCandle = thisCandle;
-                                clsCommonFunctions.AddStatusMessage($"Current close price = {thisCandle.Close}","DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"Current closeAttemptCount = {closeAttemptCount}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"Current close price = {thisCandle.Close}","DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"Current closeAttemptCount = {closeAttemptCount}", "DEBUG", logName);
 
                                 model.candles.currentCandle.grid_long_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.var4).Average(s => s.Close));
                                 model.candles.currentCandle.grid_short_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.svar4).Average(s => s.Close));
@@ -3583,8 +3600,8 @@ namespace TradingBrain.Models
                                 model.candles.currentCandle.grid_prev_long_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.var4).Average(s => s.Close));
                                 model.candles.currentCandle.grid_prev_short_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.svar4).Average(s => s.Close));
 
-                                clsCommonFunctions.AddStatusMessage($"Current : SMA Long = {model.candles.currentCandle.grid_long_sma}, Short = {model.candles.currentCandle.grid_short_sma}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"Prev : SMA Long = {model.candles.currentCandle.grid_prev_long_sma}, Short = {model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"Current : SMA Long = {model.candles.currentCandle.grid_long_sma}, Short = {model.candles.currentCandle.grid_short_sma}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"Prev : SMA Long = {model.candles.currentCandle.grid_prev_long_sma}, Short = {model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
 
                                 if (closeAttemptCount == 0 )
                                 {
@@ -3592,19 +3609,19 @@ namespace TradingBrain.Models
 
                                     if (model.thisModel.gridLTrades.Count > 0)
                                     {
-                                        clsCommonFunctions.AddStatusMessage($"Long bollid = {this.gridLID}", "DEBUG");
-                                        clsCommonFunctions.AddStatusMessage($"Long quantites = {model.thisModel.gridLTrades.Sum(x => x.quantity)}, position price = {model.thisModel.gridLTrades.Average(x => x.buyPrice)}, last price = {model.thisModel.gridLTrades.Last().buyPrice} ", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage($"Long bollid = {this.gridLID}", "DEBUG");
+                                        CommonFunctions.AddStatusMessage($"Long quantites = {model.thisModel.gridLTrades.Sum(x => x.quantity)}, position price = {model.thisModel.gridLTrades.Average(x => x.buyPrice)}, last price = {model.thisModel.gridLTrades.Last().buyPrice} ", "DEBUG", logName);
                               
                                     }
 
                                     if (model.thisModel.gridSTrades.Count > 0)
                                     {
-                                        clsCommonFunctions.AddStatusMessage($"Short bollid = {this.gridSID}", "DEBUG");
-                                        clsCommonFunctions.AddStatusMessage($"Short quantites = {model.thisModel.gridSTrades.Sum(x => x.quantity)}, position price = {model.thisModel.gridSTrades.Average(x => x.sellPrice)}, last price = {model.thisModel.gridSTrades.Last().sellPrice} ", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage($"Short bollid = {this.gridSID}", "DEBUG");
+                                        CommonFunctions.AddStatusMessage($"Short quantites = {model.thisModel.gridSTrades.Sum(x => x.quantity)}, position price = {model.thisModel.gridSTrades.Average(x => x.sellPrice)}, last price = {model.thisModel.gridSTrades.Last().sellPrice} ", "DEBUG", logName);
                         
                                     }
 
-                                    clsCommonFunctions.AddStatusMessage($"Spread = {thisCandle.spread}, Short GridSize = {thisInput.svar0}, Long GridSize = {thisInput.var0}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"Spread = {thisCandle.spread}, Short GridSize = {thisInput.svar0}, Long GridSize = {thisInput.var0}", "DEBUG", logName);
 
 
                                     model.RunProTrendCodeGRID(model.candles);
@@ -3628,15 +3645,15 @@ namespace TradingBrain.Models
                                     //        model.buyLong = false;
                                     //    }
                                     //}
-                                    clsCommonFunctions.AddStatusMessage($"values after  run  - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"values after  run  - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
 
 
-                                    string thisDealRef = "";
+                                    //string thisDealRef = "";
                                     //string dealType = "";
                                     //bool dealSent = false;
 
-                                    if (this.currentGRIDLTrade != null) { clsCommonFunctions.AddStatusMessage($"Current Long dealid = {this.currentGRIDLTrade.dealId}", "INFO", logName); }
-                                    if (this.currentGRIDSTrade != null) { clsCommonFunctions.AddStatusMessage($"Current Short dealid = {this.currentGRIDSTrade.dealId}", "INFO", logName); }
+                                    if (this.currentGRIDLTrade != null) { CommonFunctions.AddStatusMessage($"Current Long dealid = {this.currentGRIDLTrade.dealId}", "INFO", logName); }
+                                    if (this.currentGRIDSTrade != null) { CommonFunctions.AddStatusMessage($"Current Short dealid = {this.currentGRIDSTrade.dealId}", "INFO", logName); }
 
                                     List<tradeItem> openLTrades = model.thisModel.gridLTrades.DeepCopy();
                                     List<tradeItem> openSTrades = model.thisModel.gridSTrades.DeepCopy();
@@ -3656,7 +3673,7 @@ namespace TradingBrain.Models
                                     //double currentPrice = 0;
                                     if (openLTrades.Count > 0 && sellingLongs == false)
                                     {
-                                        clsCommonFunctions.AddStatusMessage($"GRID Long Trades - Num Trades : {openLTrades.Count}, Sum quantity : {openLTrades.Sum(x => x.quantity)}");
+                                        CommonFunctions.AddStatusMessage($"GRID Long Trades - Num Trades : {openLTrades.Count}, Sum quantity : {openLTrades.Sum(x => x.quantity)}");
 
                                         //foreach (tradeItem ti in openLTrades)
                                         //{
@@ -3668,7 +3685,7 @@ namespace TradingBrain.Models
 
                                     if (openSTrades.Count > 0 && buyingShorts == false)
                                     {
-                                        clsCommonFunctions.AddStatusMessage($"GRID Short Trades - Num Trades : {openSTrades.Count}, Sum quantity : {openSTrades.Sum(x => x.quantity)}");
+                                        CommonFunctions.AddStatusMessage($"GRID Short Trades - Num Trades : {openSTrades.Count}, Sum quantity : {openSTrades.Sum(x => x.quantity)}");
 
                                         //foreach (tradeItem ti in openSTrades)
                                         //{
@@ -3680,27 +3697,27 @@ namespace TradingBrain.Models
 
                                     if (model.buyLong)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                        CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
 
                                         requestedTrade reqTrade = new requestedTrade();
                                         reqTrade.dealType = "POSITION";
                                         reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, 0, this._igContainer.creds.igAccountId);
                                         requestedTrades.Add(reqTrade);
-                                        if (reqTrade.dealReference != "")
-                                        {
-                                            //dealSent = true;
-                                            thisDealRef = reqTrade.dealReference;
-                                            //dealType = "PlaceDeal";
-                                        }
+                                        //if (reqTrade.dealReference != "")
+                                        //{
+                                        //    //dealSent = true;
+                                        //    thisDealRef = reqTrade.dealReference;
+                                        //    //dealType = "PlaceDeal";
+                                        //}
 
                                     }
                                     else
                                     {
                                         if (model.sellLong)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                            clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                            CommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
                                             closeAttemptCount = 1;
                                             string dealRef = await CloseDealEpic("long", (double)openLTrades.Sum(x => x.quantity), this.epicName, this._igContainer.creds.igAccountId);
                                         }
@@ -3710,27 +3727,27 @@ namespace TradingBrain.Models
 
                                     if (model.sellShort)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("SellShort activated", "INFO", logName);
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellShort", the_app_db);
+                                        CommonFunctions.AddStatusMessage("SellShort activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellShort", the_app_db);
 
                                         requestedTrade reqTrade = new requestedTrade();
                                         reqTrade.dealType = "POSITION";
                                         reqTrade.dealReference = await PlaceDeal("short", model.modelVar.quantity, 0, this._igContainer2.creds.igAccountId);
                                         requestedTrades.Add(reqTrade);
-                                        if (reqTrade.dealReference != "")
-                                        {
-                                            //dealSent = true;
-                                            thisDealRef = reqTrade.dealReference;
-                                            //dealType = "PlaceDeal";
-                                        }
+                                        //if (reqTrade.dealReference != "")
+                                        //{
+                                        //    //dealSent = true;
+                                        //    thisDealRef = reqTrade.dealReference;
+                                        //    //dealType = "PlaceDeal";
+                                        //}
 
                                     }
                                     else
                                     {
                                         if (model.buyShort)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyShort", the_app_db);
-                                            clsCommonFunctions.AddStatusMessage("BuyShort activated", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyShort", the_app_db);
+                                            CommonFunctions.AddStatusMessage("BuyShort activated", "INFO", logName);
                                             closeAttemptCount = 1;
                                             string dealRef = await CloseDealEpic("short", (double)openSTrades.Sum(x => x.quantity), this.epicName, this._igContainer2.creds.igAccountId);
                                         }
@@ -3751,7 +3768,7 @@ namespace TradingBrain.Models
                                 }
                                 else
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"Waiting for close to finish. Attempt {closeAttemptCount} of {MAX_WAIT_FOR_CLOSE_TIME}", "INFO", logName);
+                                    CommonFunctions.AddStatusMessage($"Waiting for close to finish. Attempt {closeAttemptCount} of {MAX_WAIT_FOR_CLOSE_TIME}", "INFO", logName);
                                     //if (model.thisModel.closingGridLTrade)
                                     //{
                                     //    clsCommonFunctions.AddStatusMessage("Currently closing long trades, no new trades will be initiated", "INFO", logName);
@@ -3766,7 +3783,7 @@ namespace TradingBrain.Models
                                     closeAttemptCount += 1;
                                     if (closeAttemptCount == MAX_WAIT_FOR_CLOSE_TIME)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("Max wait time for close reached, resetting close flags", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage("Max wait time for close reached, resetting close flags", "DEBUG", logName);
                                         model.thisModel.closedGridLTrades.Clear();
                                         model.thisModel.closedGridSTrades.Clear();
                                         closeAttemptCount = 0;
@@ -3775,10 +3792,10 @@ namespace TradingBrain.Models
                                     //If there are still some trades after 45 seconds, try again
                                     if (closeAttemptCount >= 40 && model.thisModel.closedGridLTrades.Count > 0)
                                     {
-                                        clsCommonFunctions.AddStatusMessage($"still have {model.thisModel.gridLTrades.Count} trades to close.....trying again");
+                                        CommonFunctions.AddStatusMessage($"still have {model.thisModel.gridLTrades.Count} trades to close.....trying again");
                                         foreach (tradeItem trade in model.thisModel.gridLTrades)
                                         {
-                                            clsCommonFunctions.AddStatusMessage($"trade {trade.tbDealId} not closed yet", "DEBUG");
+                                            CommonFunctions.AddStatusMessage($"trade {trade.tbDealId} not closed yet", "DEBUG");
                                         }
                                         string dealRef = await CloseDealEpic("long", (double)model.thisModel.gridLTrades.Sum(x => x.quantity), this.epicName, this._igContainer.creds.igAccountId);
                                         closeAttemptCount = 1;
@@ -3843,8 +3860,8 @@ namespace TradingBrain.Models
 
                                     //send log to the website
                                     model.modelLogs.logs[0].epicName = this.epicName;
-                                    Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                    Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                    Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                    Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                     //save log to the database
                                     Container logContainer = the_app_db.GetContainer("ModelLogs");
                                     await log.SaveDocument(logContainer);
@@ -3855,7 +3872,7 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage($"No candle formed for second starting at {_startTime} - current candle list at {this.candleList.Count}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"No candle formed for second starting at {_startTime} - current candle list at {this.candleList.Count}", "DEBUG", logName);
                             }
 
                             _startTime = _startTime.AddSeconds(1);
@@ -3874,18 +3891,18 @@ namespace TradingBrain.Models
                         await log.Save();
                     }
 
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
 
 
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
           
@@ -3934,21 +3951,21 @@ namespace TradingBrain.Models
                     _igContainer.tbClient.FirstConfirmUpdate = false;
                     string param = "";
 
-                    clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Epic       - {epicName}", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Strategy   - {strategy}", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($" - Resolution - {resolution}", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Epic       - {epicName}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Strategy   - {strategy}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($" - Resolution - {resolution}", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
 
                     try
                     {
                         //watch.Start();
 
 
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
                         // If the trade has just been deleted then sort out the CFL
                         //if (lastTradeDeleted)
@@ -4002,25 +4019,25 @@ namespace TradingBrain.Models
                         /////////////////////////////////////////////////////////
 
                         // Get the last candle so we can get the spread
-                        clsCommonFunctions.AddStatusMessage($"Checking Spread ", "INFO", logName);
+                        CommonFunctions.AddStatusMessage($"Checking Spread ", "INFO", logName);
                         //double thisSpread = await Get_SpreadFromLastCandle(the_app_db, minute_container, _endTime);
                         double thisSpread = await Get_SpreadFromLastCandleRSI(the_db, candles_RSI_container, _endTime, resolution, epicName);
 
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO", logName);
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO", logName);
                         thisInput = tb.runDetails.inputs_RSI.FirstOrDefault(t => t.spread == thisSpread);
 
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}, trying spread 0", "INFO", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}, trying spread 0", "INFO", logName);
                             thisInput = tb.runDetails.inputs_RSI.FirstOrDefault(t => t.spread == 0);
                         }
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
-                            clsCommonFunctions.AddStatusMessage("Getting current candle data");
+                            CommonFunctions.AddStatusMessage("Getting current candle data");
                             //Get the last tick from the list of ticks
                             LOepic thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epicName).FirstOrDefault();
                             DateTime tickStart = _startTime;
@@ -4116,57 +4133,57 @@ namespace TradingBrain.Models
                             model.candles.prevCandle.epicName = epicName;
 
 
-                            clsCommonFunctions.AddStatusMessage($"SumQuantites in bolliTrades = {model.thisModel.bolliTrades.Sum(x => x.quantity)}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"quantity in modelVar = {model.modelVar.quantity}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"var5  = {thisInput.var5}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"Is this close ({model.candles.currentCandle.thisQuote.Close}) > prev close ({model.candles.prevCandle.thisQuote.Close}) = {model.candles.currentCandle.thisQuote.Close > model.candles.prevCandle.thisQuote.Close}", "DEBUG", logName); 
+                            CommonFunctions.AddStatusMessage($"SumQuantites in bolliTrades = {model.thisModel.bolliTrades.Sum(x => x.quantity)}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"quantity in modelVar = {model.modelVar.quantity}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"var5  = {thisInput.var5}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"Is this close ({model.candles.currentCandle.thisQuote.Close}) > prev close ({model.candles.prevCandle.thisQuote.Close}) = {model.candles.currentCandle.thisQuote.Close > model.candles.prevCandle.thisQuote.Close}", "DEBUG", logName); 
 
-                            clsCommonFunctions.AddStatusMessage($"check quantites = is sumquantites ({model.thisModel.bolliTrades.Sum(x => x.quantity)}) <= quantity ({model.modelVar.quantity}) * var5 {thisInput.var5}"  , "DEBUG", logName);  
+                            CommonFunctions.AddStatusMessage($"check quantites = is sumquantites ({model.thisModel.bolliTrades.Sum(x => x.quantity)}) <= quantity ({model.modelVar.quantity}) * var5 {thisInput.var5}"  , "DEBUG", logName);  
                            
                             if (model.thisModel.bolliTrades.Sum(x => x.quantity) <= model.modelVar.quantity * thisInput.var5)
                             {
-                                clsCommonFunctions.AddStatusMessage($"OK to do another trade", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"OK to do another trade", "DEBUG", logName);
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage($"Max trades reached", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"Max trades reached", "DEBUG", logName);
                             }
 
-                            clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong}, sellLong={model.sellLong}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong}, sellLong={model.sellLong}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
 
 
-                            clsCommonFunctions.AddStatusMessage($"bolli_avg    :{model.candles.currentCandle.bolli_avg} ", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"bolli_avgPrev:{model.candles.currentCandle.bolli_avgPrev}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"bolli_mid    :{model.candles.currentCandle.bolli_mid}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"bolli_sigma  :{model.candles.currentCandle.bolli_sigma}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"bolli_upper  :{model.candles.currentCandle.bolli_upper}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"bolli_lower  :{model.candles.currentCandle.bolli_lower}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"bolli_avg    :{model.candles.currentCandle.bolli_avg} ", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"bolli_avgPrev:{model.candles.currentCandle.bolli_avgPrev}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"bolli_mid    :{model.candles.currentCandle.bolli_mid}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"bolli_sigma  :{model.candles.currentCandle.bolli_sigma}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"bolli_upper  :{model.candles.currentCandle.bolli_upper}", "DEBUG");
+                            CommonFunctions.AddStatusMessage($"bolli_lower  :{model.candles.currentCandle.bolli_lower}", "DEBUG");
 
                             model.RunProTrendCodeBOLLI(model.candles);
 
-                            clsCommonFunctions.AddStatusMessage($"values after  run         - buyLong={model.buyLong}, sellLong={model.sellLong}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"values after  run         - buyLong={model.buyLong}, sellLong={model.sellLong}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
                             //clsCommonFunctions.AddStatusMessage($"values after  run ctd... - doSuppTrades={model.doSuppTrades}, onSuppTrade={model.onSuppTrade}", "DEBUG");
-                            clsCommonFunctions.AddStatusMessage($"Current standard deviation - {model.candles.currentCandle.thisQuote.stdDev}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                            clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"Current standard deviation - {model.candles.currentCandle.thisQuote.stdDev}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
 
-                            clsCommonFunctions.AddStatusMessage($"current bolliID = {this.bolliID}", "DEBUG", logName);
+                            CommonFunctions.AddStatusMessage($"current bolliID = {this.bolliID}", "DEBUG", logName);
 
                             // Check for stop
                             if (model.onMarket || model.thisModel.bolliTrades.Count > 0)
                             {
                                 //clsCommonFunctions.AddStatusMessage($"checking - (positionPrice - (double)candles.currentCandle.thisQuote.Close) * sumQuantities > (thisInput.var0 * modelVar.quantity)");
-                                clsCommonFunctions.AddStatusMessage("Checking Stop ......");
-                                clsCommonFunctions.AddStatusMessage($"positionPrice = {model.thisModel.bolliTrades.Average(s => s.buyPrice)}, candles.currentCandle.thisQuote.Close = {(double)model.candles.currentCandle.thisQuote.Close}, sumQuantities = {model.thisModel.bolliTrades.Sum(x => x.quantity)}, thisInput.var0 = {thisInput.var0}, modelVar.quantity = {model.modelVar.quantity}");
-                                clsCommonFunctions.AddStatusMessage($"current position = positionPrice ({model.thisModel.bolliTrades.Average(s => s.buyPrice)}) - close ({model.candles.currentCandle.thisQuote.Close}) * sumQuantites ({model.thisModel.bolliTrades.Sum(x => x.quantity)} = {((double)model.thisModel.bolliTrades.Average(s => s.buyPrice) - (double)model.candles.currentCandle.thisQuote.Close) * model.thisModel.bolliTrades.Sum(x => x.quantity)}");
-                                clsCommonFunctions.AddStatusMessage($"stop threshold = thisInput.var0 ({thisInput.var0}) * modelVar.quantity ({model.modelVar.quantity}) = {thisInput.var0 * model.modelVar.quantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"calculation = {((double)model.thisModel.bolliTrades.Average(s => s.buyPrice) - (double)model.candles.currentCandle.thisQuote.Close) * model.thisModel.bolliTrades.Sum(x => x.quantity)} > {thisInput.var0 * model.modelVar.quantity} = {((double)model.thisModel.bolliTrades.Average(s => s.buyPrice) - (double)model.candles.currentCandle.thisQuote.Close) * model.thisModel.bolliTrades.Sum(x => x.quantity) > (thisInput.var0 * model.modelVar.quantity)}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage("Checking Stop ......");
+                                CommonFunctions.AddStatusMessage($"positionPrice = {model.thisModel.bolliTrades.Average(s => s.buyPrice)}, candles.currentCandle.thisQuote.Close = {(double)model.candles.currentCandle.thisQuote.Close}, sumQuantities = {model.thisModel.bolliTrades.Sum(x => x.quantity)}, thisInput.var0 = {thisInput.var0}, modelVar.quantity = {model.modelVar.quantity}");
+                                CommonFunctions.AddStatusMessage($"current position = positionPrice ({model.thisModel.bolliTrades.Average(s => s.buyPrice)}) - close ({model.candles.currentCandle.thisQuote.Close}) * sumQuantites ({model.thisModel.bolliTrades.Sum(x => x.quantity)} = {((double)model.thisModel.bolliTrades.Average(s => s.buyPrice) - (double)model.candles.currentCandle.thisQuote.Close) * model.thisModel.bolliTrades.Sum(x => x.quantity)}");
+                                CommonFunctions.AddStatusMessage($"stop threshold = thisInput.var0 ({thisInput.var0}) * modelVar.quantity ({model.modelVar.quantity}) = {thisInput.var0 * model.modelVar.quantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"calculation = {((double)model.thisModel.bolliTrades.Average(s => s.buyPrice) - (double)model.candles.currentCandle.thisQuote.Close) * model.thisModel.bolliTrades.Sum(x => x.quantity)} > {thisInput.var0 * model.modelVar.quantity} = {((double)model.thisModel.bolliTrades.Average(s => s.buyPrice) - (double)model.candles.currentCandle.thisQuote.Close) * model.thisModel.bolliTrades.Sum(x => x.quantity) > (thisInput.var0 * model.modelVar.quantity)}", "DEBUG", logName);
                             }
                                 //clsCommonFunctions.AddStatusMessage("Force buy");
                             //model.buyLong = true;
@@ -4175,7 +4192,7 @@ namespace TradingBrain.Models
                             //model.sellLong = true;
 
 
-                            if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                            if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
                             //if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
                             List<tradeItem> openTrades = model.thisModel.bolliTrades.DeepCopy();
                             //model.sellShort = true;
@@ -4186,7 +4203,7 @@ namespace TradingBrain.Models
                             }
                                 if (param != "DEBUG")
                             {
-                                string thisDealRef = "";
+                                //string thisDealRef = "";
                                 //string dealType = "";
                                 //bool dealSent = false;
 
@@ -4198,33 +4215,33 @@ namespace TradingBrain.Models
                                 //double currentPrice = 0;
                                 if (openTrades.Count > 0 && sellingLongs == false)
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"BOLLI Trades ");
-                                    clsCommonFunctions.AddStatusMessage($"Num Trades - {openTrades.Count}");
-                                    clsCommonFunctions.AddStatusMessage($"Sum Quantity - {openTrades.Sum(x => x.quantity)}");
+                                    CommonFunctions.AddStatusMessage($"BOLLI Trades ");
+                                    CommonFunctions.AddStatusMessage($"Num Trades - {openTrades.Count}");
+                                    CommonFunctions.AddStatusMessage($"Sum Quantity - {openTrades.Sum(x => x.quantity)}");
 
                                     foreach (tradeItem ti in openTrades)
                                     {
-                                        clsCommonFunctions.AddStatusMessage($"Trade id : {ti.tbDealId}, started: {ti.tradeStarted}, BuyPrice: {ti.buyPrice}, Quantity: {ti.quantity}");
+                                        CommonFunctions.AddStatusMessage($"Trade id : {ti.tbDealId}, started: {ti.tradeStarted}, BuyPrice: {ti.buyPrice}, Quantity: {ti.quantity}");
 
                                     }
-                                    clsCommonFunctions.AddStatusMessage("");
+                                    CommonFunctions.AddStatusMessage("");
                                 }
 
                                 if (model.buyLong )
                                 {
-                                    clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
-                                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                    CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
 
                                     requestedTrade reqTrade = new requestedTrade();
                                     reqTrade.dealType = "POSITION";
                                     reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, 0, this.igAccountId);
                                     requestedTrades.Add(reqTrade);
-                                    if (reqTrade.dealReference != "")
-                                    {
-                                        //dealSent = true;
-                                        thisDealRef = reqTrade.dealReference;
-                                        //dealType = "PlaceDeal";
-                                    }
+                                    //if (reqTrade.dealReference != "")
+                                    //{
+                                    //    //dealSent = true;
+                                    //    thisDealRef = reqTrade.dealReference;
+                                    //    //dealType = "PlaceDeal";
+                                    //}
 
                                 }
                                 else
@@ -4232,8 +4249,8 @@ namespace TradingBrain.Models
                                     if (model.sellLong)
                                     {
 
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                        clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                        CommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
                                         //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
 
                                         string dealRef = await CloseDealEpic("long", (double)openTrades.Sum(x => x.quantity), this.epicName,this.igAccountId);
@@ -4335,7 +4352,7 @@ namespace TradingBrain.Models
                                 //send log to the website
                                 //model.modelLogs.logs[0].epicName = this.epicName;
                                 //Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                 //save log to the database
                                 //Container logContainer = the_app_db.GetContainer("ModelLogs");
                                 //await log.SaveDocument(logContainer);
@@ -4359,18 +4376,18 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage( "Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
@@ -4543,12 +4560,12 @@ namespace TradingBrain.Models
                                     }
                                     else
                                     {
-                                        clsCommonFunctions.AddStatusMessage("Trade update received for unknown deal id - " + tsm.DealId, "WARNING");
+                                        CommonFunctions.AddStatusMessage("Trade update received for unknown deal id - " + tsm.DealId, "WARNING");
                                         return;
                                     }
                                 }catch(Exception e)
                                 {
-                                    clsCommonFunctions.AddStatusMessage("Trade update received for unknown deal id  - " + e.ToString(), "WARNING");
+                                    CommonFunctions.AddStatusMessage("Trade update received for unknown deal id  - " + e.ToString(), "WARNING");
                                     return;
                                 }
                             }
@@ -4565,9 +4582,9 @@ namespace TradingBrain.Models
                                 if (tsm.DealId == thisTrade.dealId)
                                 {
 
-                                    clsCommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
-                                    clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, this.the_app_db);
-                                    clsCommonFunctions.AddStatusMessage("Updating  - " + tsm.DealId + " - Current Deal = " + this.currentTrade.dealId, "INFO");
+                                    CommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
+                                    CommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, this.the_app_db);
+                                    CommonFunctions.AddStatusMessage("Updating  - " + tsm.DealId + " - Current Deal = " + this.currentTrade.dealId, "INFO");
                                     await this.GetTradeFromDB(tsm.DealId, this.strategy, this.resolution);
 
                                     thisTrade.dealReference = tsm.DealReference;
@@ -4605,7 +4622,7 @@ namespace TradingBrain.Models
                                     this.tb.lastRunVars = this.model.modelVar.DeepCopy();
                                     this.tb.SaveDocument(this.the_app_db);
 
-                                    clsCommonFunctions.SendBroadcast("DealUpdated", JsonConvert.SerializeObject(thisModelTrade), this.the_app_db);
+                                    CommonFunctions.SendBroadcast("DealUpdated", JsonConvert.SerializeObject(thisModelTrade), this.the_app_db);
 
                                     await tradeSubUpdate.Add(this.the_app_db);
 
@@ -4659,8 +4676,8 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage("UPDATE failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], "ERROR");
-                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "UPDATE failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], this.the_app_db);
+                                CommonFunctions.AddStatusMessage("UPDATE failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], "ERROR");
+                                TradingBrain.Models.CommonFunctions.SaveLog("Error", "UpdateTs", "UPDATE failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], this.the_app_db);
                                 await tradeSubUpdate.Add(this.the_app_db);
                             }
 
@@ -4681,9 +4698,9 @@ namespace TradingBrain.Models
                                     tradeItem matchTrade = this.model.thisModel.bolliTrades.FirstOrDefault(t => t.tbDealId == tsm.DealId);
                                     if (matchTrade != null)
                                     {
-                                        clsCommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
+                                        CommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
                                         //clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, this.the_app_db);
-                                        clsCommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + matchTrade.tbDealId, "INFO");
+                                        CommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + matchTrade.tbDealId, "INFO");
                                         DateTime dtNow = DateTime.UtcNow;
                                         tradeItem dbTrade = matchTrade; // await this.GetTradeFromDB(tsm.DealId, this.strategy, this.resolution);
                                         dbTrade.candleSold = null;
@@ -4729,7 +4746,7 @@ namespace TradingBrain.Models
                                                 this.model.modelLogs.logs[0].tradePrice = dbTrade.sellPrice;
                                                 this.model.modelLogs.logs[0].tradeValue = (dbTrade.sellPrice - dbTrade.buyPrice) * (decimal)cTrade.size;
                                             }
-                                            clsCommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(dbTrade), this.the_app_db);
+                                            CommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(dbTrade), this.the_app_db);
                                         }
 
                                         this.model.sellLong = false;
@@ -4841,9 +4858,9 @@ namespace TradingBrain.Models
 
                                         if (matchTrade != null)
                                         {
-                                            clsCommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
+                                            CommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
                                             //clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, this.the_app_db);
-                                            clsCommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + matchTrade.tbDealId, "INFO");
+                                            CommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + matchTrade.tbDealId, "INFO");
                                             DateTime dtNow = DateTime.UtcNow;
                                             tradeItem dbTrade = matchTrade; // await this.GetTradeFromDB(tsm.DealId, this.strategy, this.resolution);
                                             dbTrade.candleSold = null;
@@ -5012,13 +5029,13 @@ namespace TradingBrain.Models
                                                     this.model.thisModel.closedGridLTrades.Add(matchTrade);
                                                     this.model.thisModel.gridLTrades.Remove(matchTrade);
 
-                                                    clsCommonFunctions.AddStatusMessage($"closedGridLTrades  = {this.model.thisModel.closedGridLTrades.Count} : gridLTrades = {this.model.thisModel.gridLTrades.Count} ", "DEBUG");
+                                                    CommonFunctions.AddStatusMessage($"closedGridLTrades  = {this.model.thisModel.closedGridLTrades.Count} : gridLTrades = {this.model.thisModel.gridLTrades.Count} ", "DEBUG");
 
                                                     if (this.model.thisModel.gridLTrades.Count == 0)
                                                     {
-                                                        clsCommonFunctions.AddStatusMessage($"closeAttemptCount going from {this.closeAttemptCount} to 0", "DEBUG");
+                                                        CommonFunctions.AddStatusMessage($"closeAttemptCount going from {this.closeAttemptCount} to 0", "DEBUG");
                                                         this.closeAttemptCount = 0;
-                                                        clsCommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(this.model.thisModel.closedGridLTrades), this.the_app_db);
+                                                        CommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(this.model.thisModel.closedGridLTrades), this.the_app_db);
                                                         //this.model.thisModel.closingGridLTrade = false;
                                                         this.model.thisModel.closedGridLTrades.Clear();
                                                         this.model.thisModel.currentGRIDLTrade = null;
@@ -5035,13 +5052,13 @@ namespace TradingBrain.Models
                                                     this.model.thisModel.closedGridSTrades.Add(matchTrade);
                                                     this.model.thisModel.gridSTrades.Remove(matchTrade);
 
-                                                    clsCommonFunctions.AddStatusMessage($"closedGridSTrades  = {this.model.thisModel.closedGridSTrades.Count} : gridSTrades = {this.model.thisModel.gridSTrades.Count} ", "DEBUG");
+                                                    CommonFunctions.AddStatusMessage($"closedGridSTrades  = {this.model.thisModel.closedGridSTrades.Count} : gridSTrades = {this.model.thisModel.gridSTrades.Count} ", "DEBUG");
 
                                                     if (this.model.thisModel.gridSTrades.Count == 0)
                                                     {
-                                                        clsCommonFunctions.AddStatusMessage($"closeAttemptCount going from {this.closeAttemptCount} to 0", "DEBUG");
+                                                        CommonFunctions.AddStatusMessage($"closeAttemptCount going from {this.closeAttemptCount} to 0", "DEBUG");
                                                         this.closeAttemptCount = 0;
-                                                        clsCommonFunctions.SendBroadcast("BuyShort", JsonConvert.SerializeObject(this.model.thisModel.closedGridSTrades), this.the_app_db);
+                                                        CommonFunctions.SendBroadcast("BuyShort", JsonConvert.SerializeObject(this.model.thisModel.closedGridSTrades), this.the_app_db);
                                                         //this.model.thisModel.closingGridSTrade = false;
                                                         this.model.thisModel.closedGridSTrades.Clear();
                                                         this.model.thisModel.currentGRIDSTrade = null;
@@ -5124,9 +5141,9 @@ namespace TradingBrain.Models
                                         {
                                             if (deleteTrade)
                                             {
-                                                clsCommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
-                                                clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, this.the_app_db);
-                                                clsCommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + thisTrade.dealId, "INFO");
+                                                CommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
+                                                CommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, this.the_app_db);
+                                                CommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + thisTrade.dealId, "INFO");
                                                 DateTime dtNow = DateTime.UtcNow;
                                                 await this.GetTradeFromDB(tsm.DealId, this.strategy, this.resolution);
 
@@ -5205,10 +5222,10 @@ namespace TradingBrain.Models
                                                 this.model.stopPriceOld = 0;// this.model.stopPrice;
 
                                                 thisModelTrade.tradeEnded = dtNow;
-                                                clsCommonFunctions.AddStatusMessage("tsm.Direction = " + tsm.Direction, "INFO");
+                                                CommonFunctions.AddStatusMessage("tsm.Direction = " + tsm.Direction, "INFO");
                                                 if (tsm.Direction == "BUY")
                                                 {
-                                                    clsCommonFunctions.AddStatusMessage("deleting buy", "INFO");
+                                                    CommonFunctions.AddStatusMessage("deleting buy", "INFO");
                                                     thisModelTrade.sellPrice = Convert.ToDecimal(thisTrade.level);
                                                     thisModelTrade.sellDate = dtNow;
                                                     thisModelTrade.tradeValue = (thisModelTrade.sellPrice - thisModelTrade.buyPrice) * (decimal)thisTrade.size;
@@ -5225,11 +5242,11 @@ namespace TradingBrain.Models
                                                         this.model.modelLogs.logs[0].tradePrice = thisModelTrade.sellPrice;
                                                         this.model.modelLogs.logs[0].tradeValue = (thisModelTrade.sellPrice - thisModelTrade.buyPrice) * (decimal)thisTrade.size;
                                                     }
-                                                    clsCommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(thisModelTrade), this.the_app_db);
+                                                    CommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(thisModelTrade), this.the_app_db);
                                                 }
                                                 else
                                                 {
-                                                    clsCommonFunctions.AddStatusMessage("deleting sell", "INFO");
+                                                    CommonFunctions.AddStatusMessage("deleting sell", "INFO");
                                                     thisModelTrade.buyPrice = Convert.ToDecimal(thisTrade.level);
                                                     thisModelTrade.purchaseDate = dtNow;
                                                     thisModelTrade.tradeValue = (thisModelTrade.sellPrice - thisModelTrade.buyPrice) * (decimal)thisTrade.size;
@@ -5243,7 +5260,7 @@ namespace TradingBrain.Models
                                                         this.model.modelLogs.logs[0].tradePrice = thisModelTrade.buyPrice;
                                                         this.model.modelLogs.logs[0].tradeValue = (thisModelTrade.sellPrice - thisModelTrade.buyPrice) * (decimal)thisTrade.size;
                                                     }
-                                                    clsCommonFunctions.SendBroadcast("BuyShort", JsonConvert.SerializeObject(thisModelTrade), this.the_app_db);
+                                                    CommonFunctions.SendBroadcast("BuyShort", JsonConvert.SerializeObject(thisModelTrade), this.the_app_db);
                                                 }
                                                 this.model.sellLong = false;
                                                 this.model.buyLong = false;
@@ -5260,11 +5277,11 @@ namespace TradingBrain.Models
                                                 this.lastTradeValue = (double)thisModelTrade.tradeValue;
 
                                                 //check if the last trade lost and was at max quantity. If so then we need to do a reset 
-                                                clsCommonFunctions.AddStatusMessage($"Check if reset required - quantity = {thisModelTrade.quantity}, maxQuantity = {this.model.modelVar.maxQuantity}, tradeValue = {thisModelTrade.tradeValue}", "DEBUG");
+                                                CommonFunctions.AddStatusMessage($"Check if reset required - quantity = {thisModelTrade.quantity}, maxQuantity = {this.model.modelVar.maxQuantity}, tradeValue = {thisModelTrade.tradeValue}", "DEBUG");
                                                 if ((thisModelTrade.quantity + 1) >= this.model.modelVar.maxQuantity && thisModelTrade.tradeValue < 0)
                                                 {
                                                     this.lastTradeMaxQuantity = true;
-                                                    clsCommonFunctions.AddStatusMessage($"Do reset next run - lastTradeMaxQuantity = {this.lastTradeMaxQuantity}", "DEBUG");
+                                                    CommonFunctions.AddStatusMessage($"Do reset next run - lastTradeMaxQuantity = {this.lastTradeMaxQuantity}", "DEBUG");
                                                 }
                                                 //if (this.model.thisModel.currentTrade.tradeValue <= 0)
                                                 //{
@@ -5299,9 +5316,9 @@ namespace TradingBrain.Models
 
                                                 // Save the last run vars into the TB settings table
                                                 //Figure out any CFL so we can update the able.
-                                                clsCommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {this.tb.lastRunVars.carriedForwardLoss}, original currentGain = {this.tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                                CommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {this.tb.lastRunVars.carriedForwardLoss}, original currentGain = {this.tb.lastRunVars.currentGain}", "DEBUG", logName);
                                                 double nettPosition = lastTradeValue + lastTradeSuppValue;
-                                                clsCommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
+                                                CommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
 
                                                 if (nettPosition <= 0)
                                                 {
@@ -5311,7 +5328,7 @@ namespace TradingBrain.Models
                                                 else
                                                 {
                                                     double newGain = Math.Max(nettPosition - model.modelVar.carriedForwardLoss, 0);
-                                                    clsCommonFunctions.AddStatusMessage($"newGain  Max({nettPosition} - {model.modelVar.carriedForwardLoss} , 0 ) =  {newGain}", "DEBUG", logName);
+                                                    CommonFunctions.AddStatusMessage($"newGain  Max({nettPosition} - {model.modelVar.carriedForwardLoss} , 0 ) =  {newGain}", "DEBUG", logName);
                                                     model.modelVar.carriedForwardLoss = Math.Max(model.modelVar.carriedForwardLoss - (double)Math.Abs(nettPosition), 0);
 
                                                     if (model.modelVar.carriedForwardLoss < 0) { model.modelVar.carriedForwardLoss = 0; }
@@ -5320,8 +5337,8 @@ namespace TradingBrain.Models
 
                                                     if (model.modelVar.quantityMultiplier == 1 && model.modelVar.carriedForwardLoss == 0) { model.modelVar.quantityMultiplier = 2; }
                                                 }
-                                                clsCommonFunctions.AddStatusMessage($"new CarriedForwardLoss  = {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
-                                                clsCommonFunctions.AddStatusMessage($"new currentGain  = {model.modelVar.currentGain}", "DEBUG", logName);
+                                                CommonFunctions.AddStatusMessage($"new CarriedForwardLoss  = {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                                                CommonFunctions.AddStatusMessage($"new currentGain  = {model.modelVar.currentGain}", "DEBUG", logName);
 
                                                 tb.lastRunVars.carriedForwardLoss = model.modelVar.carriedForwardLoss;
                                                 tb.lastRunVars.currentGain = model.modelVar.currentGain;
@@ -5331,9 +5348,9 @@ namespace TradingBrain.Models
                                                 this.tb.lastRunVars = this.model.modelVar.DeepCopy();
                                                 this.tb.SaveDocument(this.the_app_db);
 
-                                                clsCommonFunctions.AddStatusMessage("Saving trade", "INFO");
+                                                CommonFunctions.AddStatusMessage("Saving trade", "INFO");
                                                 thisModelTrade.SaveDocument(this.trade_container);
-                                                clsCommonFunctions.AddStatusMessage("Trade saved", "INFO");
+                                                CommonFunctions.AddStatusMessage("Trade saved", "INFO");
 
 
                                                 await tradeSubUpdate.Add(this.the_app_db);
@@ -5626,8 +5643,8 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage("DELETED failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], "ERROR");
-                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], this.the_app_db);
+                                CommonFunctions.AddStatusMessage("DELETED failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], "ERROR");
+                                TradingBrain.Models.CommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], this.the_app_db);
                                 await tradeSubUpdate.Add(this.the_app_db);
                             }
                             //tradeSubUpdate.Add(this.the_app_db);
@@ -5659,12 +5676,12 @@ namespace TradingBrain.Models
                                     osDealRef = this.newDealReference;
                                     accountId = this._igContainer.creds.igAccountId;
                                 }
-                                clsCommonFunctions.AddStatusMessage($"Processing OPEN trade update for DealRef: {tsm.DealReference}, saved deal ref = {osDealRef}", "INFO");
+                                CommonFunctions.AddStatusMessage($"Processing OPEN trade update for DealRef: {tsm.DealReference}, saved deal ref = {osDealRef}", "INFO");
                                 // Check the deal id with the deal reference from the Place Deal call to ensure we are dealing with the correct trade
                                 if (tsm.DealReference == osDealRef || this.strategy == "GRID" && osDealRef == "")
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
-                                    clsCommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, this.the_app_db);
+                                    CommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
+                                    CommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, this.the_app_db);
                                     this.newDealReference = "";
 
                                     //Not on market so this must be a new current trade
@@ -5751,7 +5768,7 @@ namespace TradingBrain.Models
                                             this.model.modelLogs.logs[0].quantity = thisModelTrade.quantity;
                                             this.model.modelLogs.logs[0].tradePrice = thisModelTrade.buyPrice;
                                         }
-                                        clsCommonFunctions.SendBroadcast("BuyLong", JsonConvert.SerializeObject(thisModelTrade), this.the_app_db);
+                                        CommonFunctions.SendBroadcast("BuyLong", JsonConvert.SerializeObject(thisModelTrade), this.the_app_db);
                                     }
                                     else
                                     {
@@ -5770,7 +5787,7 @@ namespace TradingBrain.Models
                                             this.model.modelLogs.logs[0].quantity = thisModelTrade.quantity;
                                             this.model.modelLogs.logs[0].tradePrice = thisModelTrade.sellPrice;
                                         }
-                                        clsCommonFunctions.SendBroadcast("SellShort", JsonConvert.SerializeObject(thisModelTrade), this.the_app_db);
+                                        CommonFunctions.SendBroadcast("SellShort", JsonConvert.SerializeObject(thisModelTrade), this.the_app_db);
                                     }
                                     this.model.onMarket = true;
 
@@ -5842,24 +5859,24 @@ namespace TradingBrain.Models
                                             this.currentGRIDLTrade = thisTrade.DeepCopy();
                                             this.model.thisModel.currentGRIDLTrade = thisModelTrade.DeepCopy();
                                             this.model.thisModel.gridLTrades.Add(thisModelTrade.DeepCopy());
-                                            clsCommonFunctions.AddStatusMessage($"Current long trade set in model - DealID: {this.model.thisModel.currentGRIDLTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDLTrade.tbDealReference}", "INFO", logName);
-                                            clsCommonFunctions.AddStatusMessage($"Current long trade set in local - DealID: {this.currentGRIDLTrade.dealId}, DealRef: {this.currentGRIDLTrade.dealReference}", "INFO", logName);
+                                            CommonFunctions.AddStatusMessage($"Current long trade set in model - DealID: {this.model.thisModel.currentGRIDLTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDLTrade.tbDealReference}", "INFO", logName);
+                                            CommonFunctions.AddStatusMessage($"Current long trade set in local - DealID: {this.currentGRIDLTrade.dealId}, DealRef: {this.currentGRIDLTrade.dealReference}", "INFO", logName);
                                         }
                                         else
                                         {
                                             this.currentGRIDSTrade = thisTrade.DeepCopy();
                                             this.model.thisModel.currentGRIDSTrade = thisModelTrade.DeepCopy();
                                             this.model.thisModel.gridSTrades.Add(thisModelTrade.DeepCopy());
-                                            clsCommonFunctions.AddStatusMessage($"Current short trade set in model - DealID: {this.model.thisModel.currentGRIDSTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDSTrade.tbDealReference}", "INFO", logName);
-                                            clsCommonFunctions.AddStatusMessage($"Current short trade set in local - DealID: {this.currentGRIDSTrade.dealId}, DealRef: {this.currentGRIDSTrade.dealReference}", "INFO", logName);
+                                            CommonFunctions.AddStatusMessage($"Current short trade set in model - DealID: {this.model.thisModel.currentGRIDSTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDSTrade.tbDealReference}", "INFO", logName);
+                                            CommonFunctions.AddStatusMessage($"Current short trade set in local - DealID: {this.currentGRIDSTrade.dealId}, DealRef: {this.currentGRIDSTrade.dealReference}", "INFO", logName);
                                         }
                                     }
                                     else
                                     {
                                         this.currentTrade = thisTrade.DeepCopy();
                                         this.model.thisModel.currentTrade = thisModelTrade.DeepCopy();
-                                        clsCommonFunctions.AddStatusMessage($"Current trade set in model - DealID: {this.model.thisModel.currentTrade.tbDealId}, DealRef: {this.model.thisModel.currentTrade.tbDealReference}", "INFO", logName);
-                                        clsCommonFunctions.AddStatusMessage($"Current trade set in local - DealID: {this.currentTrade.dealId}, DealRef: {this.currentTrade.dealReference}", "INFO", logName);
+                                        CommonFunctions.AddStatusMessage($"Current trade set in model - DealID: {this.model.thisModel.currentTrade.tbDealId}, DealRef: {this.model.thisModel.currentTrade.tbDealReference}", "INFO", logName);
+                                        CommonFunctions.AddStatusMessage($"Current trade set in local - DealID: {this.currentTrade.dealId}, DealRef: {this.currentTrade.dealReference}", "INFO", logName);
                                     }
                                     //}
 
@@ -5904,14 +5921,14 @@ namespace TradingBrain.Models
                                 }
                                 else
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"Unable to process trade update for DealRef: {tsm.DealReference}, saved deal ref = {osDealRef}", "INFO");
+                                    CommonFunctions.AddStatusMessage($"Unable to process trade update for DealRef: {tsm.DealReference}, saved deal ref = {osDealRef}", "INFO");
                                 }
                                 //}
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage("OPEN failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], "ERROR");
-                                TradingBrain.Models.clsCommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], this.the_app_db);
+                                CommonFunctions.AddStatusMessage("OPEN failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], "ERROR");
+                                TradingBrain.Models.CommonFunctions.SaveLog("Error", "UpdateTs", "DELETED failed - " + tsm.Reason + " - " + this.TradeErrors[tsm.Reason], this.the_app_db);
                                 await tradeSubUpdate.Add(this.the_app_db);
                             }
                             //tradeSubUpdate.Add(this.the_app_db);
@@ -5921,7 +5938,7 @@ namespace TradingBrain.Models
             }
             catch (Exception ex)
             {
-                clsCommonFunctions.AddStatusMessage("Error in ConfirmUpdate: " + ex.ToString(), "ERROR");
+                CommonFunctions.AddStatusMessage("Error in ConfirmUpdate: " + ex.ToString(), "ERROR");
             }
         }
 
@@ -5983,7 +6000,7 @@ namespace TradingBrain.Models
 
                         //if (reqTrade != null)
                         //{
-                        clsCommonFunctions.AddStatusMessage($"CONFIRM - deal reference = {tsm.DealReference},   deal status = {tsm.Status}");
+                        CommonFunctions.AddStatusMessage($"CONFIRM - deal reference = {tsm.DealReference},   deal status = {tsm.Status}");
 
                         await tradeSubUpdate.Add(this.the_app_db);
 
@@ -6017,7 +6034,7 @@ namespace TradingBrain.Models
                             if (tsm.Status == "OPEN" && tsm.Reason == "SUCCESS")
                             {
                                 // trade/order opened successfully
-                                clsCommonFunctions.AddStatusMessage($"CONFIRM - successful", "INFO");
+                                CommonFunctions.AddStatusMessage($"CONFIRM - successful", "INFO");
                             }
 
                             //if (reqTrade.dealType == "ORDER" && reqTrade.dealStatus == "REJECTED")
@@ -6043,10 +6060,10 @@ namespace TradingBrain.Models
                             if (tsm.Status == null && tsm.Reason != "SUCCESS")
                             {
                                 // trade/order not successful (could be update or open or delete)
-                                clsCommonFunctions.AddStatusMessage($"CONFIRM - failed - - {tsm.Reason} - {this.TradeErrors[tsm.Reason]}", "INFO");
+                                CommonFunctions.AddStatusMessage($"CONFIRM - failed - - {tsm.Reason} - {this.TradeErrors[tsm.Reason]}", "INFO");
 
 
-                                    clsCommonFunctions.AddStatusMessage($"CONFIRM - Resetting values due to  failure", "INFO");
+                                    CommonFunctions.AddStatusMessage($"CONFIRM - Resetting values due to  failure", "INFO");
                                     this.model.sellShort = false;
                                     this.model.sellLong = false;
                                     this.model.buyShort = false;
@@ -6133,15 +6150,15 @@ namespace TradingBrain.Models
                     string param = "";
 
                     //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Running code");
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
-                    clsCommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
 
                     //var watch = new System.Diagnostics.Stopwatch();
                     //var bigWatch = new System.Diagnostics.Stopwatch();
@@ -6151,9 +6168,9 @@ namespace TradingBrain.Models
                         //watch.Start();
 
 
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
 
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
 
                         // If the trade has just been deleted then sort out the CFL
@@ -6162,9 +6179,9 @@ namespace TradingBrain.Models
                         {
                             try
                             {
-                                clsCommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                                 double nettPosition = lastTradeValue + lastTradeSuppValue;
-                                clsCommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
 
                                 if (nettPosition <= 0)
                                 {
@@ -6202,12 +6219,12 @@ namespace TradingBrain.Models
                                 //}
                                 //await tb.SaveDocument(the_app_db);
 
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -6227,10 +6244,10 @@ namespace TradingBrain.Models
                         //tb.lastRunVars.doShortsVar = tb.doShorts;
                         //tb.lastRunVars.doSuppTradesVar = tb.doSuppTrades;
 
-                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
 
                         model.thisModel.inputs_RSI = this.tb.runDetails.inputs_RSI.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -6265,11 +6282,11 @@ namespace TradingBrain.Models
                         /////////////////////////////////////////////////////////
                         double thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution,epicName);
                         //double thisSpread = Math.Round(Math.Abs((double)currentTick.Offer - (double)currentTick.Bid), 1);
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
                         thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadRSIv2(tb.runDetails.inputs_RSI, thisSpread);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
@@ -6297,7 +6314,7 @@ namespace TradingBrain.Models
                             //modelInstanceInputs_RSI thisInput = clsCommonFunctions.GetInputsFromSpread_RSI(thisModel.inputs_RSI, thisCandle);
 
                             //Console.WriteLine(DateTime.Now.ToString("G") + "Getting rsi quotes from DB.......");
-                            clsCommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
+                            CommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
                             List<modQuote> rsiQuotes = new List<modQuote>();
                             //DateTime startTime = DateTime.MinValue;
                             List<modQuote> indCandles = await RSI_LoadPrices.GetPriceData(the_db, epicName, resolution, resMod, _startTime, _endTime,strategy, true);
@@ -6350,40 +6367,40 @@ namespace TradingBrain.Models
                             {
 
 
-                                clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
+                                CommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
 
                                 //model.RunProTrendCodeV2(model.candles);
                                 model.RunProTrendCodeRSIV1(model.quotes);
 
-                                clsCommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
                                 //clsCommonFunctions.AddStatusMessage($"values after  run ctd... - doSuppTrades={model.doSuppTrades}, onSuppTrade={model.onSuppTrade}", "DEBUG");
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
 
-                                clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
 
-                                if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
-                                if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+                                if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                                if (this.suppTrade != null) { CommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
 
                                 //model.sellShort = true;
 
                                 if (param != "DEBUG")
                                 {
 
-                                    string thisDealRef = "";
+                                    //string thisDealRef = "";
                                     //string dealType = "";
                                     //bool dealSent = false;
                                     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -6400,13 +6417,13 @@ namespace TradingBrain.Models
                                         newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
                                         currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.quotes.currentCandle.closePrice.ask);
 
-                                        clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                        clsCommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
 
 
                                         if (currentStop < newStop && currentPrice < newStop && currentPrice > currentStop)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
                                             model.sellLong = true;
                                         }
 
@@ -6416,34 +6433,34 @@ namespace TradingBrain.Models
 
                                     if (model.buyLong && this.currentTrade == null)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                        CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                         model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
                                         requestedTrade reqTrade = new requestedTrade();
                                         reqTrade.dealType = "POSITION";
                                         reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, model.stopLossVar, this.igAccountId, thisInput.profitTarget);
                                         requestedTrades.Add(reqTrade);
-                                        if (reqTrade.dealReference != "")
-                                        {
-                                            //dealSent = true;
-                                            thisDealRef = reqTrade.dealReference;
-                                            //dealType = "PlaceDeal";
-                                        }
+                                        //if (reqTrade.dealReference != "")
+                                        //{
+                                        //    //dealSent = true;
+                                        //    thisDealRef = reqTrade.dealReference;
+                                        //    //dealType = "PlaceDeal";
+                                        //}
                                     }
                                     else
                                     {
                                         if (model.sellLong)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                            clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO");
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                            CommonFunctions.AddStatusMessage("SellLong activated", "INFO");
                                             string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                            if (dealRef != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = dealRef;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (dealRef != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = dealRef;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
                                         }
                                     }
 
@@ -6551,8 +6568,8 @@ namespace TradingBrain.Models
                                     //currentStatus.epicName = this.epicName;
                                     //send log to the website
                                     model.modelLogs.logs[0].epicName = this.epicName;
-                                    Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                    Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                    Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                    Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                     //save log to the database
                                     Container logContainer = the_app_db.GetContainer("ModelLogs");
                                     await log.SaveDocument(logContainer);
@@ -6568,7 +6585,7 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
+                                CommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
                             }
                         }
                         _startTime = _startTime.AddMinutes(1);
@@ -6590,31 +6607,31 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage("Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
 
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
             if (latestHour != DateTime.UtcNow.Hour)
             {
-                clsCommonFunctions.AddStatusMessage("Hour has changed so call the AccountDetails API to ensure token doesn't expire", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Hour has changed so call the AccountDetails API to ensure token doesn't expire", "INFO", logName);
                 try
                 {
                     IgResponse<dto.endpoint.accountbalance.AccountDetailsResponse> ret = await _igContainer.igRestApiClient.accountBalance();
                     if (ret != null)
                     {
-                        clsCommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO", logName);
+                        CommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO", logName);
                     }
                     latestHour = DateTime.UtcNow.Hour;
                 }
@@ -6690,21 +6707,21 @@ namespace TradingBrain.Models
                     _igContainer.tbClient.FirstConfirmUpdate = false;
                     string param = "";
 
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
-                    clsCommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
 
                     try
                     {
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
 
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
                         // If the trade has just been deleted then sort out the CFL
 
@@ -6712,9 +6729,9 @@ namespace TradingBrain.Models
                         {
                             try
                             {
-                                clsCommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                                 double nettPosition = lastTradeValue + lastTradeSuppValue;
-                                clsCommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
 
                                 if (nettPosition <= 0)
                                 {
@@ -6731,12 +6748,12 @@ namespace TradingBrain.Models
                                 tb.lastRunVars.currentGain = model.modelVar.currentGain;
                                 tb.lastRunVars.numCandlesOnMarket = 0;
 
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -6751,10 +6768,10 @@ namespace TradingBrain.Models
                         model.doSuppTrades = tb.doSuppTrades;
                         model.nightingaleOn = true;
 
-                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
 
                         model.thisModel.inputs_RSI = this.tb.runDetails.inputs_RSI.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -6789,11 +6806,11 @@ namespace TradingBrain.Models
                         /////////////////////////////////////////////////////////
                         double thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution,epicName);
                         //double thisSpread = Math.Round(Math.Abs((double)currentTick.Offer - (double)currentTick.Bid), 1);
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
                         thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadRSIv2(tb.runDetails.inputs_RSI, thisSpread);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
@@ -6816,7 +6833,7 @@ namespace TradingBrain.Models
                             RSI_LoadPrices obj = new RSI_LoadPrices();
                             model.quotes.currentCandle = obj.LoadPrices(the_db, minute_container, epicName, resolution, _endTime, createMinRecord, _igContainer.igRestApiClient);
 
-                            clsCommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
+                            CommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
                             List<modQuote> rsiQuotes = new List<modQuote>();
 
                             List<modQuote> indCandles = await RSI_LoadPrices.GetPriceData(the_db, epicName, resolution, resMod, _startTime, _endTime, strategy, true);
@@ -6846,38 +6863,38 @@ namespace TradingBrain.Models
                             {
 
 
-                                clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
+                                CommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
                                 // run the actual code 
                                 model.RunProTrendCodeRSIATR(model.quotes);
 
-                                clsCommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
-                                clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
+                                CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
 
-                                if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
-                                if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+                                if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                                if (this.suppTrade != null) { CommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
 
                                 //model.sellShort = true;
 
                                 if (param != "DEBUG")
                                 {
 
-                                    string thisDealRef = "";
+                                    //string thisDealRef = "";
                                     //string dealType = "";
                                     //bool dealSent = false;
 
@@ -6895,13 +6912,13 @@ namespace TradingBrain.Models
                                         newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
                                         currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.quotes.currentCandle.closePrice.ask);
 
-                                        clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                        clsCommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
 
 
                                         if (currentStop < newStop && currentPrice < newStop && currentPrice > currentStop)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
                                             model.sellLong = true;
                                         }
 
@@ -6911,8 +6928,8 @@ namespace TradingBrain.Models
 
                                     if (model.buyLong && this.currentTrade == null)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                        CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                         model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
                                         requestedTrade reqTrade = new requestedTrade();
@@ -6920,27 +6937,27 @@ namespace TradingBrain.Models
                                         reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, model.stopLossVar, this.igAccountId, thisInput.profitTarget);
                                         requestedTrades.Add(reqTrade);
 
-                                        if (reqTrade.dealReference != "")
-                                        {
-                                            //dealSent = true;
-                                            thisDealRef = reqTrade.dealReference;
-                                            //dealType = "PlaceDeal";
-                                        }
+                                        //if (reqTrade.dealReference != "")
+                                        //{
+                                        //    //dealSent = true;
+                                        //    thisDealRef = reqTrade.dealReference;
+                                        //    //dealType = "PlaceDeal";
+                                        //}
                                     }
                                     else
                                     {
                                         if (model.sellLong)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                            clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO");
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                            CommonFunctions.AddStatusMessage("SellLong activated", "INFO");
                                             //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                             string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                            if (dealRef != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = dealRef;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (dealRef != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = dealRef;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
 
                                         }
                                     }
@@ -7049,8 +7066,8 @@ namespace TradingBrain.Models
                                     //currentStatus.epicName = this.epicName;
                                     //send log to the website
                                     model.modelLogs.logs[0].epicName = this.epicName;
-                                    Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                    Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                    Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                    Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                     //save log to the database
                                     Container logContainer = the_app_db.GetContainer("ModelLogs");
                                     await log.SaveDocument(logContainer);
@@ -7066,7 +7083,7 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
+                                CommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
                             }
                         }
                         _startTime = _startTime.AddMinutes(1);
@@ -7088,31 +7105,31 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage("Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
 
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
             if (latestHour != DateTime.UtcNow.Hour)
             {
-                clsCommonFunctions.AddStatusMessage("Hour has changed so call the AccountDetails API to ensure token doesn't expire", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Hour has changed so call the AccountDetails API to ensure token doesn't expire", "INFO", logName);
                 try
                 {
                     IgResponse<dto.endpoint.accountbalance.AccountDetailsResponse> ret = await _igContainer.igRestApiClient.accountBalance();
                     if (ret != null)
                     {
-                        clsCommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO", logName);
+                        CommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO", logName);
                     }
                     latestHour = DateTime.UtcNow.Hour;
                 }
@@ -7188,21 +7205,21 @@ namespace TradingBrain.Models
                     _igContainer.tbClient.FirstConfirmUpdate = false;
                     string param = "";
 
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
-                    clsCommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
 
                     try
                     {
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
 
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
                         // If the trade has just been deleted then sort out the CFL
 
@@ -7210,9 +7227,9 @@ namespace TradingBrain.Models
                         {
                             try
                             {
-                                clsCommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                                 double nettPosition = lastTradeValue + lastTradeSuppValue;
-                                clsCommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
 
                                 if (nettPosition <= 0)
                                 {
@@ -7232,12 +7249,12 @@ namespace TradingBrain.Models
                                 tb.lastRunVars.numCandlesOnMarket = 0;
                                 tb.lastRunVars.quantityMultiplier = model.modelVar.quantityMultiplier;
 
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -7254,10 +7271,10 @@ namespace TradingBrain.Models
                         // turn off nightingale
                         model.nightingaleOn = false;
 
-                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
 
                         model.thisModel.inputs_RSI = this.tb.runDetails.inputs_RSI.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -7296,11 +7313,11 @@ namespace TradingBrain.Models
                             thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
                         }
                         //double thisSpread = Math.Round(Math.Abs((double)currentTick.Offer - (double)currentTick.Bid), 1);
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
                         thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadRSIv2(tb.runDetails.inputs_RSI, thisSpread);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
@@ -7323,7 +7340,7 @@ namespace TradingBrain.Models
                             RSI_LoadPrices obj = new RSI_LoadPrices();
                             model.quotes.currentCandle = obj.LoadPrices(the_db, minute_container, epicName, resolution, _endTime, createMinRecord, _igContainer.igRestApiClient);
 
-                            clsCommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
+                            CommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
                             List<modQuote> rsiQuotes = new List<modQuote>();
 
                             List<modQuote> indCandles = await RSI_LoadPrices.GetPriceData(the_db, epicName, resolution, resMod, _startTime, _endTime, strategy, true);
@@ -7358,39 +7375,39 @@ namespace TradingBrain.Models
                             {
 
 
-                                clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
+                                CommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
                                 // run the actual code 
                                 model.RunProTrendCodeRSICUML(model.quotes);
 
-                                clsCommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
-                                clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
+                                CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
                                 //clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
                                 //clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
 
-                                if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
-                                if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+                                if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                                if (this.suppTrade != null) { CommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
 
                                 //model.sellShort = true;
 
                                 if (param != "DEBUG")
                                 {
 
-                                    string thisDealRef = "";
+                                    //string thisDealRef = "";
                                     //string dealType = "";
                                    // bool dealSent = false;
 
@@ -7408,13 +7425,13 @@ namespace TradingBrain.Models
                                         newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
                                         currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.quotes.currentCandle.closePrice.ask);
 
-                                        clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                        clsCommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
 
 
                                         if (currentStop < newStop && currentPrice < newStop && currentPrice > currentStop)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
                                             model.sellLong = true;
                                         }
 
@@ -7424,8 +7441,8 @@ namespace TradingBrain.Models
 
                                     if (model.buyLong && this.currentTrade == null)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                        CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                         model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
                                         requestedTrade reqTrade = new requestedTrade();
@@ -7433,27 +7450,27 @@ namespace TradingBrain.Models
                                         reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, model.stopLossVar, this.igAccountId, thisInput.profitTarget);
                                         requestedTrades.Add(reqTrade);
 
-                                        if (reqTrade.dealReference != "")
-                                        {
-                                            //dealSent = true;
-                                            thisDealRef = reqTrade.dealReference;
-                                           // dealType = "PlaceDeal";
-                                        }
+                                        //if (reqTrade.dealReference != "")
+                                        //{
+                                        //    //dealSent = true;
+                                        //    thisDealRef = reqTrade.dealReference;
+                                        //   // dealType = "PlaceDeal";
+                                        //}
                                     }
                                     else
                                     {
                                         if (model.sellLong)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                            clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO");
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                            CommonFunctions.AddStatusMessage("SellLong activated", "INFO");
                                             //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                             string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                            if (dealRef != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = dealRef;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (dealRef != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = dealRef;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
 
                                         }
                                     }
@@ -7562,8 +7579,8 @@ namespace TradingBrain.Models
                                     //currentStatus.epicName = this.epicName;
                                     //send log to the website
                                     model.modelLogs.logs[0].epicName = this.epicName;
-                                    Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                    Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                    Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                    Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                     //save log to the database
                                     Container logContainer = the_app_db.GetContainer("ModelLogs");
                                     await log.SaveDocument(logContainer);
@@ -7579,7 +7596,7 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
+                                CommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
                             }
                         }
                         _startTime = _startTime.AddMinutes(1);
@@ -7601,31 +7618,31 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage("Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
 
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
             if (latestHour != DateTime.UtcNow.Hour)
             {
-                clsCommonFunctions.AddStatusMessage("Hour has changed so call the AccountDetails API to ensure token doesn't expire", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Hour has changed so call the AccountDetails API to ensure token doesn't expire", "INFO", logName);
                 try
                 {
                     IgResponse<dto.endpoint.accountbalance.AccountDetailsResponse> ret = await _igContainer.igRestApiClient.accountBalance();
                     if (ret != null)
                     {
-                        clsCommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO", logName);
+                        CommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO", logName);
                     }
                     latestHour = DateTime.UtcNow.Hour;
                 }
@@ -7707,21 +7724,21 @@ namespace TradingBrain.Models
                     _igContainer.tbClient.FirstConfirmUpdate = false;
                     string param = "";
 
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
-                    clsCommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
 
                     try
                     {
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
 
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
                         // If the trade has just been deleted then sort out the CFL
 
@@ -7750,12 +7767,12 @@ namespace TradingBrain.Models
                                 //tb.lastRunVars.currentGain = model.modelVar.currentGain;
                                 tb.lastRunVars.numCandlesOnMarket = 0;
                                 tb.lastRunVars.quantityMultiplier = model.modelVar.quantityMultiplier;
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -7772,10 +7789,10 @@ namespace TradingBrain.Models
                         // turn on nightingale
                         model.nightingaleOn = true;
 
-                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
 
                         model.thisModel.inputs_RSI = this.tb.runDetails.inputs_RSI.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -7836,11 +7853,11 @@ namespace TradingBrain.Models
                             thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
                         }
                         //double thisSpread = Math.Round(Math.Abs((double)currentTick.Offer - (double)currentTick.Bid), 1);
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
                         thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadRSIv2(tb.runDetails.inputs_RSI, thisSpread);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
@@ -7863,7 +7880,7 @@ namespace TradingBrain.Models
                             RSI_LoadPrices obj = new RSI_LoadPrices();
                             model.quotes.currentCandle = obj.LoadPrices(the_db, minute_container, epicName, resolution, _endTime, createMinRecord, _igContainer.igRestApiClient);
 
-                            clsCommonFunctions.AddStatusMessage("Getting VWAP Quotes from DB", "INFO", logName);
+                            CommonFunctions.AddStatusMessage("Getting VWAP Quotes from DB", "INFO", logName);
                             List<modQuote> rsiQuotes = new List<modQuote>();
 
                             List<modQuote> indCandles = await RSI_LoadPrices.GetPriceDataVWAP(the_db, epicName, resolution, resMod, _startTime, _endTime, strategy, true);
@@ -7905,9 +7922,9 @@ namespace TradingBrain.Models
                                     trendFlag = 1;
                                 }
 
-                                clsCommonFunctions.AddStatusMessage($"rollingVWAP = {model.quotes.rollingVWAP}, stdDevVWAP = {model.quotes.stdDevVWAP}");
-                                clsCommonFunctions.AddStatusMessage($"avgClose = {model.quotes.avgClose}, prevAvgClose = {model.quotes.prevAvgClose}");
-                                clsCommonFunctions.AddStatusMessage($"trendFlag = {trendFlag} ");
+                                CommonFunctions.AddStatusMessage($"rollingVWAP = {model.quotes.rollingVWAP}, stdDevVWAP = {model.quotes.stdDevVWAP}");
+                                CommonFunctions.AddStatusMessage($"avgClose = {model.quotes.avgClose}, prevAvgClose = {model.quotes.prevAvgClose}");
+                                CommonFunctions.AddStatusMessage($"trendFlag = {trendFlag} ");
 
                                 //int idx = (indIndex) - thisInput.var7;
                                 //model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev(thisInput.var6).ToList()[idx]; //stdDevResults[idx];
@@ -7925,40 +7942,40 @@ namespace TradingBrain.Models
                                 {
 
 
-                                    clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
                                     //clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
                                     //clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow.Atr} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh.Atr}", "DEBUG", logName);
                                     //clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle.StdDev} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle.StdDev}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle.StdDev}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
                                     // run the actual code 
                                     model.RunProTrendCodeVWAP(model.quotes);
 
-                                    clsCommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
-                                    clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"WinningBetMultiple - {model.modelVar.winningBetMultiple}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxBetMultiple - {model.modelVar.maxBetMultiple}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
+                                    CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"WinningBetMultiple - {model.modelVar.winningBetMultiple}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxBetMultiple - {model.modelVar.maxBetMultiple}", "DEBUG", logName);
 
 
-                                    if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
-                                    if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+                                    if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                                    if (this.suppTrade != null) { CommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
 
                                     //model.sellShort = true;
 
                                     if (param != "DEBUG")
                                     {
 
-                                        string thisDealRef = "";
+                                        //string thisDealRef = "";
                                         //string dealType = "";
                                         //bool dealSent = false;
 
@@ -7976,13 +7993,13 @@ namespace TradingBrain.Models
                                             newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
                                             currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.quotes.currentCandle.closePrice.ask);
 
-                                            clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                            clsCommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
+                                            CommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                            CommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
 
 
                                             if (currentStop < newStop && currentPrice < newStop && currentPrice > currentStop)
                                             {
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
                                                 model.sellLong = true;
                                             }
 
@@ -7992,8 +8009,8 @@ namespace TradingBrain.Models
 
                                         if (model.buyLong && this.currentTrade == null)
                                         {
-                                            clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                            CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                             //model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
                                             model.stopLossVar = (double)model.quotes.currentCandle.closePrice.ask * (thisInput.stopLoss / 100);
                                             requestedTrade reqTrade = new requestedTrade();
@@ -8001,27 +8018,27 @@ namespace TradingBrain.Models
                                             reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, model.stopLossVar, this.igAccountId, (double)model.quotes.currentCandle.openPrice.ask * (thisInput.profitTarget / 100));
                                             requestedTrades.Add(reqTrade);
 
-                                            if (reqTrade.dealReference != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = reqTrade.dealReference;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (reqTrade.dealReference != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = reqTrade.dealReference;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
                                         }
                                         else
                                         {
                                             if (model.sellLong)
                                             {
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                                clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO");
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                                CommonFunctions.AddStatusMessage("SellLong activated", "INFO");
                                                 //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                                 string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                                if (dealRef != "")
-                                                {
-                                                    //dealSent = true;
-                                                    thisDealRef = dealRef;
-                                                    //dealType = "PlaceDeal";
-                                                }
+                                                //if (dealRef != "")
+                                                //{
+                                                //    //dealSent = true;
+                                                //    thisDealRef = dealRef;
+                                                //    //dealType = "PlaceDeal";
+                                                //}
 
                                             }
                                         }
@@ -8130,8 +8147,8 @@ namespace TradingBrain.Models
                                         //currentStatus.epicName = this.epicName;
                                         //send log to the website
                                         model.modelLogs.logs[0].epicName = this.epicName;
-                                        Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                        Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                        Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                        Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                         //save log to the database
                                         Container logContainer = the_app_db.GetContainer("ModelLogs");
                                         await log.SaveDocument(logContainer);
@@ -8143,7 +8160,7 @@ namespace TradingBrain.Models
                                     // save the run details to ensure all picked up
                                     tb.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
 
-                                    TradingBrainSettings newTB = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                                    TradingBrainSettings newTB = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
                                     newTB.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
                                     await newTB.SaveDocument(the_app_db);
 
@@ -8151,12 +8168,12 @@ namespace TradingBrain.Models
                                 }
                                 else
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
+                                    CommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
                                 }
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage($"No candle found for {_startTime}. ", "INFO");
+                                CommonFunctions.AddStatusMessage($"No candle found for {_startTime}. ", "INFO");
                             }
                         }
                         _startTime = _startTime.AddMinutes(1);
@@ -8179,19 +8196,19 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage("Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
 
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
@@ -8294,21 +8311,21 @@ namespace TradingBrain.Models
                     _igContainer.tbClient.FirstConfirmUpdate = false;
                     string param = "";
 
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
-                    clsCommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
 
                     try
                     {
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
 
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
                         // If the trade has just been deleted then sort out the CFL
 
@@ -8337,12 +8354,12 @@ namespace TradingBrain.Models
                                 //tb.lastRunVars.currentGain = model.modelVar.currentGain;
                                 tb.lastRunVars.numCandlesOnMarket = 0;
                                 tb.lastRunVars.quantityMultiplier = model.modelVar.quantityMultiplier;
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -8359,10 +8376,10 @@ namespace TradingBrain.Models
                         // turn on nightingale
                         model.nightingaleOn = true;
 
-                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
 
                         model.thisModel.inputs_RSI = this.tb.runDetails.inputs_RSI.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -8424,11 +8441,11 @@ namespace TradingBrain.Models
                              thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
                         }
                         //double thisSpread = Math.Round(Math.Abs((double)currentTick.Offer - (double)currentTick.Bid), 1);
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
                         thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadRSIv2(tb.runDetails.inputs_RSI, thisSpread);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
@@ -8451,7 +8468,7 @@ namespace TradingBrain.Models
                             RSI_LoadPrices obj = new RSI_LoadPrices();
                             model.quotes.currentCandle = obj.LoadPrices(the_db, minute_container, epicName, resolution, _endTime, createMinRecord, _igContainer.igRestApiClient);
 
-                            clsCommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
+                            CommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
                             List<modQuote> rsiQuotes = new List<modQuote>();
 
                             List<modQuote> indCandles = await RSI_LoadPrices.GetPriceDataCASEYC(the_db, epicName, resolution, resMod, _startTime, _endTime, strategy, true);
@@ -8504,52 +8521,52 @@ namespace TradingBrain.Models
                                 {
 
 
-                                    clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
+                                    CommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
                                     // clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}, modelQuotes.prevStdDevCandleShort {model.quotes.prevStdDevCandleShort}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.caseyC = {model.quotes.caseyC}, modelQuotes.caseyCExit = {model.quotes.caseyCExit}");
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.caseyCShort = {model.quotes.caseyCShort}, modelQuotes.caseyCExitShort = {model.quotes.caseyCExitShort}");
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.ema:{model.quotes.ema} modelQuotes.prevEma:{model.quotes.prevEma}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
+                                    CommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}, modelQuotes.prevStdDevCandleShort {model.quotes.prevStdDevCandleShort}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"modelQuotes.caseyC = {model.quotes.caseyC}, modelQuotes.caseyCExit = {model.quotes.caseyCExit}");
+                                    CommonFunctions.AddStatusMessage($"modelQuotes.caseyCShort = {model.quotes.caseyCShort}, modelQuotes.caseyCExitShort = {model.quotes.caseyCExitShort}");
+                                    CommonFunctions.AddStatusMessage($"modelQuotes.ema:{model.quotes.ema} modelQuotes.prevEma:{model.quotes.prevEma}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
                                     // run the actual code 
                                     model.RunProTrendCodeCASEYC(model.quotes);
 
 
-                                    clsCommonFunctions.AddStatusMessage($"values after run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
-                                    clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"values after run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
+                                    CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
                                     //clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
                                     //clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"WinningBetMultiple - {model.modelVar.winningBetMultiple}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxBetMultiple - {model.modelVar.maxBetMultiple}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"calcAvgWinningTrade - {model.modelVar.calcAvgWinningTrade}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"seedAvgWinningTrade - {model.modelVar.seedAvgWinningTrade}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"WinningBetMultiple - {model.modelVar.winningBetMultiple}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxBetMultiple - {model.modelVar.maxBetMultiple}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"calcAvgWinningTrade - {model.modelVar.calcAvgWinningTrade}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"seedAvgWinningTrade - {model.modelVar.seedAvgWinningTrade}", "DEBUG", logName);
 
 
-                                    if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
-                                    if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+                                    if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                                    if (this.suppTrade != null) { CommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
 
                                     //model.sellShort = true;
 
                                     if (param != "DEBUG")
                                     {
 
-                                        string thisDealRef = "";
+                                        //string thisDealRef = "";
                                         //string dealType = "";
                                         //bool dealSent = false;
 
@@ -8567,7 +8584,7 @@ namespace TradingBrain.Models
 
                                         if (model.buyLong && this.currentTrade == null)
                                         {
-                                            clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                            CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
                                             //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                             //model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
@@ -8576,27 +8593,27 @@ namespace TradingBrain.Models
                                             reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, 0, this.igAccountId, 0);
                                             requestedTrades.Add(reqTrade);
 
-                                            if (reqTrade.dealReference != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = reqTrade.dealReference;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (reqTrade.dealReference != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = reqTrade.dealReference;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
                                         }
                                         else
                                         {
                                             if (model.sellLong)
                                             {
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                                clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO");
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                                CommonFunctions.AddStatusMessage("SellLong activated", "INFO");
                                                 //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                                 string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                                if (dealRef != "")
-                                                {
-                                                    //dealSent = true;
-                                                    thisDealRef = dealRef;
-                                                    //dealType = "PlaceDeal";
-                                                }
+                                                //if (dealRef != "")
+                                                //{
+                                                //    //dealSent = true;
+                                                //    thisDealRef = dealRef;
+                                                //    //dealType = "PlaceDeal";
+                                                //}
 
                                             }
                                         }
@@ -8605,7 +8622,7 @@ namespace TradingBrain.Models
 
                                         if (model.sellShort && this.currentTrade == null)
                                         {
-                                            clsCommonFunctions.AddStatusMessage("sellShort activated", "INFO", logName);
+                                            CommonFunctions.AddStatusMessage("sellShort activated", "INFO", logName);
                                             //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                             //model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
@@ -8614,27 +8631,27 @@ namespace TradingBrain.Models
                                             reqTrade.dealReference = await PlaceDeal("short", model.modelVar.quantity, 0, this.igAccountId, 0);
                                             requestedTrades.Add(reqTrade);
 
-                                            if (reqTrade.dealReference != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = reqTrade.dealReference;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (reqTrade.dealReference != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = reqTrade.dealReference;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
                                         }
                                         else
                                         {
                                             if (model.buyShort)
                                             {
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                                clsCommonFunctions.AddStatusMessage("buyShort activated", "INFO");
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                                CommonFunctions.AddStatusMessage("buyShort activated", "INFO");
                                                 //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                                 string dealRef = await CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                                if (dealRef != "")
-                                                {
-                                                    //dealSent = true;
-                                                    thisDealRef = dealRef;
-                                                    //dealType = "PlaceDeal";
-                                                }
+                                                //if (dealRef != "")
+                                                //{
+                                                //    //dealSent = true;
+                                                //    thisDealRef = dealRef;
+                                                //    //dealType = "PlaceDeal";
+                                                //}
 
                                             }
                                         }
@@ -8655,7 +8672,7 @@ namespace TradingBrain.Models
                                     }
                                     catch (Exception ex)
                                     {
-                                        clsCommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
+                                        CommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
                                         Log log = new Log(the_app_db);
                                         log.Log_Message = ex.ToString();
                                         log.Log_Type = "Error";
@@ -8718,8 +8735,8 @@ namespace TradingBrain.Models
                                         //currentStatus.epicName = this.epicName;
                                         //send log to the website
                                         model.modelLogs.logs[0].epicName = this.epicName;
-                                        Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                        Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                        Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                        Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                         //save log to the database
                                         Container logContainer = the_app_db.GetContainer("ModelLogs");
                                         await log.SaveDocument(logContainer);
@@ -8731,7 +8748,7 @@ namespace TradingBrain.Models
                                     // save the run details to ensure all picked up
                                     tb.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
 
-                                    TradingBrainSettings newTB = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                                    TradingBrainSettings newTB = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
                                     newTB.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
                                     newTB.lastRunVars.calcAvgWinningTrade = modelVar.calcAvgWinningTrade;
                                     await newTB.SaveDocument(the_app_db);
@@ -8740,12 +8757,12 @@ namespace TradingBrain.Models
                                 }
                                 else
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
+                                    CommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
                                 }
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage($"No candle found for {_startTime}. ","INFO");
+                                CommonFunctions.AddStatusMessage($"No candle found for {_startTime}. ","INFO");
                             }
                         }
                         _startTime = _startTime.AddMinutes(1);
@@ -8758,7 +8775,7 @@ namespace TradingBrain.Models
                     }
                     catch (Exception ex)
                     {
-                        clsCommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
+                        CommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
                         Log log = new Log(the_app_db);
                         log.Log_Message = ex.ToString();
                         log.Log_Type = "Error";
@@ -8769,19 +8786,19 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage("Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
 
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
@@ -8884,21 +8901,21 @@ namespace TradingBrain.Models
                     _igContainer.tbClient.FirstConfirmUpdate = false;
                     string param = "";
 
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
-                    clsCommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
 
                     try
                     {
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
 
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
                         // If the trade has just been deleted then sort out the CFL
 
@@ -8927,12 +8944,12 @@ namespace TradingBrain.Models
                                 //tb.lastRunVars.currentGain = model.modelVar.currentGain;
                                 tb.lastRunVars.numCandlesOnMarket = 0;
                                 tb.lastRunVars.quantityMultiplier = model.modelVar.quantityMultiplier;
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -8949,10 +8966,10 @@ namespace TradingBrain.Models
                         // turn on nightingale
                         model.nightingaleOn = true;
 
-                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
 
                         model.thisModel.inputs_RSI = this.tb.runDetails.inputs_RSI.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -9015,11 +9032,11 @@ namespace TradingBrain.Models
                             thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
                         }
                         //double thisSpread = Math.Round(Math.Abs((double)currentTick.Offer - (double)currentTick.Bid), 1);
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
                         thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadRSIv2(tb.runDetails.inputs_RSI, thisSpread);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
@@ -9046,15 +9063,15 @@ namespace TradingBrain.Models
 
                             if (dbPrice != null || dbPrice.endDate == _endTime)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Current candles taken from DB using end date {_endTime} : ", "INFO", logName);
+                                CommonFunctions.AddStatusMessage($"Current candles taken from DB using end date {_endTime} : ", "INFO", logName);
                                 model.quotes.currentCandle = dbPrice;
                             }
                             else {
-                                clsCommonFunctions.AddStatusMessage("Getting current candles from API", "INFO", logName);
+                                CommonFunctions.AddStatusMessage("Getting current candles from API", "INFO", logName);
                                 model.quotes.currentCandle = obj.LoadPrices(the_db, minute_container, epicName, resolution, _endTime, createMinRecord, _igContainer.igRestApiClient);
                             }
 
-                            clsCommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
+                            CommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
                             List<modQuote> rsiQuotes = new List<modQuote>();
 
                             List<modQuote> indCandles = await RSI_LoadPrices.GetPriceDataCASEYC(the_db, epicName, resolution, resMod, _startTime, _endTime, strategy, true);
@@ -9151,27 +9168,27 @@ namespace TradingBrain.Models
                                 {
 
 
-                                    clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
+                                    CommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
 
 
 
-                                    clsCommonFunctions.AddStatusMessage($"atrCandleLow:...........{model.quotes.atrCandleLow}");
-                                    clsCommonFunctions.AddStatusMessage($"atrCandleHigh:..........{model.quotes.atrCandleHigh}");
-                                    clsCommonFunctions.AddStatusMessage($"atrCandleLowShort:......{model.quotes.atrCandleLowShort}");
-                                    clsCommonFunctions.AddStatusMessage($"atrCandleHighShort:.....{model.quotes.atrCandleHighShort}");
-                                    clsCommonFunctions.AddStatusMessage($"caseyC:.................{model.quotes.caseyC}");
-                                    clsCommonFunctions.AddStatusMessage($"caseyCExit:.............{model.quotes.caseyCExit}");
-                                    clsCommonFunctions.AddStatusMessage($"caseyCShort:............{model.quotes.caseyCShort}");
-                                    clsCommonFunctions.AddStatusMessage($"caseyCExitShort:........{model.quotes.caseyCExitShort}");
-                                    clsCommonFunctions.AddStatusMessage($"sma:....................{model.quotes.sma}");
-                                    clsCommonFunctions.AddStatusMessage($"prevSma:................{model.quotes.prevSma}");
-                                    clsCommonFunctions.AddStatusMessage($"stdDevCandle:...........{model.quotes.stdDevCandle}");
-                                    clsCommonFunctions.AddStatusMessage($"stdDevLongCandle:.......{model.quotes.stdDevLongCandle}");
-                                    clsCommonFunctions.AddStatusMessage($"stdDevCandleShort:......{model.quotes.stdDevCandleShort}");
-                                    clsCommonFunctions.AddStatusMessage($"prevStdDevCandle:.......{model.quotes.prevStdDevCandle}");
-                                    clsCommonFunctions.AddStatusMessage($"prevStdDevCandleShort:..{model.quotes.prevStdDevCandleShort}");
+                                    CommonFunctions.AddStatusMessage($"atrCandleLow:...........{model.quotes.atrCandleLow}");
+                                    CommonFunctions.AddStatusMessage($"atrCandleHigh:..........{model.quotes.atrCandleHigh}");
+                                    CommonFunctions.AddStatusMessage($"atrCandleLowShort:......{model.quotes.atrCandleLowShort}");
+                                    CommonFunctions.AddStatusMessage($"atrCandleHighShort:.....{model.quotes.atrCandleHighShort}");
+                                    CommonFunctions.AddStatusMessage($"caseyC:.................{model.quotes.caseyC}");
+                                    CommonFunctions.AddStatusMessage($"caseyCExit:.............{model.quotes.caseyCExit}");
+                                    CommonFunctions.AddStatusMessage($"caseyCShort:............{model.quotes.caseyCShort}");
+                                    CommonFunctions.AddStatusMessage($"caseyCExitShort:........{model.quotes.caseyCExitShort}");
+                                    CommonFunctions.AddStatusMessage($"sma:....................{model.quotes.sma}");
+                                    CommonFunctions.AddStatusMessage($"prevSma:................{model.quotes.prevSma}");
+                                    CommonFunctions.AddStatusMessage($"stdDevCandle:...........{model.quotes.stdDevCandle}");
+                                    CommonFunctions.AddStatusMessage($"stdDevLongCandle:.......{model.quotes.stdDevLongCandle}");
+                                    CommonFunctions.AddStatusMessage($"stdDevCandleShort:......{model.quotes.stdDevCandleShort}");
+                                    CommonFunctions.AddStatusMessage($"prevStdDevCandle:.......{model.quotes.prevStdDevCandle}");
+                                    CommonFunctions.AddStatusMessage($"prevStdDevCandleShort:..{model.quotes.prevStdDevCandleShort}");
 
 
                                     // clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow.Rsi} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh.Rsi}", "DEBUG", logName);
@@ -9180,43 +9197,43 @@ namespace TradingBrain.Models
                                     //clsCommonFunctions.AddStatusMessage($"modelQuotes.caseyC = {model.quotes.caseyC}, modelQuotes.caseyCExit = {model.quotes.caseyCExit}");
                                     //clsCommonFunctions.AddStatusMessage($"modelQuotes.caseyCShort = {model.quotes.caseyCShort}, modelQuotes.caseyCExitShort = {model.quotes.caseyCExitShort}");
                                     //clsCommonFunctions.AddStatusMessage($"modelQuotes.ema:{model.quotes.ema} modelQuotes.prevEma:{model.quotes.prevEma}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
                                     // run the actual code 
                                     model.RunProTrendCodeCASEYCv2(model.quotes);
 
 
-                                    clsCommonFunctions.AddStatusMessage($"values after run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
-                                    clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"values after run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"           buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnmarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"           onMarket={model.onMarket}");
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
+                                    CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
                                     //clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
                                     //clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"WinningBetMultiple - {model.modelVar.winningBetMultiple}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxBetMultiple - {model.modelVar.maxBetMultiple}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"calcAvgWinningTrade - {model.modelVar.calcAvgWinningTrade}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"seedAvgWinningTrade - {model.modelVar.seedAvgWinningTrade}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"WinningBetMultiple - {model.modelVar.winningBetMultiple}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxBetMultiple - {model.modelVar.maxBetMultiple}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"calcAvgWinningTrade - {model.modelVar.calcAvgWinningTrade}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"seedAvgWinningTrade - {model.modelVar.seedAvgWinningTrade}", "DEBUG", logName);
 
 
-                                    if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
-                                    if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+                                    if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                                    if (this.suppTrade != null) { CommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
 
                                     //model.sellShort = true;
 
                                     if (param != "DEBUG")
                                     {
 
-                                        string thisDealRef = "";
+                                        //string thisDealRef = "";
                                         //string dealType = "";
                                         //bool dealSent = false;
 
@@ -9234,7 +9251,7 @@ namespace TradingBrain.Models
 
                                         if (model.buyLong && this.currentTrade == null)
                                         {
-                                            clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                            CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
                                             //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                             //model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
@@ -9243,27 +9260,27 @@ namespace TradingBrain.Models
                                             reqTrade.dealReference = await PlaceDeal("long", model.modelVar.quantity, 0, this.igAccountId, 0);
                                             requestedTrades.Add(reqTrade);
 
-                                            if (reqTrade.dealReference != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = reqTrade.dealReference;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (reqTrade.dealReference != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = reqTrade.dealReference;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
                                         }
                                         else
                                         {
                                             if (model.sellLong)
                                             {
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                                clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO");
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                                CommonFunctions.AddStatusMessage("SellLong activated", "INFO");
                                                 //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                                 string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                                if (dealRef != "")
-                                                {
-                                                    //dealSent = true;
-                                                    thisDealRef = dealRef;
-                                                    //dealType = "PlaceDeal";
-                                                }
+                                                //if (dealRef != "")
+                                                //{
+                                                //    //dealSent = true;
+                                                //    thisDealRef = dealRef;
+                                                //    //dealType = "PlaceDeal";
+                                                //}
 
                                             }
                                         }
@@ -9272,7 +9289,7 @@ namespace TradingBrain.Models
 
                                         if (model.sellShort && this.currentTrade == null)
                                         {
-                                            clsCommonFunctions.AddStatusMessage("sellShort activated", "INFO", logName);
+                                            CommonFunctions.AddStatusMessage("sellShort activated", "INFO", logName);
                                             //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                             //model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
@@ -9281,27 +9298,27 @@ namespace TradingBrain.Models
                                             reqTrade.dealReference = await PlaceDeal("short", model.modelVar.quantity, 0, this.igAccountId, 0);
                                             requestedTrades.Add(reqTrade);
 
-                                            if (reqTrade.dealReference != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = reqTrade.dealReference;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (reqTrade.dealReference != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = reqTrade.dealReference;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
                                         }
                                         else
                                         {
                                             if (model.buyShort)
                                             {
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                                clsCommonFunctions.AddStatusMessage("buyShort activated", "INFO");
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                                CommonFunctions.AddStatusMessage("buyShort activated", "INFO");
                                                 //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                                 string dealRef = await CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                                if (dealRef != "")
-                                                {
-                                                    //dealSent = true;
-                                                    thisDealRef = dealRef;
-                                                    //dealType = "PlaceDeal";
-                                                }
+                                                //if (dealRef != "")
+                                                //{
+                                                //    //dealSent = true;
+                                                //    thisDealRef = dealRef;
+                                                //    //dealType = "PlaceDeal";
+                                                //}
 
                                             }
                                         }
@@ -9322,7 +9339,7 @@ namespace TradingBrain.Models
                                     }
                                     catch (Exception ex)
                                     {
-                                        clsCommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
+                                        CommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
                                         Log log = new Log(the_app_db);
                                         log.Log_Message = ex.ToString();
                                         log.Log_Type = "Error";
@@ -9385,8 +9402,8 @@ namespace TradingBrain.Models
                                         //currentStatus.epicName = this.epicName;
                                         //send log to the website
                                         model.modelLogs.logs[0].epicName = this.epicName;
-                                        Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                        Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                        Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                        Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                         //save log to the database
                                         Container logContainer = the_app_db.GetContainer("ModelLogs");
                                         await log.SaveDocument(logContainer);
@@ -9398,7 +9415,7 @@ namespace TradingBrain.Models
                                     // save the run details to ensure all picked up
                                     tb.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
 
-                                    TradingBrainSettings newTB = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                                    TradingBrainSettings newTB = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
                                     newTB.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
                                     newTB.lastRunVars.calcAvgWinningTrade = modelVar.calcAvgWinningTrade;
                                     await newTB.SaveDocument(the_app_db);
@@ -9412,7 +9429,7 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage($"No candle found for {_startTime}. ", "INFO");
+                                CommonFunctions.AddStatusMessage($"No candle found for {_startTime}. ", "INFO");
                             }
                         }
                         _startTime = _startTime.AddMinutes(1);
@@ -9425,7 +9442,7 @@ namespace TradingBrain.Models
                     }
                     catch (Exception ex)
                     {
-                        clsCommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
+                        CommonFunctions.AddStatusMessage(ex.ToString(), "ERROR");
                         Log log = new Log(the_app_db);
                         log.Log_Message = ex.ToString();
                         log.Log_Type = "Error";
@@ -9436,19 +9453,19 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage("Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
 
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
@@ -9551,21 +9568,21 @@ namespace TradingBrain.Models
                     _igContainer.tbClient.FirstConfirmUpdate = false;
                     string param = "";
 
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
-                    clsCommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
 
                     try
                     {
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
 
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
                         // If the trade has just been deleted then sort out the CFL
 
@@ -9594,12 +9611,12 @@ namespace TradingBrain.Models
                                 //tb.lastRunVars.currentGain = model.modelVar.currentGain;
                                 tb.lastRunVars.numCandlesOnMarket = 0;
                                 tb.lastRunVars.quantityMultiplier = model.modelVar.quantityMultiplier;
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -9616,10 +9633,10 @@ namespace TradingBrain.Models
                         // turn off nightingale
                         model.nightingaleOn = false;
 
-                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
 
                         model.thisModel.inputs_RSI = this.tb.runDetails.inputs_RSI.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -9672,11 +9689,11 @@ namespace TradingBrain.Models
                             thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
                         }
                         //double thisSpread = Math.Round(Math.Abs((double)currentTick.Offer - (double)currentTick.Bid), 1);
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
                         thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadRSIv2(tb.runDetails.inputs_RSI, thisSpread);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
@@ -9699,7 +9716,7 @@ namespace TradingBrain.Models
                             RSI_LoadPrices obj = new RSI_LoadPrices();
                             model.quotes.currentCandle = obj.LoadPrices(the_db, minute_container, epicName, resolution, _endTime, createMinRecord, _igContainer.igRestApiClient);
 
-                            clsCommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
+                            CommonFunctions.AddStatusMessage("Getting RSI Quotes from DB", "INFO", logName);
                             List<modQuote> rsiQuotes = new List<modQuote>();
 
                             List<modQuote> indCandles = await RSI_LoadPrices.GetPriceDataCASEYC(the_db, epicName, resolution, resMod, _startTime, _endTime, strategy, true);
@@ -9725,7 +9742,7 @@ namespace TradingBrain.Models
                                 model.quotes.caseyCExit = (double)indCandles.GetRange(indIndex + 1 - (int)thisInput.var3, (int)thisInput.var3).Average(s => s.cRank[(int)thisInput.var0 - 1].cRank);
                                 //model.quotes.caseyCAverage = await RSI_LoadPrices.GetCASEYCAverageClose(the_db, epicName, resolution, resMod,200,  _endTime);
 
-                                clsCommonFunctions.AddStatusMessage($"caseyC = {model.quotes.caseyC}, caseyCExit = {model.quotes.caseyCExit}, caseyAverage = {model.quotes.caseyCAverage}");
+                                CommonFunctions.AddStatusMessage($"caseyC = {model.quotes.caseyC}, caseyCExit = {model.quotes.caseyCExit}, caseyAverage = {model.quotes.caseyCAverage}");
 
                                 int idx = (indIndex) - (int)thisInput.var7;
                                 model.quotes.prevStdDevCandle = indCandles.Take(indIndex + 1).GetStdDev((int)thisInput.var6).ToList()[idx].StdDev ?? 0; //stdDevResults[idx];
@@ -9743,39 +9760,39 @@ namespace TradingBrain.Models
                                 {
 
 
-                                    clsCommonFunctions.AddStatusMessage($"values before run         - buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
+                                    CommonFunctions.AddStatusMessage($"values before run         - buyShort={model.buyShort},  sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"modelQuotes.rsiCandleLow:{model.quotes.rsiCandleLow} modelQuotes.rsiCandleHigh:{model.quotes.rsiCandleHigh}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"modelQuotes.atrCandleLow:{model.quotes.atrCandleLow} modelQuotes.atrCandleHigh:{model.quotes.atrCandleHigh}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
                                     // run the actual code 
                                     model.RunProTrendCodeCASEYCSHORT(model.quotes);
 
-                                    clsCommonFunctions.AddStatusMessage($"values after  run        - buyShort={model.buyShort}, sellShort={model.sellShort},  shortOnMarket={model.shortOnMarket},  onMarket={model.onMarket}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
-                                    clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"values after  run        - buyShort={model.buyShort}, sellShort={model.sellShort},  shortOnMarket={model.shortOnMarket},  onMarket={model.onMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
+                                    CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"quantityMultiplier - {model.modelVar.quantityMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
                                     //clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
                                     //clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
-                                    clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
 
-                                    if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
-                                    if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+                                    if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                                    if (this.suppTrade != null) { CommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
 
                                     //model.sellShort = true;
 
                                     if (param != "DEBUG")
                                     {
 
-                                        string thisDealRef = "";
+                                        //string thisDealRef = "";
                                        // string dealType = "";
                                        // bool dealSent = false;
 
@@ -9793,13 +9810,13 @@ namespace TradingBrain.Models
                                             newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
                                             currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.quotes.currentCandle.closePrice.ask);
 
-                                            clsCommonFunctions.AddStatusMessage($"[SHORT] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                            clsCommonFunctions.AddStatusMessage($"[SHORT] Current stop > newStop = {currentStop > newStop},  currentPrice > newStop = {currentPrice > newStop}, currentPrice < currentStop {currentPrice < currentStop}  ", "DEBUG", logName);
+                                            CommonFunctions.AddStatusMessage($"[SHORT] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                            CommonFunctions.AddStatusMessage($"[SHORT] Current stop > newStop = {currentStop > newStop},  currentPrice > newStop = {currentPrice > newStop}, currentPrice < currentStop {currentPrice < currentStop}  ", "DEBUG", logName);
 
 
                                             if (currentStop > newStop && currentPrice > newStop && currentPrice < currentStop)
                                             {
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Selling short because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now higher than the new stop.", the_app_db);
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Selling short because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now higher than the new stop.", the_app_db);
                                                 model.buyShort = true;
                                             }
 
@@ -9809,8 +9826,8 @@ namespace TradingBrain.Models
 
                                         if (model.sellShort && this.currentTrade == null)
                                         {
-                                            clsCommonFunctions.AddStatusMessage("sellShort activated", "INFO", logName);
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellShort", the_app_db);
+                                            CommonFunctions.AddStatusMessage("sellShort activated", "INFO", logName);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellShort", the_app_db);
                                             model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
                                             requestedTrade reqTrade = new requestedTrade();
@@ -9818,27 +9835,27 @@ namespace TradingBrain.Models
                                             reqTrade.dealReference = await PlaceDeal("short", model.modelVar.quantity, model.stopLossVar, this.igAccountId, thisInput.profitTarget);
                                             requestedTrades.Add(reqTrade);
 
-                                            if (reqTrade.dealReference != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = reqTrade.dealReference;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (reqTrade.dealReference != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = reqTrade.dealReference;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
                                         }
                                         else
                                         {
                                             if (model.buyShort)
                                             {
-                                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "buyShort", the_app_db);
-                                                clsCommonFunctions.AddStatusMessage("buyShort activated", "INFO");
+                                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "buyShort", the_app_db);
+                                                CommonFunctions.AddStatusMessage("buyShort activated", "INFO");
                                                 //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                                 string dealRef = await CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                                if (dealRef != "")
-                                                {
-                                                    //dealSent = true;
-                                                    thisDealRef = dealRef;
-                                                    //dealType = "PlaceDeal";
-                                                }
+                                                //if (dealRef != "")
+                                                //{
+                                                //    //dealSent = true;
+                                                //    thisDealRef = dealRef;
+                                                //    //dealType = "PlaceDeal";
+                                                //}
 
                                             }
                                         }
@@ -9923,8 +9940,8 @@ namespace TradingBrain.Models
                                         //currentStatus.epicName = this.epicName;
                                         //send log to the website
                                         model.modelLogs.logs[0].epicName = this.epicName;
-                                        Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                        Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                        Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                        Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                         //save log to the database
                                         Container logContainer = the_app_db.GetContainer("ModelLogs");
                                         await log.SaveDocument(logContainer);
@@ -9936,7 +9953,7 @@ namespace TradingBrain.Models
                                     // save the run details to ensure all picked up
                                     tb.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
 
-                                    TradingBrainSettings newTB = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                                    TradingBrainSettings newTB = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
                                     newTB.lastRunVars.numCandlesOnMarket = modelVar.numCandlesOnMarket;
                                     await newTB.SaveDocument(the_app_db);
 
@@ -9944,12 +9961,12 @@ namespace TradingBrain.Models
                                 }
                                 else
                                 {
-                                    clsCommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
+                                    CommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
                                 }
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage($"No candle found for {_startTime}. ", "INFO");
+                                CommonFunctions.AddStatusMessage($"No candle found for {_startTime}. ", "INFO");
                             }
                         }
                         _startTime = _startTime.AddMinutes(1);
@@ -9972,19 +9989,19 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage("Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
 
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
@@ -10089,15 +10106,15 @@ namespace TradingBrain.Models
                     string param = "";
 
                     //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Running code");
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
-                    clsCommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Run Started ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Strategy   :- " + this.strategy, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Resolution :- " + this.resolution, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Account ID :- " + this.igAccountId, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" - Epic       :- " + this.epicName, "INFO", logName);
+                    CommonFunctions.AddStatusMessage(" ------------------", "INFO", logName);
+                    CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
+                    CommonFunctions.AddStatusMessage($"resMod = {resMod}", "DEBUG", logName);
 
                     //var watch = new System.Diagnostics.Stopwatch();
                     //var bigWatch = new System.Diagnostics.Stopwatch();
@@ -10107,9 +10124,9 @@ namespace TradingBrain.Models
                         //watch.Start();
 
 
-                        this.tb = await clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
 
-                        clsCommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
 
                         // If the trade has just been deleted then sort out the CFL
@@ -10118,9 +10135,9 @@ namespace TradingBrain.Models
                         {
                             try
                             {
-                                clsCommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"original carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, original currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                                 double nettPosition = lastTradeValue + lastTradeSuppValue;
-                                clsCommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"lastTradeValue  = {lastTradeValue}, lastTradeSuppValue = {lastTradeSuppValue}, nett position = {nettPosition}", "DEBUG", logName);
 
                                 if (nettPosition <= 0)
                                 {
@@ -10158,12 +10175,12 @@ namespace TradingBrain.Models
                                 //}
                                 //await tb.SaveDocument(the_app_db);
 
-                                clsCommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"new carriedForwardLoss  = {tb.lastRunVars.carriedForwardLoss}, new currentGain = {tb.lastRunVars.currentGain}", "DEBUG", logName);
                             }
 
                             catch (Exception ex)
                             {
-                                clsCommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage($"Sorting new CFL failed - {ex.ToString()}", "ERROR", logName);
                             }
 
                             lastTradeDeleted = false;
@@ -10183,10 +10200,10 @@ namespace TradingBrain.Models
                         //tb.lastRunVars.doShortsVar = tb.doShorts;
                         //tb.lastRunVars.doSuppTradesVar = tb.doSuppTrades;
 
-                        clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
-                        clsCommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
+                        CommonFunctions.AddStatusMessage($"nightingaleOn= {model.nightingaleOn}", "DEBUG", logName);
 
                         model.thisModel.inputs_REI = this.tb.runDetails.inputs_REI.DeepCopy();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -10227,11 +10244,11 @@ namespace TradingBrain.Models
                             thisSpread = await Get_SpreadFromLastCandleRSI(the_db, minute_container, _endTime, resolution, epicName);
                         }
 
-                        clsCommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
+                        CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO");
                         thisInput = IGModels.clsCommonFunctions.GetInputsFromSpreadREI(tb.runDetails.inputs_REI, thisSpread);
                         if (thisInput == null)
                         {
-                            clsCommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
+                            CommonFunctions.AddStatusMessage($"No inputs found for spread = {thisSpread}", "ERROR", logName);
                         }
                         else
                         {
@@ -10259,7 +10276,7 @@ namespace TradingBrain.Models
                             //modelInstanceInputs_RSI thisInput = clsCommonFunctions.GetInputsFromSpread_RSI(thisModel.inputs_RSI, thisCandle);
 
                             //Console.WriteLine(DateTime.Now.ToString("G") + "Getting rsi quotes from DB.......");
-                            clsCommonFunctions.AddStatusMessage("Getting REI Quotes from DB", "INFO", logName);
+                            CommonFunctions.AddStatusMessage("Getting REI Quotes from DB", "INFO", logName);
                             List<modQuote> rsiQuotes = new List<modQuote>();
                             //DateTime startTime = DateTime.MinValue;
                             List<modQuote> indCandles = await RSI_LoadPrices.GetPriceData(the_db, epicName, resolution, resMod, _startTime, _endTime,strategy, true);
@@ -10310,40 +10327,40 @@ namespace TradingBrain.Models
                             {
 
 
-                                clsCommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.rei:{model.quotes.rei} ", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
+                                CommonFunctions.AddStatusMessage($"values before run         - buyLong={model.buyLong},  sellLong={model.sellLong}, longOnmarket={model.longOnmarket},   onMarket={model.onMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"modelQuotes.rei:{model.quotes.rei} ", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"modelQuotes.stdDevCandle:{model.quotes.stdDevCandle} modelQuotes.stdDevLongCandle:{model.quotes.stdDevLongCandle}  modelQuotes.prevStdDevCandle {model.quotes.prevStdDevCandle}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {model.modelVar.numCandlesOnMarket}", "INFO");
 
 
                                 //model.RunProTrendCodeV2(model.candles);
                                 model.RunProTrendCodeREI(model.quotes);
 
-                                clsCommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"values after  run        - buyLong={model.buyLong}, sellLong={model.sellLong},  longOnmarket={model.longOnmarket},  onMarket={model.onMarket}", "DEBUG", logName);
                                 //clsCommonFunctions.AddStatusMessage($"values after  run ctd... - doSuppTrades={model.doSuppTrades}, onSuppTrade={model.onSuppTrade}", "DEBUG");
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket: {modelVar.numCandlesOnMarket}", "INFO");
 
-                                clsCommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
-                                clsCommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"Model vars - ", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"baseQuantity - {model.modelVar.baseQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"startingQuantity - {model.modelVar.startingQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"currentGain - {model.modelVar.currentGain}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"gainMultiplier - {model.modelVar.gainMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"maxQuantityMultiplier - {model.modelVar.maxQuantityMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"maxQuantity - {model.modelVar.maxQuantity}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"carriedForwardloss - {model.modelVar.carriedForwardLoss}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"suppQuantityMultiplier - {model.modelVar.suppQuantityMultiplier}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"suppStopPercentage - {model.modelVar.suppStopPercentage}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"numCandlesOnMarket - {model.modelVar.numCandlesOnMarket}", "DEBUG", logName);
 
-                                if (this.currentTrade != null) { clsCommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
-                                if (this.suppTrade != null) { clsCommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
+                                if (this.currentTrade != null) { CommonFunctions.AddStatusMessage(" current dealid = " + this.currentTrade.dealId, "INFO", logName); }
+                                if (this.suppTrade != null) { CommonFunctions.AddStatusMessage(" current supp dealid = " + this.suppTrade.dealId, "INFO", logName); }
 
                                 //model.sellShort = true;
 
                                 if (param != "DEBUG")
                                 {
 
-                                    string thisDealRef = "";
+                                    //string thisDealRef = "";
                                     //string dealType = "";
                                     //bool dealSent = false;
 
@@ -10361,13 +10378,13 @@ namespace TradingBrain.Models
                                         newStop = IGModels.clsCommonFunctions.Dbl2DP((double)this.currentTrade.stopLevel);
                                         currentPrice = IGModels.clsCommonFunctions.Dbl2DP((double)model.quotes.currentCandle.closePrice.ask);
 
-                                        clsCommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
-                                        clsCommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage($"[LONG] Current stop {currentStop} - newStop  {newStop} - CurrentPrice {currentPrice}  ", "DEBUG", logName);
+                                        CommonFunctions.AddStatusMessage($"[LONG] Current stop < newStop = {currentStop < newStop},  currentPrice < newStop = {currentPrice < newStop}, currentPrice > currentStop {currentPrice > currentStop}  ", "DEBUG", logName);
 
 
                                         if (currentStop < newStop && currentPrice < newStop && currentPrice > currentStop)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "Selling long because the original stop price : " + currentStop + " has changed to : " + newStop + " and the current price : + " + currentPrice + " is now lower than the new stop.", the_app_db);
                                             model.sellLong = true;
                                         }
 
@@ -10377,8 +10394,8 @@ namespace TradingBrain.Models
 
                                     if (model.buyLong && this.currentTrade == null)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
-                                        TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
+                                        CommonFunctions.AddStatusMessage("BuyLong activated", "INFO", logName);
+                                        TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyLong", the_app_db);
                                         model.stopLossVar = thisInput.stopLoss;// (double)thisInput.var4 * Math.Abs((double)targetVar * (double)model.candles.currentCandle.mATypicalLongTypical - (double)model.candles.currentCandle.mATypicalLongTypical);
 
                                         requestedTrade reqTrade = new requestedTrade();
@@ -10387,27 +10404,27 @@ namespace TradingBrain.Models
                                         requestedTrades.Add(reqTrade);
 
 
-                                        if (reqTrade.dealReference != "")
-                                        {
-                                            //dealSent = true;
-                                            thisDealRef = reqTrade.dealReference;
-                                            //dealType = "PlaceDeal";
-                                        }
+                                        //if (reqTrade.dealReference != "")
+                                        //{
+                                        //    //dealSent = true;
+                                        //    thisDealRef = reqTrade.dealReference;
+                                        //    //dealType = "PlaceDeal";
+                                        //}
                                     }
                                     else
                                     {
                                         if (model.sellLong)
                                         {
-                                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
-                                            clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO");
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
+                                            CommonFunctions.AddStatusMessage("SellLong activated", "INFO");
                                             //CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId);
                                             string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
-                                            if (dealRef != "")
-                                            {
-                                                //dealSent = true;
-                                                thisDealRef = dealRef;
-                                                //dealType = "PlaceDeal";
-                                            }
+                                            //if (dealRef != "")
+                                            //{
+                                            //    //dealSent = true;
+                                            //    thisDealRef = dealRef;
+                                            //    //dealType = "PlaceDeal";
+                                            //}
 
                                         }
                                     }
@@ -10516,8 +10533,8 @@ namespace TradingBrain.Models
                                     //currentStatus.epicName = this.epicName;
                                     //send log to the website
                                     model.modelLogs.logs[0].epicName = this.epicName;
-                                    Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
-                                    Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                                    Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0]), the_app_db));
+                                    Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                                     //save log to the database
                                     Container logContainer = the_app_db.GetContainer("ModelLogs");
                                     await log.SaveDocument(logContainer);
@@ -10533,7 +10550,7 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
+                                CommonFunctions.AddStatusMessage($"Not doing trades for hour {currentHour}", "INFO", logName);
                             }
                         }
                         _startTime = _startTime.AddMinutes(1);
@@ -10555,31 +10572,31 @@ namespace TradingBrain.Models
 
                     //bigWatch.Stop();
                     //clsCommonFunctions.AddStatusMessage("Completed run - Time taken = " + bigWatch.ElapsedMilliseconds, "INFO", logName);
-                    clsCommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Completed run ", "INFO", logName);
 
                     // call the accounts api each hour just so we ensure the tokens don't expire
                     //clsCommonFunctions.AddStatusMessage($"Current hour - {DateTime.UtcNow.Hour}, Last hour = {latestHour}", "INFO") ;
                 }
                 else
                 {
-                    clsCommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
+                    CommonFunctions.AddStatusMessage("Trading not currently open", "INFO", logName);
                 }
             }
             else
             {
-                clsCommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Trading brain paused...", "INFO", logName);
                 pausedAfterNGL = false;
             }
 
             if (latestHour != DateTime.UtcNow.Hour)
             {
-                clsCommonFunctions.AddStatusMessage("Hour has changed so call the AccountDetails API to ensure token doesn't expire", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Hour has changed so call the AccountDetails API to ensure token doesn't expire", "INFO", logName);
                 try
                 {
                     IgResponse<dto.endpoint.accountbalance.AccountDetailsResponse> ret = await _igContainer.igRestApiClient.accountBalance();
                     if (ret != null)
                     {
-                        clsCommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO", logName);
+                        CommonFunctions.AddStatusMessage("AccountDetails response = " + ret.StatusCode.ToString(), "INFO", logName);
                     }
                     latestHour = DateTime.UtcNow.Hour;
                 }
@@ -10660,7 +10677,7 @@ namespace TradingBrain.Models
                 }
                
             }
-            clsCommonFunctions.AddStatusMessage("Starting messaging - TradingBrain-" + this.epicName + "-" + this.igAccountId + "-" + strat + resol, "INFO", logName);
+            CommonFunctions.AddStatusMessage("Starting messaging - TradingBrain-" + this.epicName + "-" + this.igAccountId + "-" + strat + resol, "INFO", logName);
             hubConnection = new HubConnectionBuilder()
                 .WithUrl(url, (HttpConnectionOptions options) => options.Headers.Add("userid", "TradingBrain-" + this.epicName + "-" + this.igAccountId + "-" + strat + resol))
                  .WithAutomaticReconnect()
@@ -10668,8 +10685,8 @@ namespace TradingBrain.Models
 
             hubConnection.Closed += async (error) =>
             {
-                clsCommonFunctions.AddStatusMessage("Messaging connection errored - " + error.ToString(), "ERROR", logName);
-                clsCommonFunctions.SaveLog("Error", "Message Connection", error.ToString(), this.the_app_db);
+                CommonFunctions.AddStatusMessage("Messaging connection errored - " + error.ToString(), "ERROR", logName);
+                CommonFunctions.SaveLog("Error", "Message Connection", error.ToString(), this.the_app_db);
                 await Task.Delay(new Random().Next(0, 5) * 1000);
                 await hubConnection.StartAsync();
             };
@@ -10686,17 +10703,17 @@ namespace TradingBrain.Models
                         PingMessage msg = new PingMessage();
                         msg.epicName = this.epicName;
 
-                        clsCommonFunctions.SendMessage(obj.messageValue, "Ping", JsonConvert.SerializeObject(msg), the_app_db);
+                        CommonFunctions.SendMessage(obj.messageValue, "Ping", JsonConvert.SerializeObject(msg), the_app_db);
                         break;
 
                     case "Status":
                         //AddStatusMessage($"status sent - {currentStatus.epicName}-{currentStatus.strategy}", "INFO");
-                        clsCommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus), the_app_db);
+                        CommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus), the_app_db);
                         break;
 
                     case "Pause":
                         //clsCommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus));
-                        clsCommonFunctions.AddStatusMessage("Pause request received", "INFO", logName);
+                        CommonFunctions.AddStatusMessage("Pause request received", "INFO", logName);
 
                         paused = true;
                         pausedAfterNGL = false;
@@ -10708,32 +10725,32 @@ namespace TradingBrain.Models
                         {
                             currentStatus.status = "paused";
                         }
-                        Task taskA = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                        Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                         break;
 
                     case "PauseAfterNGL":
-                        clsCommonFunctions.AddStatusMessage("PauseAfterNGL request received", "INFO", logName);
+                        CommonFunctions.AddStatusMessage("PauseAfterNGL request received", "INFO", logName);
                         // Pause TB once CFL = 0
                         paused = true;
                         pausedAfterNGL = true;
                         currentStatus.status = "deferred pause (after nightingale success)";
-                        Task taskB = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                        Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                         break;
 
                     case "Stop":
                         // Stop TB (pause) and close any open trades
-                        Task taskC = Task.Run(() => clsCommonFunctions.AddStatusMessage("Stop request received", "INFO", logName));
+                        Task taskC = Task.Run(() => CommonFunctions.AddStatusMessage("Stop request received", "INFO", logName));
                         paused = true;
                         pausedAfterNGL = false;
                         if (model.longOnmarket)
                         {
-                            TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong - Immediate stop activated", the_app_db);
-                            clsCommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
+                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong - Immediate stop activated", the_app_db);
+                            CommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
                             CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                             if (model.onSuppTrade)
                             {
-                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "SellLong supplementary- Immediate stop activated", the_app_db);
-                                clsCommonFunctions.AddStatusMessage("SellLong supplementary activated", "INFO", logName);
+                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong supplementary- Immediate stop activated", the_app_db);
+                                CommonFunctions.AddStatusMessage("SellLong supplementary activated", "INFO", logName);
                                 CloseDeal("long", (double)this.suppTrade.size, this.suppTrade.dealId, this.igAccountId);
                             }
                         }
@@ -10741,34 +10758,34 @@ namespace TradingBrain.Models
                         {
                             if (model.shortOnMarket)
                             {
-                                TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyShort - Immediate stop activated", the_app_db);
-                                clsCommonFunctions.AddStatusMessage("BuyShort activated", "INFO", logName);
+                                TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyShort - Immediate stop activated", the_app_db);
+                                CommonFunctions.AddStatusMessage("BuyShort activated", "INFO", logName);
                                 CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                 if (model.onSuppTrade)
                                 {
-                                    TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "RunCode", "BuyShort supplementary - Immediate stop activated", the_app_db);
-                                    clsCommonFunctions.AddStatusMessage("BuyShort supplementary activated", "INFO", logName);
+                                    TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyShort supplementary - Immediate stop activated", the_app_db);
+                                    CommonFunctions.AddStatusMessage("BuyShort supplementary activated", "INFO", logName);
                                     CloseDeal("short", (double)this.suppTrade.size, this.suppTrade.dealId, this.igAccountId);
                                 }
                             }
                         }
 
                         currentStatus.status = "paused";
-                        Task taskD= Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                        Task taskD= Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                         break;
 
                     case "Resume":
                         //clsCommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus));
-                        clsCommonFunctions.AddStatusMessage("Resume request received", "INFO", logName);
+                        CommonFunctions.AddStatusMessage("Resume request received", "INFO", logName);
                         paused = false;
                         pausedAfterNGL = false;
                         currentStatus.status = "running";
-                        Task taskE = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                        Task taskE = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
                         break;
 
                     case "ChangeQuantity":
                         //clsCommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus));
-                        clsCommonFunctions.AddStatusMessage("ChangeQuantity request received", "INFO", logName);
+                        CommonFunctions.AddStatusMessage("ChangeQuantity request received", "INFO", logName);
                         if (obj.messageValue != "")
                         {
                             ModelVarsChange? newVars = new ModelVarsChange();
@@ -10776,7 +10793,7 @@ namespace TradingBrain.Models
 
                             if (newVars.baseQuantity > 0)
                             {
-                                clsCommonFunctions.AddStatusMessage("New baseQuantity to use = " + newVars.baseQuantity, "INFO", logName);
+                                CommonFunctions.AddStatusMessage("New baseQuantity to use = " + newVars.baseQuantity, "INFO", logName);
                                 tb.lastRunVars.baseQuantity = newVars.baseQuantity;
                                 tb.lastRunVars.maxQuantity = newVars.baseQuantity * tb.lastRunVars.maxQuantityMultiplier;
                                 tb.lastRunVars.minQuantity = newVars.baseQuantity;
@@ -10788,24 +10805,24 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage("New baseQuantity is 0", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage("New baseQuantity is 0", "ERROR", logName);
                             }
 
                             if (newVars.maxQuantityMultiplier > 0)
                             {
-                                clsCommonFunctions.AddStatusMessage("New maxQuantityMultiplier to use = " + newVars.maxQuantityMultiplier, "INFO", logName);
+                                CommonFunctions.AddStatusMessage("New maxQuantityMultiplier to use = " + newVars.maxQuantityMultiplier, "INFO", logName);
                                 tb.lastRunVars.maxQuantityMultiplier = newVars.maxQuantityMultiplier;
                                 model.modelVar.maxQuantityMultiplier = newVars.maxQuantityMultiplier;
                                 currentStatus.maxQuantityMultiplier = newVars.maxQuantityMultiplier;
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage("New maxQuantityMultiplier is 0", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage("New maxQuantityMultiplier is 0", "ERROR", logName);
                             }
 
                             //if (newVars.carriedForwardLoss > 0)
                             //{
-                            clsCommonFunctions.AddStatusMessage("New carriedForwardLoss to use = " + newVars.carriedForwardLoss, "INFO", logName);
+                            CommonFunctions.AddStatusMessage("New carriedForwardLoss to use = " + newVars.carriedForwardLoss, "INFO", logName);
                             tb.lastRunVars.carriedForwardLoss = newVars.carriedForwardLoss;
                             model.modelVar.carriedForwardLoss = newVars.carriedForwardLoss;
                             currentStatus.carriedForwardLoss = newVars.carriedForwardLoss;
@@ -10817,7 +10834,7 @@ namespace TradingBrain.Models
 
                             //if (newVars.currentGain > 0)
                             //{
-                            clsCommonFunctions.AddStatusMessage("New currentGain to use = " + newVars.currentGain, "INFO", logName);
+                            CommonFunctions.AddStatusMessage("New currentGain to use = " + newVars.currentGain, "INFO", logName);
                             tb.lastRunVars.currentGain = newVars.currentGain;
                             model.modelVar.currentGain = newVars.currentGain;
                             currentStatus.currentGain = newVars.currentGain;
@@ -10829,17 +10846,17 @@ namespace TradingBrain.Models
 
                             if (newVars.gainMultiplier > 0)
                             {
-                                clsCommonFunctions.AddStatusMessage("New gainMultiplier to use = " + newVars.gainMultiplier, "INFO", logName);
+                                CommonFunctions.AddStatusMessage("New gainMultiplier to use = " + newVars.gainMultiplier, "INFO", logName);
                                 tb.lastRunVars.gainMultiplier = newVars.gainMultiplier;
                                 model.modelVar.gainMultiplier = newVars.gainMultiplier;
                                 currentStatus.gainMultiplier = newVars.gainMultiplier;
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage("New gainMultiplier is 0", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage("New gainMultiplier is 0", "ERROR", logName);
                             }
 
-                            clsCommonFunctions.AddStatusMessage("New seedAvgWinningTrade to use = " + newVars.seedAvgWinningTrade, "INFO", logName);
+                            CommonFunctions.AddStatusMessage("New seedAvgWinningTrade to use = " + newVars.seedAvgWinningTrade, "INFO", logName);
                             tb.lastRunVars.seedAvgWinningTrade = newVars.seedAvgWinningTrade;
                             model.modelVar.seedAvgWinningTrade = newVars.seedAvgWinningTrade;
                             currentStatus.seedAvgWinningTrade = newVars.seedAvgWinningTrade;
@@ -10890,8 +10907,8 @@ namespace TradingBrain.Models
 
                             // Save the last run vars into the TB settings table
                             Task<bool> res = tb.SaveDocument(the_app_db);
-                            Task taskF = Task.Run(() => clsCommonFunctions.SendBroadcast("QuantityChanged", JsonConvert.SerializeObject(currentStatus), the_app_db));
-                            clsCommonFunctions.AddStatusMessage("New values saved", "INFO", logName);
+                            Task taskF = Task.Run(() => CommonFunctions.SendBroadcast("QuantityChanged", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                            CommonFunctions.AddStatusMessage("New values saved", "INFO", logName);
                         }
                         //var newValString = obj.messageValue;
                         //double newVal = 0;
@@ -10924,7 +10941,7 @@ namespace TradingBrain.Models
                         break;
                     case "ChangeQuantityRSI":
                         //clsCommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus));
-                        clsCommonFunctions.AddStatusMessage("ChangeQuantityRSI request received", "INFO", logName);
+                        CommonFunctions.AddStatusMessage("ChangeQuantityRSI request received", "INFO", logName);
                         if (obj.messageValue != "")
                         {
                             ModelVarsChange? newVars = new ModelVarsChange();
@@ -10932,7 +10949,7 @@ namespace TradingBrain.Models
 
                             if (newVars.baseQuantity > 0)
                             {
-                                clsCommonFunctions.AddStatusMessage("New baseQuantity to use = " + newVars.baseQuantity, "INFO", logName);
+                                CommonFunctions.AddStatusMessage("New baseQuantity to use = " + newVars.baseQuantity, "INFO", logName);
                                 tb.lastRunVars.baseQuantity = newVars.baseQuantity;
                                 tb.lastRunVars.maxQuantity = newVars.baseQuantity * tb.lastRunVars.maxQuantityMultiplier;
                                 tb.lastRunVars.minQuantity = newVars.baseQuantity;
@@ -10953,15 +10970,15 @@ namespace TradingBrain.Models
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage("New baseQuantity is 0", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage("New baseQuantity is 0", "ERROR", logName);
                             }
 
-                            clsCommonFunctions.AddStatusMessage("New carriedForwardLoss to use = " + newVars.carriedForwardLoss, "INFO", logName);
+                            CommonFunctions.AddStatusMessage("New carriedForwardLoss to use = " + newVars.carriedForwardLoss, "INFO", logName);
                             tb.lastRunVars.carriedForwardLoss = newVars.carriedForwardLoss;
                             model.modelVar.carriedForwardLoss = newVars.carriedForwardLoss;
                             currentStatus.carriedForwardLoss = newVars.carriedForwardLoss;
 
-                            clsCommonFunctions.AddStatusMessage("New currentGain to use = " + newVars.currentGain, "INFO", logName);
+                            CommonFunctions.AddStatusMessage("New currentGain to use = " + newVars.currentGain, "INFO", logName);
                             tb.lastRunVars.currentGain = newVars.currentGain;
                             model.modelVar.currentGain = newVars.currentGain;
                             currentStatus.currentGain = newVars.currentGain;
@@ -10970,10 +10987,10 @@ namespace TradingBrain.Models
                             {
                                 if (newVars.hoursToTrade.Count == 24)
                                 {
-                                    clsCommonFunctions.AddStatusMessage("New hoursToTrade to use -", "INFO", logName);
+                                    CommonFunctions.AddStatusMessage("New hoursToTrade to use -", "INFO", logName);
                                     for (int i = 0; i < newVars.hoursToTrade.Count; i++)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("Hour " + i + " = " + newVars.hoursToTrade[i].trade, "INFO", logName);
+                                        CommonFunctions.AddStatusMessage("Hour " + i + " = " + newVars.hoursToTrade[i].trade, "INFO", logName);
                                     }
                                     tb.lastRunVars.hoursToTrade = newVars.hoursToTrade;
                                     modelVar.hoursToTrade = newVars.hoursToTrade;
@@ -10981,12 +10998,12 @@ namespace TradingBrain.Models
                                 }
                                 else
                                 {
-                                    clsCommonFunctions.AddStatusMessage("New hoursToTrade is less than 24", "ERROR", logName);
+                                    CommonFunctions.AddStatusMessage("New hoursToTrade is less than 24", "ERROR", logName);
                                 }
                             }
                             else
                             {
-                                clsCommonFunctions.AddStatusMessage("New hoursToTrade is null", "ERROR", logName);
+                                CommonFunctions.AddStatusMessage("New hoursToTrade is null", "ERROR", logName);
                             }
 
                             if (this.strategy == "BOLLI")
@@ -10999,32 +11016,32 @@ namespace TradingBrain.Models
 
                                     if (newVars.var1 > 0)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("New var1 to use = " + newVars.var1, "INFO", logName);
+                                        CommonFunctions.AddStatusMessage("New var1 to use = " + newVars.var1, "INFO", logName);
                                         tb.runDetails.inputs_RSI[0].var1 = newVars.var1;
                                     }
                                     if (newVars.var2 > 0)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("New var2 to use = " + newVars.var2, "INFO", logName);
+                                        CommonFunctions.AddStatusMessage("New var2 to use = " + newVars.var2, "INFO", logName);
                                         tb.runDetails.inputs_RSI[0].var2 = newVars.var2;
                                     }
                                     if (newVars.var3 > 0)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("New var3 to use = " + newVars.var3, "INFO", logName);
+                                        CommonFunctions.AddStatusMessage("New var3 to use = " + newVars.var3, "INFO", logName);
                                         tb.runDetails.inputs_RSI[0].var3 = newVars.var3;
                                     }
                                     if (newVars.var4 > 0)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("New var4 to use = " + newVars.var4, "INFO", logName);
+                                        CommonFunctions.AddStatusMessage("New var4 to use = " + newVars.var4, "INFO", logName);
                                         tb.runDetails.inputs_RSI[0].var4 = newVars.var4;
                                     }
                                     if (newVars.var5 > 0)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("New var5 to use = " + newVars.var5, "INFO", logName);
+                                        CommonFunctions.AddStatusMessage("New var5 to use = " + newVars.var5, "INFO", logName);
                                         tb.runDetails.inputs_RSI[0].var5 = newVars.var5;
                                     }
                                     if (newVars.var6 > 0)
                                     {
-                                        clsCommonFunctions.AddStatusMessage("New var6 to use = " + newVars.var6, "INFO", logName);
+                                        CommonFunctions.AddStatusMessage("New var6 to use = " + newVars.var6, "INFO", logName);
                                         tb.runDetails.inputs_RSI[0].var6 = newVars.var6;
                                     }
 
@@ -11037,8 +11054,8 @@ namespace TradingBrain.Models
 
                             // Save the last run vars into the TB settings table
                             Task<bool> res = tb.SaveDocument(the_app_db);
-                            clsCommonFunctions.SendBroadcast("QuantityChanged", JsonConvert.SerializeObject(currentStatus), the_app_db);
-                            clsCommonFunctions.AddStatusMessage("New values saved", "INFO", logName);
+                            CommonFunctions.SendBroadcast("QuantityChanged", JsonConvert.SerializeObject(currentStatus), the_app_db);
+                            CommonFunctions.AddStatusMessage("New values saved", "INFO", logName);
                         }
                         //var newValString = obj.messageValue;
                         //double newVal = 0;
@@ -11071,7 +11088,7 @@ namespace TradingBrain.Models
                         break;
                     case "Kill":
                         currentStatus.status = "closed";
-                        Task taskG = Task.Run(() => clsCommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
+                        Task taskG = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus), the_app_db));
 
                         // Close Console app
                         System.Environment.Exit(1);
@@ -11087,8 +11104,8 @@ namespace TradingBrain.Models
             {
 
                 await hubConnection.StartAsync();
-                clsCommonFunctions.AddStatusMessage("Connection started", "INFO", logName);
-                clsCommonFunctions.SaveLog("Info", "Message Connection", "Messaging started", this.the_app_db);
+                CommonFunctions.AddStatusMessage("Connection started", "INFO", logName);
+                CommonFunctions.SaveLog("Info", "Message Connection", "Messaging started", this.the_app_db);
             }
             catch (Exception e)
             {
@@ -11108,13 +11125,13 @@ namespace TradingBrain.Models
                 // Start queuing or dropping messages.
                 string strErr = "";
                 if (error != null) { strErr = error.ToString(); }
-                clsCommonFunctions.AddStatusMessage($"Messaging connection lost, retrying - {strErr}", "ERROR", logName);
+                CommonFunctions.AddStatusMessage($"Messaging connection lost, retrying - {strErr}", "ERROR", logName);
                 return Task.CompletedTask;
             };
             hubConnection.Reconnected += connectionId =>
             {
                 Debug.Assert(hubConnection.State == HubConnectionState.Connected);
-                clsCommonFunctions.AddStatusMessage("Messaging connection reconnected", "INFO", logName);
+                CommonFunctions.AddStatusMessage("Messaging connection reconnected", "INFO", logName);
                 // Notify users the connection was reestablished.
                 // Start dequeuing messages queued while reconnecting if any.
 
@@ -11169,13 +11186,13 @@ namespace TradingBrain.Models
                         // Check if there was any tick data (might not have been collected). If not, then create one.
                         if (data.Open == 0)
                         {
-                            clsCommonFunctions.AddStatusMessage("TickData not found. Creating ...", "INFO");
+                            CommonFunctions.AddStatusMessage("TickData not found. Creating ...", "INFO");
                             // Get the previous tick and save it as the next tick
                             TickData tick = await IGModels.clsCommonFunctions.GetTickData(the_db, TicksContainer, epicName, dtDate);
                             tick.UTM = dtDate;
                             tick.id = System.Guid.NewGuid().ToString();
                             bool sv = await tick.Save(the_db, TicksContainer);
-                            clsCommonFunctions.AddStatusMessage("New tick created. ", "INFO");
+                            CommonFunctions.AddStatusMessage("New tick created. ", "INFO");
                             //Now we can get the candle data as it should now find the tick created above
                             data = await IGModels.clsCommonFunctions.GetCandleDataV2(the_db, TicksContainer, epicName, dtDate, minEnd);
                         }
@@ -12117,7 +12134,7 @@ namespace TradingBrain.Models
                     }
                     catch (Exception ex)
                     {
-                        clsCommonFunctions.AddStatusMessage($"Error in Long GetPositions - {ex.ToString()}", "ERROR");
+                        CommonFunctions.AddStatusMessage($"Error in Long GetPositions - {ex.ToString()}", "ERROR");
                     }
                     try { 
                     ret = await _igContainer2.igRestApiClient.getOTCOpenPositionsV1();
@@ -12199,7 +12216,7 @@ namespace TradingBrain.Models
                     }
                     catch (Exception ex)
                     {
-                        clsCommonFunctions.AddStatusMessage($"Error in Short GetPositions - {ex.ToString()}", "ERROR");
+                        CommonFunctions.AddStatusMessage($"Error in Short GetPositions - {ex.ToString()}", "ERROR");
                     }
                 }
                 else

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static TradingBrain.Models.clsCommonFunctions;
+using static TradingBrain.Models.CommonFunctions;
 
 
 namespace TradingBrain.Models
@@ -85,7 +85,7 @@ namespace TradingBrain.Models
                         this.Log_Timestamp = DateTime.UtcNow;
                     }
 
-                    ItemResponse<Log> SaveResponse = await container.CreateItemAsync<Log>(this, new PartitionKey(this.Log_Type));
+                     await container.CreateItemAsync<Log>(this, new PartitionKey(this.Log_Type));
 
                 }
 

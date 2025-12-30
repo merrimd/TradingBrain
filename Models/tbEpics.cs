@@ -6,18 +6,18 @@ using System.Threading.Tasks;
 
 namespace TradingBrain.Models
 {
-    public class tbEpics
+    public class TbEpics
     {
         public string epic { get; set; }
         public string resolution { get; set; }
         public string strategy { get; set; }
-        public tbEpics()
+        public TbEpics()
         {
             epic = "";
             resolution = "";
             strategy = "";
         }
-        public tbEpics(string input)
+        public TbEpics(string input)
         {
             resolution = "";
             strategy = "";

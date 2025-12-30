@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace TradingBrain.Models
 {
-    public class clsChartUpdate
+    public class ChartUpdate
     {
         public string Epic { get; set; }
         public Decimal Bid { get; set; }
@@ -31,7 +31,7 @@ namespace TradingBrain.Models
 
 
 
-        public clsChartUpdate()
+        public ChartUpdate()
         {
             this.Epic = "";
             this.Bid = new Decimal();
@@ -77,14 +77,14 @@ namespace TradingBrain.Models
                         if (!exist)
                         {
                             this.id = System.Guid.NewGuid().ToString();
-                            ItemResponse<clsChartUpdate> SaveResponse = await container.CreateItemAsync<clsChartUpdate>(this, new PartitionKey(this.id));
+                            ItemResponse<ChartUpdate> SaveResponse = await container.CreateItemAsync<ChartUpdate>(this, new PartitionKey(this.id));
                         }
                         blnLoop = false;
                     }
                 }
                 catch (CosmosException de)
                 {
-                    clsCommonFunctions.AddStatusMessage(de.ToString(), "ERROR");
+                    CommonFunctions.AddStatusMessage(de.ToString(), "ERROR");
                     var log = new Log();
                     log.Log_Message = de.ToString();
                     log.Log_Type = "Error";
@@ -94,7 +94,7 @@ namespace TradingBrain.Models
                 }
                 catch (Exception e)
                 {
-                    clsCommonFunctions.AddStatusMessage(e.ToString(), "ERROR");
+                    CommonFunctions.AddStatusMessage(e.ToString(), "ERROR");
                     var log = new Log();
                     log.Log_Message = e.ToString();
                     log.Log_Type = "Error";
@@ -123,16 +123,16 @@ namespace TradingBrain.Models
                     .WithParameter("@epicName", this.Epic)
                     .WithParameter("@UTM", this.UTM);
 
-                    using FeedIterator<clsChartUpdate> filteredFeed = container.GetItemQueryIterator<clsChartUpdate>(
+                    using FeedIterator<ChartUpdate> filteredFeed = container.GetItemQueryIterator<ChartUpdate>(
                         queryDefinition: parameterizedQuery
                     );
 
                     while (filteredFeed.HasMoreResults)
                     {
-                        FeedResponse<clsChartUpdate> response = await filteredFeed.ReadNextAsync();
+                        FeedResponse<ChartUpdate> response = await filteredFeed.ReadNextAsync();
 
                         // Iterate query results
-                        foreach (clsChartUpdate item in response)
+                        foreach (ChartUpdate item in response)
                         {
                             if (item.Epic == this.Epic && this.Bid == item.Bid)
                             {
@@ -146,7 +146,7 @@ namespace TradingBrain.Models
             }
             catch (CosmosException de)
             {
-                clsCommonFunctions.AddStatusMessage(de.ToString(), "ERROR");
+                CommonFunctions.AddStatusMessage(de.ToString(), "ERROR");
                 var log = new Log();
                 log.Log_Message = de.ToString();
                 log.Log_Type = "Error"; 
@@ -156,7 +156,7 @@ namespace TradingBrain.Models
             }
             catch (Exception e)
             {
-                clsCommonFunctions.AddStatusMessage(e.ToString(), "ERROR");
+                CommonFunctions.AddStatusMessage(e.ToString(), "ERROR");
                 var log = new Log();
                 log.Log_Message = e.ToString();
                 log.Log_Type = "Error";
@@ -168,7 +168,7 @@ namespace TradingBrain.Models
         }
 
     }
-    public class clsChartUpdateMini
+    public class ChartUpdateMini
     {
         public string Epic { get; set; }
         public Decimal Bid { get; set; }
@@ -176,7 +176,7 @@ namespace TradingBrain.Models
         public DateTime? UTM { get; set; }
 
 
-        public clsChartUpdateMini()
+        public ChartUpdateMini()
         {
             this.Epic = "";
             this.Bid = new Decimal();

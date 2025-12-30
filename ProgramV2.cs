@@ -83,13 +83,17 @@ namespace TradingBrain
             {
                 blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}${date:format=HH}/app-log.log";
             }
-
+            string blobConnectionString = Environment.GetEnvironmentVariable("BlobConnectionString") ?? "";
+            if (blobConnectionString == "")
+            {
+                blobConnectionString = igWebApiConnectionConfig["BlobConnectionString"] ?? "";
+            }
             BlobStorageTarget azureBlobTarget = new BlobStorageTarget()
             {
                 Name = "azureBlob",
 
                 // Your Azure Blob connection string
-                ConnectionString = "DefaultEndpointsProtocol=https;AccountName=mikewardig;AccountKey=RwdizLFFqzdH7VkjssHQtlXyyPc/WitD5lWPl67XEqvObt1wFSFI6amn2mc/DPmMTXeoIkMxoRPo+ASts6Rm/Q==;EndpointSuffix=core.windows.net",
+                ConnectionString = blobConnectionString,
 
                 // Container and blob path
                 Container = "tb-logs-" + region,

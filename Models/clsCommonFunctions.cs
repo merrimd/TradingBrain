@@ -15,14 +15,14 @@ using System.Web;
 
 using IGModels.ModellingModels;
 using NLog;
-using static TradingBrain.Models.clsCommonFunctions;
+using static TradingBrain.Models.CommonFunctions;
 using Org.BouncyCastle.Pqc.Crypto.Lms;
 using System.Net.Http;
 using Lightstreamer.DotNet.Client;
 
 namespace TradingBrain.Models
 {
-    public  static class clsCommonFunctions
+    public  static class CommonFunctions
     {
         public async static void AddStatusMessage(string message, string level = "INFO")
         {
@@ -437,13 +437,13 @@ namespace TradingBrain.Models
             return (epic);
         }
 
-        public static List<clsEpicList> GetEpicList(string[] epics)
+        public static List<EpicList> GetEpicList(string[] epics)
         {
-            List<clsEpicList> ret = new List<clsEpicList>();
+            List<EpicList> ret = new List<EpicList>();
 
             foreach (string item in epics)
             {
-                clsEpicList o = new clsEpicList();
+                EpicList o = new EpicList();
                 o.Epic = item;
                 o.counter = 0;
                 o.last_ig_updatetime = "";
@@ -715,7 +715,7 @@ namespace TradingBrain.Models
                 {
                     time = $"{client.Timeout.TotalMilliseconds:N0} milliseconds";
                 }
-                clsCommonFunctions.AddStatusMessage("Message timed out.");
+                CommonFunctions.AddStatusMessage("Message timed out.");
                 //throw new TimeoutException($"No response after waiting {time}.");
             }
             catch (Exception e)
@@ -834,7 +834,7 @@ namespace TradingBrain.Models
 
 
 
-                    clsCommonFunctions.AddStatusMessage("Getting latest vars (if necessary)", "INFO",logName);
+                    CommonFunctions.AddStatusMessage("Getting latest vars (if necessary)", "INFO",logName);
 
 
 
@@ -852,7 +852,7 @@ namespace TradingBrain.Models
                         if (opt.averageWinValue > 0)
                         {
                             ret.lastRunVars.seedAvgWinningTrade = opt.averageWinValue;
-                            clsCommonFunctions.AddStatusMessage($"seedAvgWinningTrade taken from opt - {opt.averageWinValue}", "INFO", logName);
+                            CommonFunctions.AddStatusMessage($"seedAvgWinningTrade taken from opt - {opt.averageWinValue}", "INFO", logName);
                         }
                         await ret.SaveDocument(the_db);
                     }
@@ -940,7 +940,7 @@ namespace TradingBrain.Models
 
                 if (thisApp.model.doSuppTrades)
                 {
-                    clsCommonFunctions.AddStatusMessage($"order values - dealPrice={this.level}, targetPrice= {targetPrice}, targetUnits = {targetUnits}, suppTargetUnits = {suppTargetUnits}, newLevel = {newLevel}, stop level {newStop}, suppStopPercentage {suppStopPercentage}", "DEBUG");
+                    CommonFunctions.AddStatusMessage($"order values - dealPrice={this.level}, targetPrice= {targetPrice}, targetUnits = {targetUnits}, suppTargetUnits = {suppTargetUnits}, newLevel = {newLevel}, stop level {newStop}, suppStopPercentage {suppStopPercentage}", "DEBUG");
                 }
             }
         }

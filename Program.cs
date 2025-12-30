@@ -143,7 +143,7 @@ namespace TradingBrain.Models
 
             //Get list of epics from config
 
-            List<tbEpics> epcs = new List<tbEpics>();
+            List<TbEpics> epcs = new List<TbEpics>();
             List<string> epicList = new List<string>();
             string settingEpics = "";
 
@@ -166,13 +166,13 @@ namespace TradingBrain.Models
             {
                 foreach (string tmp in settingEpics.Split(",").ToList())
                 {
-                    epcs.Add(new tbEpics(tmp));
+                    epcs.Add(new TbEpics(tmp));
                     epicList.Add(tmp);
                 }
             }
             else
             {
-                epcs.Add(new tbEpics("IX.D.NASDAQ.CASH.IP|SMA"));
+                epcs.Add(new TbEpics("IX.D.NASDAQ.CASH.IP|SMA"));
                 epicList.Add("IX.D.NASDAQ.CASH.IP|SMA");
             }
             string[] epics = { epcs[0].epic };
@@ -188,13 +188,18 @@ namespace TradingBrain.Models
             {
                 blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}container/${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}${date:format=HH}/app-log.log";
             }
+            string blobConnectionString = Environment.GetEnvironmentVariable("BlobConnectionString") ?? "";
+            if (blobConnectionString == "")
+            {
+                blobConnectionString = igWebApiConnectionConfig["BlobConnectionString"] ?? "";
+            }
 
             BlobStorageTarget azureBlobTarget = new BlobStorageTarget()
             {
                 Name = "azureBlob",
 
                 // Your Azure Blob connection string
-                ConnectionString = "DefaultEndpointsProtocol=https;AccountName=mikewardig;AccountKey=RwdizLFFqzdH7VkjssHQtlXyyPc/WitD5lWPl67XEqvObt1wFSFI6amn2mc/DPmMTXeoIkMxoRPo+ASts6Rm/Q==;EndpointSuffix=core.windows.net",
+                ConnectionString = blobConnectionString,
 
                 // Container and blob path
                 Container = "tb-logs-" + region,
@@ -245,7 +250,7 @@ namespace TradingBrain.Models
 
             if (useEnvironment)
             {
-                clsCommonFunctions.AddStatusMessage(Environment.GetEnvironmentVariable("environment") ?? "DEMO", "INFO");
+                CommonFunctions.AddStatusMessage(Environment.GetEnvironmentVariable("environment") ?? "DEMO", "INFO");
                 creds.igEnvironment = Environment.GetEnvironmentVariable("environment") ?? "DEMO";
                 creds.igUsername = Environment.GetEnvironmentVariable("username." + creds.igEnvironment) ?? "";
                 creds.igPassword = Environment.GetEnvironmentVariable("password." + creds.igEnvironment) ?? "";
@@ -255,7 +260,7 @@ namespace TradingBrain.Models
             else
             {
                 //Get credentials from config
-                clsCommonFunctions.AddStatusMessage(igWebApiConnectionConfig["environment"] ?? "DEMO", "INFO");
+                CommonFunctions.AddStatusMessage(igWebApiConnectionConfig["environment"] ?? "DEMO", "INFO");
                 creds.igEnvironment = igWebApiConnectionConfig["environment"] ?? "DEMO";
                 creds.igUsername = igWebApiConnectionConfig["username." + creds.igEnvironment] ?? "";
                 creds.igPassword = igWebApiConnectionConfig["password." + creds.igEnvironment] ?? "";
@@ -266,10 +271,10 @@ namespace TradingBrain.Models
             creds.primary = true;
             igContainer = new IGContainer(creds);
             igContainer.igRestApiClient = new IgRestApiClient(creds.igEnvironment, smartDispatcher);
-            igContainer.EpicList = clsCommonFunctions.GetEpicList(epicList.ToArray());
+            igContainer.EpicList = CommonFunctions.GetEpicList(epicList.ToArray());
 
             // Start the lightstreamer bits in a new thread
-            clsCommonFunctions.AddStatusMessage("Starting lightstreamer in a new thread", "INFO");
+            CommonFunctions.AddStatusMessage("Starting lightstreamer in a new thread", "INFO");
             Thread t = new Thread(new ThreadStart(igContainer.StartLightstreamer));
             t.Start();
 
@@ -298,10 +303,10 @@ namespace TradingBrain.Models
                 creds2.primary = false;
                 igContainer2 = new IGContainer(creds2);
                 igContainer2.igRestApiClient = new IgRestApiClient(creds2.igEnvironment, smartDispatcher);
-                igContainer2.EpicList = clsCommonFunctions.GetEpicList(epicList.ToArray());
+                igContainer2.EpicList = CommonFunctions.GetEpicList(epicList.ToArray());
 
                 // Start the lightstreamer bits in a new thread
-                clsCommonFunctions.AddStatusMessage("Starting second lightstreamer in a new thread", "INFO");
+                CommonFunctions.AddStatusMessage("Starting second lightstreamer in a new thread", "INFO");
                 Thread u = new Thread(new ThreadStart(igContainer2.StartLightstreamer));
                 u.Start();
             }
@@ -309,7 +314,7 @@ namespace TradingBrain.Models
             Database? the_db = IGModels.clsCommonFunctions.Get_Database("IX.D.NASDAQ.CASH.IP").Result;
             Database? the_app_db = IGModels.clsCommonFunctions.Get_App_Database("IX.D.NASDAQ.CASH.IP").Result;
 
-            foreach (tbEpics tbepic in epcs)
+            foreach (TbEpics tbepic in epcs)
             {
                 string jobId = IGModels.clsCommonFunctions.GetLogName(tbepic.epic, tbepic.strategy, tbepic.resolution);
                 //MappedDiagnosticsLogicalContext.Set("jobId", jobId);
@@ -329,60 +334,10 @@ namespace TradingBrain.Models
                 {
 
 
-                    Container? container = null;
-                    Container? chart_container = null;
-                    Container? trade_container = null;
-                    Container? minute_container = null;
-                    Container? TicksContainer = null;
-                    Container? candles_RSI_container = null;
-
-                    candles_RSI_container = the_db.GetContainer("Candles_RSI");
-
-                    switch (tbepic.epic)
-                    {
-                        case "IX.D.NIKKEI.DAILY.IP":
-                            container = the_db.GetContainer("CandleUpdate");
-                            chart_container = the_db.GetContainer("CandleTicks_NIKKEI");
-                            TicksContainer = the_db.GetContainer("CandleTicks_NIKKEI");
-                            trade_container = the_app_db.GetContainer("TradingBrainTrades");
-                            
-                            break;
-
-                        default:
-                            container = the_db.GetContainer("CandleUpdate");
-                            chart_container = the_db.GetContainer("CandleTicks");
-                            TicksContainer = the_db.GetContainer("CandleTicks");
-                            trade_container = the_app_db.GetContainer("TradingBrainTrades");
-                            break;
-                    }
-
-                    //SetupDB(pms.epic);
-
-                    if (tbepic.strategy == "RSI" || 
-                        tbepic.strategy == "REI" || 
-                        tbepic.strategy == "RSI-ATR" || 
-                        tbepic.strategy == "RSI-CUML" || 
-                        tbepic.strategy == "CASEYC" ||
-                        tbepic.strategy == "CASEYCSHORT" ||
-                        tbepic.strategy == "VWAP" ||
-                        tbepic.strategy == "CASEYCEQUITIES")
-                    {
-                        minute_container = the_db.GetContainer("Candles_RSI");
-                    }
-                    else
-                    {
-                        if (tbepic.epic == "IX.D.NIKKEI.DAILY.IP")
-                        {
-                            minute_container = the_db.GetContainer("MinuteCandle_NIKKEI");
-                        }
-                        else
-                        {
-                            minute_container = the_db.GetContainer("MinuteCandle");
-                        }
-                    }
+                   
                     tbLog.Info("Initialising app");
 
-                    workerList.Add(new MainApp(the_db, the_app_db, container, chart_container, tbepic.epic, minute_container, candles_RSI_container, TicksContainer, trade_container, igContainer,igContainer2, tbepic.strategy, tbepic.resolution));
+                    workerList.Add(new MainApp(the_db, the_app_db,  tbepic.epic,   igContainer,igContainer2, tbepic.strategy, tbepic.resolution));
          
                     ;
 
@@ -447,21 +402,7 @@ namespace TradingBrain.Models
 
 
         }
-            static async Task RunSecondAlignedTimer(Func<Task> action)
-            {
-                while (true)
-                {
-          
-                DateTime now = DateTime.UtcNow;
-                    double msToNextSecond = 1000 - now.Millisecond   - (now.Ticks % TimeSpan.TicksPerMillisecond) / 10000.0;
 
-                    if (msToNextSecond < 0) msToNextSecond =0;
-
-                    await Task.Delay((int)msToNextSecond);
-                await action();
-                //await action();
-            }
-            }
         public static async void RunMainAppCode(object sender, System.Timers.ElapsedEventArgs e)
         {
             var parallelTasks = new List<Task<RunRet>>();
@@ -680,7 +621,7 @@ namespace TradingBrain.Models
             // Calculate the precise interval in milliseconds
             double interval = (nextRun - now).TotalMilliseconds;
 
-            clsCommonFunctions.AddStatusMessage($"Next run scheduled at: {nextRun:yyyy-MM-dd HH:mm:ss.fff}");
+            CommonFunctions.AddStatusMessage($"Next run scheduled at: {nextRun:yyyy-MM-dd HH:mm:ss.fff}");
             return interval;
 
         }
@@ -869,11 +810,11 @@ namespace TradingBrain.Models
 
                     if (exception == null)
                     {
-                        clsCommonFunctions.AddStatusMessage("normal proc exit", "INFO");
+                        CommonFunctions.AddStatusMessage("normal proc exit", "INFO");
                     }
                     else
                     {
-                        clsCommonFunctions.AddStatusMessage("unhandled exception: " + exception.GetType().Name, "ERROR");
+                        CommonFunctions.AddStatusMessage("unhandled exception: " + exception.GetType().Name, "ERROR");
                     }
                 }
 

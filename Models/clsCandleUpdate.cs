@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace TradingBrain.Models
 {
-    public class clsCandleUpdate
+    public class CandleUpdate
     {
         public string Epic { get; set; }
         public Decimal Bid { get; set; }
@@ -27,7 +27,7 @@ namespace TradingBrain.Models
         public string id { get; set; }
 
 
-        public clsCandleUpdate()
+        public CandleUpdate()
         {
             this.Epic = "";
             this.Bid = new Decimal();
@@ -66,17 +66,17 @@ namespace TradingBrain.Models
                         // DatabaseResponse db = await the_db.ReadAsync();
                         //Container container = the_db.GetContainer("Candles");
 
-                        ItemResponse<clsCandleUpdate> SaveResponse = await container.CreateItemAsync<clsCandleUpdate>(this, new PartitionKey(this.Epic));
+                         await container.CreateItemAsync<CandleUpdate>(this, new PartitionKey(this.Epic));
                         blnLoop = false;
                     }
                 }
                 catch (CosmosException de)
                 {
-                    clsCommonFunctions.AddStatusMessage(de.ToString(),"ERROR");
+                    CommonFunctions.AddStatusMessage(de.ToString(),"ERROR");
                 }
                 catch (Exception e)
                 {
-                    clsCommonFunctions.AddStatusMessage(e.ToString(),"ERROR");
+                    CommonFunctions.AddStatusMessage(e.ToString(),"ERROR");
                 }
 
 
