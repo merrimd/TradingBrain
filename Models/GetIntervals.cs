@@ -15,11 +15,11 @@ namespace TradingBrain.Models
         {
             DateTime now = DateTime.Now;
             DateTime nextRun = DateTime.MinValue;
-            int testOffset = 0;
-            if (region == "test")
-            {
-                testOffset = 5;
-            }
+            //int testOffset = 0;
+            //if (region == "test")
+            //{
+            //    testOffset = 5;
+            //}
             string resUnit = "MINUTE";
             int resNum = 1;
             string[] res = resolution.Split('_');

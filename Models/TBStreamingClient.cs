@@ -42,11 +42,11 @@ namespace TradingBrain.Models
     public class TBStreamingClient
     {
         //private DemoForm demoForm;
-        private Delegates.LightstreamerUpdateDelegate updateDelegate;
-        private Delegates.LightstreamerStatusChangedDelegate statusChangeDelegate;
+        private Delegates.LightstreamerUpdateDelegate? updateDelegate;
+        private Delegates.LightstreamerStatusChangedDelegate? statusChangeDelegate;
 
-        public LightstreamerClient client;
-        private Subscription subscription;
+        public LightstreamerClient? client;
+        private Subscription? subscription;
         //private Dictionary<ChartQuotes, Subscription> charts = new Dictionary<ChartQuotes, Subscription>();
 
 
@@ -55,7 +55,7 @@ namespace TradingBrain.Models
         public bool LoggedIn;
         public bool connectionEstablished;
         public bool FirstConfirmUpdate;
-        public IGContainer _igContainer;
+        public IGContainer? _igContainer;
         public int currentSecond = 0;
         public TBStreamingClient(
                 string pushServerUrl,
@@ -75,7 +75,7 @@ namespace TradingBrain.Models
                 FirstConfirmUpdate = true;
 
 
-                bool connectionEstablished = false;
+                //bool connectionEstablished = false;
 
                 SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
 
@@ -183,7 +183,7 @@ namespace TradingBrain.Models
             }
             catch (Exception e)
             {
-                clsCommonFunctions.AddStatusMessage("ConnectToRest failed - " + e.ToString, "ERROR");
+                clsCommonFunctions.AddStatusMessage("ConnectToRest failed - " + e.ToString(), "ERROR");
 
             }
         }
@@ -378,7 +378,7 @@ namespace TradingBrain.Models
         {
             private static PropertyEventDispatcher instance = new SmartDispatcher();
 
-            private static bool _designer = false;
+            //private static bool _designer = false;
 
 
 
@@ -493,7 +493,7 @@ namespace TradingBrain.Models
                         thisUTM = (DateTime)EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"));
                     }
 
-                    LOepic thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epic).FirstOrDefault();
+                    LOepic? thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epic).FirstOrDefault();
 
                     tick thisTick = new tick();
                     thisTick.bid = Convert.ToDecimal(wlmUpdate.getValue("BID"));
@@ -723,13 +723,13 @@ namespace TradingBrain.Models
             //try
             //{
             //    //var tradeSubUpdate = JsonConvert.DeserializeObject<LsTradeSubscriptionData>(inputData);
-            TradeSubUpdate tradeSubUpdate = (TradeSubUpdate)JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
+            TradeSubUpdate? tradeSubUpdate = JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
             tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString();
             tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString();
             tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString();
             tradeSubUpdate.updateType = "OPU";
 
-            MainApp _thisApp = null;
+            //MainApp _thisApp = null;
 
             foreach (MainApp wrk in _igContainer.workerList)
             {
@@ -929,13 +929,13 @@ namespace TradingBrain.Models
             //try
             //{
             //    //var tradeSubUpdate = JsonConvert.DeserializeObject<LsTradeSubscriptionData>(inputData);
-            TradeSubUpdate tradeSubUpdate = (TradeSubUpdate)JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
+            TradeSubUpdate? tradeSubUpdate = JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
             tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString();
             tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString();
             tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString();
             tradeSubUpdate.updateType = "OPU";
 
-            MainApp _thisApp = null;
+            //MainApp _thisApp = null;
 
             foreach (MainApp wrk in _igContainer.workerList)
             {
@@ -1147,7 +1147,7 @@ namespace TradingBrain.Models
 
             try
             {
-                string chartName = "CHART:IX.D.NASDAQ.CASH.IP:TICK";
+                //string chartName = "CHART:IX.D.NASDAQ.CASH.IP:TICK";
 
                 List<string> epics = new List<string>();
 
@@ -1288,23 +1288,23 @@ namespace TradingBrain.Models
     public class IGContainer
     {
         public IgRestApiClient? igRestApiClient { get; set; }
-        public ConversationContext context { get; set; }
+        public ConversationContext? context { get; set; }
         public ObservableCollection<IgPublicApiData.AccountModel>? Accounts { get; set; }
         public string CurrentAccountId { get; set; }
         public string igAccountId { get; set; }
         public List<clsEpicList> EpicList { get; set; }
         public List<LOepic> PriceEpicList { get; set; }
         public static bool LoggedIn { get; set; }
-        public TBStreamingClient tbClient { get; set; }
+        public TBStreamingClient? tbClient { get; set; }
         private bool isDirty = false;
 
         private string pushServerUrl;
         public string forceT;
-        private string forceTransport = "no";
+        //private string forceTransport = "no";
         public Database? the_db { get; set; }
         public Database? the_app_db { get; set; }
         public List<MainApp> workerList { get; set; }
-        public IgApiCreds creds { get; set; }
+        public IgApiCreds? creds { get; set; }
         public IGContainer()
         {
             igRestApiClient = null;
@@ -1319,6 +1319,8 @@ namespace TradingBrain.Models
             tbClient = null;
             workerList = new List<MainApp>();
             creds = new IgApiCreds();
+            forceT = "";
+            pushServerUrl = "";
         }
         public IGContainer(IgApiCreds _creds)
         {
@@ -1334,6 +1336,8 @@ namespace TradingBrain.Models
             the_app_db = null;
             tbClient = null;
             workerList = new List<MainApp>();
+            forceT = "";
+            pushServerUrl = "";
         }
         public void StartLightstreamer()
         {
@@ -1365,7 +1369,7 @@ namespace TradingBrain.Models
         public void OnLightstreamerStatusChanged(int cStatus, string status)
         {
             //statusLabel.Text = status;
-            var a = 1;
+            //var a = 1;
 
 
         }
@@ -1396,9 +1400,12 @@ namespace TradingBrain.Models
             this.lastUTM = DateTime.MinValue;
             this.closePrices = new List<double>();
             this.ticks = new List<tick>();
+            this.latestCandle = new tbPrice();
         }
     }
+#pragma warning disable CS8981 // The type name only contains lower-cased ascii characters. Such names may become reserved for the language.
     public class tick
+#pragma warning restore CS8981 // The type name only contains lower-cased ascii characters. Such names may become reserved for the language.
     {
         public decimal bid { get; set; }
         public decimal offer { get; set; }

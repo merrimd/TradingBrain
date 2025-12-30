@@ -56,14 +56,14 @@ namespace TradingBrain.Models
 
         public static List<MainApp> workerList = new List<MainApp>();
 
-        public TBStreamingClient tbClient;
+       // public TBStreamingClient tbClient;
         private bool isDirty = false;
 
-        private string pushServerUrl;
-        public string forceT;
-        private string forceTransport = "no";
+        //private string pushServerUrl;
+        //public string forceT;
+        //private string forceTransport = "no";
 
-        public IgRestApiClient? igRestApiClient;
+       // public IgRestApiClient? igRestApiClient;
 
         public delegate void StopDelegate();
         public static string region = "";
@@ -74,7 +74,7 @@ namespace TradingBrain.Models
             try
             {
                 the_db = await IGModels.clsCommonFunctions.Get_Database();
-                the_db = await IGModels.clsCommonFunctions.Get_App_Database();
+                the_app_db = await IGModels.clsCommonFunctions.Get_App_Database();
 
                 if (the_db != null)
                 {
@@ -236,10 +236,10 @@ namespace TradingBrain.Models
             ScopeContext.PushProperty("resolution", "");
             //Connect to IG & Lightstreamer
                          
-            IGContainer igContainer = null;
-            IGContainer igContainer2 = null;
-            IgApiCreds creds = new IgApiCreds();
-            IgApiCreds creds2 = new IgApiCreds();
+            IGContainer? igContainer = null;
+            IGContainer? igContainer2 = null;
+            IgApiCreds? creds = new IgApiCreds();
+            IgApiCreds?   creds2 = new IgApiCreds();
 
             SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
 
@@ -329,12 +329,12 @@ namespace TradingBrain.Models
                 {
 
 
-                    Container container = null;
-                    Container chart_container = null;
-                    Container trade_container = null;
-                    Container minute_container = null;
-                    Container TicksContainer = null;
-                    Container candles_RSI_container = null;
+                    Container? container = null;
+                    Container? chart_container = null;
+                    Container? trade_container = null;
+                    Container? minute_container = null;
+                    Container? TicksContainer = null;
+                    Container? candles_RSI_container = null;
 
                     candles_RSI_container = the_db.GetContainer("Candles_RSI");
 
@@ -579,11 +579,11 @@ namespace TradingBrain.Models
         {
             DateTime now = DateTime.Now;
             DateTime nextRun = DateTime.MinValue;
-            int testOffset = 0;
-            if (region == "test")
-            {
-                testOffset = 5;
-            }
+            //int testOffset = 0;
+            //if (region == "test")
+            //{
+            //    testOffset = 5;
+            //}
             string resUnit = "MINUTE";
             int resNum = 1;
             string[] res = resolution.Split('_');
@@ -754,9 +754,9 @@ namespace TradingBrain.Models
             return ret;
 
         }
-        static async Task CreateTBThread(string epic, string strategy, string resolution,IGContainer igContainer)
+        static async Task CreateTBThread(string epic, string strategy, string resolution,IGContainer? igContainer)
         {
-            System.Timers.Timer t;
+            //System.Timers.Timer t;
 
             MainApp? app = null;
 
@@ -816,11 +816,11 @@ namespace TradingBrain.Models
             {
 
 
-                Container container;
-                Container chart_container;
-                Container trade_container;
+                Container? container;
+                Container? chart_container;
+                Container? trade_container;
 
-                Container candles_RSI_container = the_db.GetContainer("Candles_RSI");
+                Container? candles_RSI_container = the_db.GetContainer("Candles_RSI");
                 switch (epic)
                 {
                     case "IX.D.NIKKEI.DAILY.IP":
@@ -927,7 +927,7 @@ namespace TradingBrain.Models
         public void OnLightstreamerStatusChanged(int cStatus, string status)
         {
             //statusLabel.Text = status;
-            var a = 1;
+            //var a = 1;
 
 
         }

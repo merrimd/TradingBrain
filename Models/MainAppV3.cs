@@ -93,7 +93,7 @@ namespace TradingBrain.Models
 
         public string epicName;
 
-        private long _lngTickCount;
+       // private long _lngTickCount;
 
         public clsChartUpdate currentTick { get; set; }
         public clsTradeUpdate currentTrade { get; set; }
@@ -117,8 +117,8 @@ namespace TradingBrain.Models
         public ModelVars modelVar { get; set; }
 
         public HubConnection hubConnection { get; set; }
-        private bool FirstConfirmUpdate = true;
-        TradingBrainSettings firstTB;
+        //private bool FirstConfirmUpdate = true;
+        //TradingBrainSettings firstTB;
         public int latestHour = 0;
         public System.Timers.Timer ti = new System.Timers.Timer();
         public bool marketOpen = false;
@@ -223,7 +223,7 @@ namespace TradingBrain.Models
 
                 currentTick = new clsChartUpdate();
                 currentCandle = new clsCandleUpdate();
-                _lngTickCount = 0;
+                //_lngTickCount = 0;
                 the_db = db;
                 the_app_db = appDb;
                 the_container = container;
@@ -974,10 +974,10 @@ namespace TradingBrain.Models
         {
             DateTime now = DateTime.Now;
             DateTime nextRun = DateTime.MinValue;
-            int testOffset = 0;
+           // int testOffset = 0;
             if (model.region == "test")
             {
-                testOffset = 5;
+                //testOffset = 5;
             }
             string resUnit = "MINUTE";
             int resNum = 1;
@@ -1086,7 +1086,8 @@ namespace TradingBrain.Models
         {
             RunRet taskRet = new RunRet();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            //MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("jobId", this.logName);
             bool liveMode = true;
             bool marketOpen = false;
 
@@ -1380,8 +1381,8 @@ namespace TradingBrain.Models
                             if (param != "DEBUG")
                             {
                                 string thisDealRef = "";
-                                string dealType = "";
-                                bool dealSent = false;
+                                //string dealType = "";
+                                //bool dealSent = false;
 
                                 double targetVar = thisInput.targetVarInput / 100 + 1;
                                 double targetVarShort = thisInput.targetVarInputShort / 100 + 1;
@@ -1508,9 +1509,9 @@ namespace TradingBrain.Models
                                     requestedTrades.Add(reqTrade);
                                     if (reqTrade.dealReference != "")
                                     {
-                                        dealSent = true;
+                                        //dealSent = true;
                                         thisDealRef = reqTrade.dealReference;
-                                        dealType = "PlaceDeal";
+                                        //dealType = "PlaceDeal";
                                     }
 
                                 }
@@ -1524,9 +1525,9 @@ namespace TradingBrain.Models
                                         string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId,this.igAccountId);
                                         if (dealRef != "")
                                         {
-                                            dealSent = true;
+                                            //dealSent = true;
                                             thisDealRef = dealRef;
-                                            dealType = "PlaceDeal";
+                                            //dealType = "PlaceDeal";
                                         }
 
                                         if (model.doSuppTrades && model.onSuppTrade)
@@ -1536,9 +1537,9 @@ namespace TradingBrain.Models
                                             dealRef = await CloseDeal("long", (double)this.suppTrade.size, this.suppTrade.dealId, this.igAccountId);
                                             if (dealRef != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = dealRef;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
                                         }
                                     }
@@ -1555,9 +1556,9 @@ namespace TradingBrain.Models
                                     requestedTrades.Add(reqTrade);
                                     if (reqTrade.dealReference != "")
                                     {
-                                        dealSent = true;
+                                        //dealSent = true;
                                         thisDealRef = reqTrade.dealReference;
-                                        dealType = "PlaceDeal";
+                                        //dealType = "PlaceDeal";
                                     }
                                 }
                                 else
@@ -1570,9 +1571,9 @@ namespace TradingBrain.Models
                                         string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                         if (dealRef != "")
                                         {
-                                            dealSent = true;
+                                            //dealSent = true;
                                             thisDealRef = dealRef;
-                                            dealType = "PlaceDeal";
+                                           // dealType = "PlaceDeal";
                                         }
 
                                         if (model.doSuppTrades && model.onSuppTrade)
@@ -1606,9 +1607,9 @@ namespace TradingBrain.Models
                                             string dealRef = await EditDeal((double)model.thisModel.currentTrade.buyPrice + model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId,  model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                             if (dealRef != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = dealRef;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
 
                                             //If on a supp trade then set that trades sl to be the same as the current trade
@@ -1642,9 +1643,9 @@ namespace TradingBrain.Models
                                                 string dealRef = await EditDeal((double)model.thisModel.currentTrade.buyPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                                 if (dealRef != "")
                                                 {
-                                                    dealSent = true;
+                                                    //dealSent = true;
                                                     thisDealRef = dealRef;
-                                                    dealType = "PlaceDeal";
+                                                    //dealType = "PlaceDeal";
                                                 }
                                             }
                                         }
@@ -1673,9 +1674,9 @@ namespace TradingBrain.Models
                                             string dealRef = await EditDeal((double)model.thisModel.currentTrade.sellPrice - model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                             if (dealRef != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = dealRef;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
                                             //If on a supp trade then set that trades sl to be the same as the current trade
                                             if (model.onSuppTrade && this.suppTrade != null)
@@ -1706,9 +1707,9 @@ namespace TradingBrain.Models
                                                 string dealRef = await EditDeal((double)model.thisModel.currentTrade.sellPrice + model.thisModel.currentTrade.stopLossValue, this.currentTrade.dealId, model.thisModel.currentTrade.stopLossValue, this.igAccountId);
                                                 if (dealRef != "")
                                                 {
-                                                    dealSent = true;
+                                                    //dealSent = true;
                                                     thisDealRef = dealRef;
-                                                    dealType = "PlaceDeal";
+                                                   // dealType = "PlaceDeal";
                                                 }
                                             }
                                         }
@@ -1890,7 +1891,7 @@ namespace TradingBrain.Models
         public async Task<RunRet> RunCodeV5(object sender, System.Timers.ElapsedEventArgs e)
         {
 
-            bool liveMode = true;
+            //bool liveMode = true;
             bool marketOpen = false;
 
             DateTime dtNow = DateTime.UtcNow;
@@ -2023,7 +2024,7 @@ namespace TradingBrain.Models
                         {
                             _startTime = new DateTime(2024, 11, 11, 16, 12, 00);
                             _endTime = new DateTime(2024, 11, 12, 14, 30, 00);
-                            liveMode = false;
+                            //liveMode = false;
                         }
                         modelInstanceInputs thisInput = new modelInstanceInputs();
                         //while (_startTime <= _endTime)
@@ -3349,14 +3350,14 @@ namespace TradingBrain.Models
             ScopeContext.PushProperty("epic", this.epicName + "/");
             ScopeContext.PushProperty("strategy", strategy + "/");
             ScopeContext.PushProperty("resolution", resolution + "/");
-            bool liveMode = true;
+            //bool liveMode = true;
             bool marketOpen = false;
 
             DateTime dtNow = DateTime.UtcNow;
             DateTime _startTime;
             resolution = "SECOND";
 
-            int numCandlesToStart = 20;
+            //int numCandlesToStart = 20;
 
             // Sometimes the timer that runs the RunCode will actually start at :59.xxx rather than at :00.000. This then means the minute candle is incorrect.
             //int seconds = dtNow.Second;
@@ -3388,7 +3389,7 @@ namespace TradingBrain.Models
                     // All candles loaded so lets crack on.
                     _igContainer.tbClient.FirstConfirmUpdate = false;
                     _igContainer2.tbClient.FirstConfirmUpdate = false;
-                    string param = "";
+                    //string param = "";
 
 
                     clsCommonFunctions.AddStatusMessage(" ----------------------------", "INFO", logName);
@@ -3632,8 +3633,8 @@ namespace TradingBrain.Models
 
 
                                     string thisDealRef = "";
-                                    string dealType = "";
-                                    bool dealSent = false;
+                                    //string dealType = "";
+                                    //bool dealSent = false;
 
                                     if (this.currentGRIDLTrade != null) { clsCommonFunctions.AddStatusMessage($"Current Long dealid = {this.currentGRIDLTrade.dealId}", "INFO", logName); }
                                     if (this.currentGRIDSTrade != null) { clsCommonFunctions.AddStatusMessage($"Current Short dealid = {this.currentGRIDSTrade.dealId}", "INFO", logName); }
@@ -3653,7 +3654,7 @@ namespace TradingBrain.Models
                                         buyingShorts = true;
                                     }
 
-                                    double currentPrice = 0;
+                                    //double currentPrice = 0;
                                     if (openLTrades.Count > 0 && sellingLongs == false)
                                     {
                                         clsCommonFunctions.AddStatusMessage($"GRID Long Trades - Num Trades : {openLTrades.Count}, Sum quantity : {openLTrades.Sum(x => x.quantity)}");
@@ -3689,9 +3690,9 @@ namespace TradingBrain.Models
                                         requestedTrades.Add(reqTrade);
                                         if (reqTrade.dealReference != "")
                                         {
-                                            dealSent = true;
+                                            //dealSent = true;
                                             thisDealRef = reqTrade.dealReference;
-                                            dealType = "PlaceDeal";
+                                            //dealType = "PlaceDeal";
                                         }
 
                                     }
@@ -3719,9 +3720,9 @@ namespace TradingBrain.Models
                                         requestedTrades.Add(reqTrade);
                                         if (reqTrade.dealReference != "")
                                         {
-                                            dealSent = true;
+                                            //dealSent = true;
                                             thisDealRef = reqTrade.dealReference;
-                                            dealType = "PlaceDeal";
+                                            //dealType = "PlaceDeal";
                                         }
 
                                     }
@@ -3902,7 +3903,7 @@ namespace TradingBrain.Models
             ScopeContext.PushProperty("epic", this.epicName + "/");
             ScopeContext.PushProperty("strategy", strategy + "/");
             ScopeContext.PushProperty("resolution", resolution + "/");
-            bool liveMode = true;
+            //bool liveMode = true;
             bool marketOpen = false;
 
             DateTime dtNow = DateTime.UtcNow;
@@ -4187,15 +4188,15 @@ namespace TradingBrain.Models
                                 if (param != "DEBUG")
                             {
                                 string thisDealRef = "";
-                                string dealType = "";
-                                bool dealSent = false;
+                                //string dealType = "";
+                                //bool dealSent = false;
 
 
                                 //////////////////////////////////////////////////////////////////////////////////////////////
                                 // Check for changes to stop limit that would mean the current trade has to end immediately //
                                 //////////////////////////////////////////////////////////////////////////////////////////////
 
-                                double currentPrice = 0;
+                                //double currentPrice = 0;
                                 if (openTrades.Count > 0 && sellingLongs == false)
                                 {
                                     clsCommonFunctions.AddStatusMessage($"BOLLI Trades ");
@@ -4221,9 +4222,9 @@ namespace TradingBrain.Models
                                     requestedTrades.Add(reqTrade);
                                     if (reqTrade.dealReference != "")
                                     {
-                                        dealSent = true;
+                                        //dealSent = true;
                                         thisDealRef = reqTrade.dealReference;
-                                        dealType = "PlaceDeal";
+                                        //dealType = "PlaceDeal";
                                     }
 
                                 }
@@ -4482,8 +4483,8 @@ namespace TradingBrain.Models
             try
             {
                 this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-                MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
-
+                //MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+                ScopeContext.PushProperty("jobId", this.logName);
                 //    //var tradeSubUpdate = JsonConvert.DeserializeObject<LsTradeSubscriptionData>(inputData);
                 TradeSubUpdate tradeSubUpdate = (TradeSubUpdate)JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
                 tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString();
@@ -4548,7 +4549,7 @@ namespace TradingBrain.Models
                                     }
                                 }catch(Exception e)
                                 {
-                                    clsCommonFunctions.AddStatusMessage("Trade update received for unknown deal id  ", "WARNING");
+                                    clsCommonFunctions.AddStatusMessage("Trade update received for unknown deal id  - " + e.ToString(), "WARNING");
                                     return;
                                 }
                             }
@@ -5929,7 +5930,8 @@ namespace TradingBrain.Models
         {
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
             this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
-            MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            //MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
+            ScopeContext.PushProperty("jobId", this.logName);
             try
             {
                 TradeSubUpdate tradeSubUpdate = (TradeSubUpdate)JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
@@ -6383,8 +6385,8 @@ namespace TradingBrain.Models
                                 {
 
                                     string thisDealRef = "";
-                                    string dealType = "";
-                                    bool dealSent = false;
+                                    //string dealType = "";
+                                    //bool dealSent = false;
                                     //////////////////////////////////////////////////////////////////////////////////////////////
                                     // Check for changes to stop limit that would mean the current trade has to end immediately //
                                     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -6425,9 +6427,9 @@ namespace TradingBrain.Models
                                         requestedTrades.Add(reqTrade);
                                         if (reqTrade.dealReference != "")
                                         {
-                                            dealSent = true;
+                                            //dealSent = true;
                                             thisDealRef = reqTrade.dealReference;
-                                            dealType = "PlaceDeal";
+                                            //dealType = "PlaceDeal";
                                         }
                                     }
                                     else
@@ -6439,9 +6441,9 @@ namespace TradingBrain.Models
                                             string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                             if (dealRef != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = dealRef;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
                                         }
                                     }
@@ -6877,8 +6879,8 @@ namespace TradingBrain.Models
                                 {
 
                                     string thisDealRef = "";
-                                    string dealType = "";
-                                    bool dealSent = false;
+                                    //string dealType = "";
+                                    //bool dealSent = false;
 
                                     //////////////////////////////////////////////////////////////////////////////////////////////
                                     // Check for changes to stop limit that would mean the current trade has to end immediately //
@@ -6921,9 +6923,9 @@ namespace TradingBrain.Models
 
                                         if (reqTrade.dealReference != "")
                                         {
-                                            dealSent = true;
+                                            //dealSent = true;
                                             thisDealRef = reqTrade.dealReference;
-                                            dealType = "PlaceDeal";
+                                            //dealType = "PlaceDeal";
                                         }
                                     }
                                     else
@@ -6936,9 +6938,9 @@ namespace TradingBrain.Models
                                             string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                             if (dealRef != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = dealRef;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
 
                                         }
@@ -7390,8 +7392,8 @@ namespace TradingBrain.Models
                                 {
 
                                     string thisDealRef = "";
-                                    string dealType = "";
-                                    bool dealSent = false;
+                                    //string dealType = "";
+                                   // bool dealSent = false;
 
                                     //////////////////////////////////////////////////////////////////////////////////////////////
                                     // Check for changes to stop limit that would mean the current trade has to end immediately //
@@ -7434,9 +7436,9 @@ namespace TradingBrain.Models
 
                                         if (reqTrade.dealReference != "")
                                         {
-                                            dealSent = true;
+                                            //dealSent = true;
                                             thisDealRef = reqTrade.dealReference;
-                                            dealType = "PlaceDeal";
+                                           // dealType = "PlaceDeal";
                                         }
                                     }
                                     else
@@ -7449,9 +7451,9 @@ namespace TradingBrain.Models
                                             string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                             if (dealRef != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = dealRef;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
 
                                         }
@@ -7958,8 +7960,8 @@ namespace TradingBrain.Models
                                     {
 
                                         string thisDealRef = "";
-                                        string dealType = "";
-                                        bool dealSent = false;
+                                        //string dealType = "";
+                                        //bool dealSent = false;
 
                                         //////////////////////////////////////////////////////////////////////////////////////////////
                                         // Check for changes to stop limit that would mean the current trade has to end immediately //
@@ -8002,9 +8004,9 @@ namespace TradingBrain.Models
 
                                             if (reqTrade.dealReference != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = reqTrade.dealReference;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
                                         }
                                         else
@@ -8017,9 +8019,9 @@ namespace TradingBrain.Models
                                                 string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                                 if (dealRef != "")
                                                 {
-                                                    dealSent = true;
+                                                    //dealSent = true;
                                                     thisDealRef = dealRef;
-                                                    dealType = "PlaceDeal";
+                                                    //dealType = "PlaceDeal";
                                                 }
 
                                             }
@@ -8549,8 +8551,8 @@ namespace TradingBrain.Models
                                     {
 
                                         string thisDealRef = "";
-                                        string dealType = "";
-                                        bool dealSent = false;
+                                        //string dealType = "";
+                                        //bool dealSent = false;
 
                                         //////////////////////////////////////////////////////////////////////////////////////////////
                                         // Check for changes to stop limit that would mean the current trade has to end immediately //
@@ -8577,9 +8579,9 @@ namespace TradingBrain.Models
 
                                             if (reqTrade.dealReference != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = reqTrade.dealReference;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
                                         }
                                         else
@@ -8592,9 +8594,9 @@ namespace TradingBrain.Models
                                                 string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                                 if (dealRef != "")
                                                 {
-                                                    dealSent = true;
+                                                    //dealSent = true;
                                                     thisDealRef = dealRef;
-                                                    dealType = "PlaceDeal";
+                                                    //dealType = "PlaceDeal";
                                                 }
 
                                             }
@@ -8615,9 +8617,9 @@ namespace TradingBrain.Models
 
                                             if (reqTrade.dealReference != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = reqTrade.dealReference;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
                                         }
                                         else
@@ -8630,9 +8632,9 @@ namespace TradingBrain.Models
                                                 string dealRef = await CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                                 if (dealRef != "")
                                                 {
-                                                    dealSent = true;
+                                                    //dealSent = true;
                                                     thisDealRef = dealRef;
-                                                    dealType = "PlaceDeal";
+                                                    //dealType = "PlaceDeal";
                                                 }
 
                                             }
@@ -9216,8 +9218,8 @@ namespace TradingBrain.Models
                                     {
 
                                         string thisDealRef = "";
-                                        string dealType = "";
-                                        bool dealSent = false;
+                                        //string dealType = "";
+                                        //bool dealSent = false;
 
                                         //////////////////////////////////////////////////////////////////////////////////////////////
                                         // Check for changes to stop limit that would mean the current trade has to end immediately //
@@ -9244,9 +9246,9 @@ namespace TradingBrain.Models
 
                                             if (reqTrade.dealReference != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = reqTrade.dealReference;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
                                         }
                                         else
@@ -9259,9 +9261,9 @@ namespace TradingBrain.Models
                                                 string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                                 if (dealRef != "")
                                                 {
-                                                    dealSent = true;
+                                                    //dealSent = true;
                                                     thisDealRef = dealRef;
-                                                    dealType = "PlaceDeal";
+                                                    //dealType = "PlaceDeal";
                                                 }
 
                                             }
@@ -9282,9 +9284,9 @@ namespace TradingBrain.Models
 
                                             if (reqTrade.dealReference != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = reqTrade.dealReference;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
                                         }
                                         else
@@ -9297,9 +9299,9 @@ namespace TradingBrain.Models
                                                 string dealRef = await CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                                 if (dealRef != "")
                                                 {
-                                                    dealSent = true;
+                                                    //dealSent = true;
                                                     thisDealRef = dealRef;
-                                                    dealType = "PlaceDeal";
+                                                    //dealType = "PlaceDeal";
                                                 }
 
                                             }
@@ -9775,8 +9777,8 @@ namespace TradingBrain.Models
                                     {
 
                                         string thisDealRef = "";
-                                        string dealType = "";
-                                        bool dealSent = false;
+                                       // string dealType = "";
+                                       // bool dealSent = false;
 
                                         //////////////////////////////////////////////////////////////////////////////////////////////
                                         // Check for changes to stop limit that would mean the current trade has to end immediately //
@@ -9819,9 +9821,9 @@ namespace TradingBrain.Models
 
                                             if (reqTrade.dealReference != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = reqTrade.dealReference;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
                                         }
                                         else
@@ -9834,9 +9836,9 @@ namespace TradingBrain.Models
                                                 string dealRef = await CloseDeal("short", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                                 if (dealRef != "")
                                                 {
-                                                    dealSent = true;
+                                                    //dealSent = true;
                                                     thisDealRef = dealRef;
-                                                    dealType = "PlaceDeal";
+                                                    //dealType = "PlaceDeal";
                                                 }
 
                                             }
@@ -10042,7 +10044,7 @@ namespace TradingBrain.Models
             ScopeContext.PushProperty("resolution", resolution + "/");
             int resMod = 0;
 
-            bool liveMode = true;
+            //bool liveMode = true;
             bool marketOpen = false;
 
             DateTime dtNow = DateTime.UtcNow;
@@ -10343,8 +10345,8 @@ namespace TradingBrain.Models
                                 {
 
                                     string thisDealRef = "";
-                                    string dealType = "";
-                                    bool dealSent = false;
+                                    //string dealType = "";
+                                    //bool dealSent = false;
 
                                     //////////////////////////////////////////////////////////////////////////////////////////////
                                     // Check for changes to stop limit that would mean the current trade has to end immediately //
@@ -10388,9 +10390,9 @@ namespace TradingBrain.Models
 
                                         if (reqTrade.dealReference != "")
                                         {
-                                            dealSent = true;
+                                            //dealSent = true;
                                             thisDealRef = reqTrade.dealReference;
-                                            dealType = "PlaceDeal";
+                                            //dealType = "PlaceDeal";
                                         }
                                     }
                                     else
@@ -10403,9 +10405,9 @@ namespace TradingBrain.Models
                                             string dealRef = await CloseDeal("long", (double)this.currentTrade.size, this.currentTrade.dealId, this.igAccountId);
                                             if (dealRef != "")
                                             {
-                                                dealSent = true;
+                                                //dealSent = true;
                                                 thisDealRef = dealRef;
-                                                dealType = "PlaceDeal";
+                                                //dealType = "PlaceDeal";
                                             }
 
                                         }
@@ -10770,7 +10772,7 @@ namespace TradingBrain.Models
                         clsCommonFunctions.AddStatusMessage("ChangeQuantity request received", "INFO", logName);
                         if (obj.messageValue != "")
                         {
-                            ModelVarsChange newVars = new ModelVarsChange();
+                            ModelVarsChange? newVars = new ModelVarsChange();
                             newVars = JsonConvert.DeserializeObject<ModelVarsChange>(obj.messageValue);
 
                             if (newVars.baseQuantity > 0)
@@ -10926,7 +10928,7 @@ namespace TradingBrain.Models
                         clsCommonFunctions.AddStatusMessage("ChangeQuantityRSI request received", "INFO", logName);
                         if (obj.messageValue != "")
                         {
-                            ModelVarsChange newVars = new ModelVarsChange();
+                            ModelVarsChange? newVars = new ModelVarsChange();
                             newVars = JsonConvert.DeserializeObject<ModelVarsChange>(obj.messageValue);
 
                             if (newVars.baseQuantity > 0)
@@ -11149,7 +11151,7 @@ namespace TradingBrain.Models
                 //AvgDates min30DatesShort = new AvgDates();
                 //min30DatesShort.GetAvgDates(dtDate, (min30AvgIndexShort-1));
 
-                string ret = "";
+               // string ret = "";
 
                 retCandle.epicName = epicName;
                 retCandle.candleStart = dtDate;
@@ -11309,7 +11311,7 @@ namespace TradingBrain.Models
                 // Start the loop to get [num] number of candles into the object
                 DateTime currentStart = CandleStart;
                 DateTime getStartDate = currentStart;
-                bool weekendDetected = false;
+                //bool weekendDetected = false;
                 for (int i = 0; i <= num - 1; i++)
                 {
 
@@ -11339,15 +11341,15 @@ namespace TradingBrain.Models
                             }
                             getStartDate = getStartDate.AddDays(daysToSubtract);
                             getStartDate = new DateTime(getStartDate.Year, getStartDate.Month, getStartDate.Day, 20, getStartDate.Minute, 0);
-                            weekendDetected = true;
+                            //weekendDetected = true;
                         }
                         else
                         {
                             //if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate))
-                            if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates,epic.Epic).Result)
-                            {
-                                weekendDetected = false;
-                            }
+                            //if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates,epic.Epic).Result)
+                            //{
+                            //    weekendDetected = false;
+                            //}
                         }
 
                         clsMinuteCandle item = await Get_MinuteCandle(the_db, container, epic, getStartDate);
@@ -11449,7 +11451,7 @@ namespace TradingBrain.Models
                 // Start the loop to get [num] number of candles into the object
                 DateTime currentStart = CandleStart;
                 DateTime getStartDate = currentStart;
-                bool weekendDetected = false;
+               // bool weekendDetected = false;
                 for (int i = 0; i <= num - 1; i++)
                 {
 
@@ -11480,15 +11482,15 @@ namespace TradingBrain.Models
                             }
                             getStartDate = getStartDate.AddDays(daysToSubtract);
                             getStartDate = new DateTime(getStartDate.Year, getStartDate.Month, getStartDate.Day, 20, getStartDate.Minute, 0);
-                            weekendDetected = true;
+                            //weekendDetected = true;
                         }
                         else
                         {
                             //if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate))
-                            if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates,epic.Epic).Result)
-                            {
-                                weekendDetected = false;
-                            }
+                            //if (IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, exchangeClosedDates,epic.Epic).Result)
+                            //{
+                            //    weekendDetected = false;
+                            //}
                         }
 
                         //clsMinuteCandle item = await Get_MinuteCandle(the_db, container, epic, getStartDate);
@@ -12092,7 +12094,7 @@ namespace TradingBrain.Models
                                 this.model.onMarket = true;
 
 
-                                tradeItem thisTde = this.model.thisModel.gridLTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDLTrade.tbDealId);
+                                tradeItem? thisTde = this.model.thisModel.gridLTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDLTrade.tbDealId);
                                 if (thisTde == null)
                                 {
                                     this.model.thisModel.gridLTrades.Add(thisTrade);
@@ -12176,7 +12178,7 @@ namespace TradingBrain.Models
                                 this.model.onMarket = true;
 
 
-                                tradeItem thisTde = this.model.thisModel.gridSTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDSTrade.tbDealId);
+                                tradeItem? thisTde = this.model.thisModel.gridSTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDSTrade.tbDealId);
                                 if (thisTde == null)
                                 {
                                     this.model.thisModel.gridSTrades.Add(thisTrade);
@@ -12262,7 +12264,7 @@ namespace TradingBrain.Models
                                     this.model.onMarket = true;
 
 
-                                    tradeItem thisTde = this.model.thisModel.bolliTrades.Find(x => x.tbDealId == this.model.thisModel.currentTrade.tbDealId);
+                                    tradeItem? thisTde = this.model.thisModel.bolliTrades.Find(x => x.tbDealId == this.model.thisModel.currentTrade.tbDealId);
                                     if (thisTde == null)
                                     {
                                         this.model.thisModel.bolliTrades.Add(thisTrade);
@@ -12323,7 +12325,7 @@ namespace TradingBrain.Models
 
                                         if (this.strategy == "BOLLI")
                                         {
-                                            tradeItem thisTde = this.model.thisModel.bolliTrades.Find(x => x.tbDealId == this.model.thisModel.currentTrade.tbDealId);
+                                            tradeItem? thisTde = this.model.thisModel.bolliTrades.Find(x => x.tbDealId == this.model.thisModel.currentTrade.tbDealId);
                                             if (thisTde == null)
                                             {
                                                 this.model.thisModel.bolliTrades.Add(thisTrade);
@@ -12513,7 +12515,7 @@ namespace TradingBrain.Models
 
             try
             {
-                Microsoft.Azure.Cosmos.Container container = the_app_db.GetContainer("TradingBrainTrades");
+                Microsoft.Azure.Cosmos.Container? container = the_app_db.GetContainer("TradingBrainTrades");
                 string qry = "SELECT * FROM  c WHERE  c.tbDealId=@DealID AND c.strategy = @strategy AND c.resolution = @resolution ";
                 if (strategy == "SMA")
                 {
@@ -12578,7 +12580,7 @@ namespace TradingBrain.Models
 
             try
             {
-                Microsoft.Azure.Cosmos.Container container = the_app_db.GetContainer("TradingBrainTrades");
+                Microsoft.Azure.Cosmos.Container? container = the_app_db.GetContainer("TradingBrainTrades");
                 string qry = "SELECT * FROM  c WHERE  c.tbDealId=@DealID   ";
 
                 var parameterizedQuery = new QueryDefinition(
@@ -12638,7 +12640,7 @@ namespace TradingBrain.Models
 
             try
             {
-                Microsoft.Azure.Cosmos.Container container = the_app_db.GetContainer("TradingBrainTrades");
+                Microsoft.Azure.Cosmos.Container? container = the_app_db.GetContainer("TradingBrainTrades");
 
                 var parameterizedQuery = new QueryDefinition(
                     query: "SELECT * FROM  c WHERE  c.suppOrderId=@DealID "
@@ -12697,7 +12699,7 @@ namespace TradingBrain.Models
 
             try
             {
-                Microsoft.Azure.Cosmos.Container container = the_app_db.GetContainer("TradingBrainOrders");
+                Microsoft.Azure.Cosmos.Container? container = the_app_db.GetContainer("TradingBrainOrders");
 
                 var parameterizedQuery = new QueryDefinition(
                     query: "SELECT * FROM  c WHERE  c.tbDealId=@DealID "
@@ -12758,7 +12760,7 @@ namespace TradingBrain.Models
 
             try
             {
-                Microsoft.Azure.Cosmos.Container container = the_app_db.GetContainer("TradingBrainTrades");
+                Microsoft.Azure.Cosmos.Container? container = the_app_db.GetContainer("TradingBrainTrades");
 
                 var parameterizedQuery = new QueryDefinition(
                     query: "SELECT * FROM  c WHERE  c.tbDealId=@DealID "

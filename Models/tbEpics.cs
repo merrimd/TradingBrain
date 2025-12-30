@@ -19,6 +19,8 @@ namespace TradingBrain.Models
         }
         public tbEpics(string input)
         {
+            resolution = "";
+            strategy = "";
             List<string> tmp = input.Split("|").ToList();
             epic = tmp[0];
             if (tmp.Count == 2)
