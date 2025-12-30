@@ -164,7 +164,6 @@ namespace TradingBrain.Models
             try
             {
                 this.logName = IGModels.clsCommonFunctions.GetLogName(epic, strategy, resolution);
-
                 ScopeContext.PushProperty("app", "TRADINGBRAIN/");
                 ScopeContext.PushProperty("epic", epic + "/");
                 ScopeContext.PushProperty("strategy", strategy + "/");
