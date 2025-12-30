@@ -280,10 +280,10 @@ namespace TradingBrain.Models
                 if (useEnvironment)
                 {
                     creds2.igEnvironment = Environment.GetEnvironmentVariable("environment") ?? "DEMO";
-                    creds2.igUsername = Environment.GetEnvironmentVariable("username." + creds2.igEnvironment) ?? "";
-                    creds2.igPassword = Environment.GetEnvironmentVariable("password." + creds2.igEnvironment) ?? "";
-                    creds2.igApiKey = Environment.GetEnvironmentVariable("apikey." + creds2.igEnvironment) ?? "";
-                    creds2.igAccountId = Environment.GetEnvironmentVariable("accountId." + creds2.igEnvironment) ?? "";
+                    creds2.igUsername = Environment.GetEnvironmentVariable("username2." + creds2.igEnvironment) ?? "";
+                    creds2.igPassword = Environment.GetEnvironmentVariable("password2." + creds2.igEnvironment) ?? "";
+                    creds2.igApiKey = Environment.GetEnvironmentVariable("apikey2." + creds2.igEnvironment) ?? "";
+                    creds2.igAccountId = Environment.GetEnvironmentVariable("accountId2." + creds2.igEnvironment) ?? "";
                 }
                 else
                 {
