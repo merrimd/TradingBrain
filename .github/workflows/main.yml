@@ -38,7 +38,7 @@ jobs:
               SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
             shell: powershell
             run: |
-              ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"merrimd_TradingBrain" /o:"merrimd" /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+              ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"merrimd_TradingBrain" /o:"merrimd" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.qualitygate.wait=true
               dotnet build tradingbrain.csproj
               ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
  
