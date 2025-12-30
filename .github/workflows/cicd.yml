@@ -38,13 +38,13 @@ jobs:
       # Static code analysis
       - name: Run code linting
         run: |
-          dotnet format --verify-no-changes --verbosity diagnostic
+          dotnet format tradingbrain.csproj --verify-no-changes --verbosity diagnostic
         continue-on-error: true
 
       # Dependency vulnerability scanning
       - name: Run dependency scan
         run: |
-          dotnet list package --vulnerable --include-transitive
+           dotnet list tradingbrain.csproj package --vulnerable --include-transitive package --vulnerable --include-transitive
         continue-on-error: true
 
       # GitHub Code Scanning (CodeQL)
@@ -56,7 +56,7 @@ jobs:
 
       - name: Build for CodeQL analysis
         run: |
-          dotnet build /home/runner/work/TradingBrain/TradingBrain/TradingBrain.csproj --configuration Release
+          dotnet build tradingbrain.csproj --configuration Release
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
@@ -97,10 +97,10 @@ jobs:
         run: dotnet restore
 
       - name: Build application
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build tradingbrain.csproj --configuration Release --no-restore
 
       - name: Run unit tests
-        run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+        run: dotnet test tradingbrain.csproj --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
