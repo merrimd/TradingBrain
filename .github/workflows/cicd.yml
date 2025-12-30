@@ -56,7 +56,7 @@ jobs:
 
       - name: Build for CodeQL analysis
         run: |
-          dotnet build tradingbrain.csproj --configuration Release
+          dotnet build  --configuration Release
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
