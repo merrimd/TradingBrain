@@ -39,7 +39,7 @@ jobs:
             shell: powershell
             run: |
               ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"merrimd_TradingBrain" /o:"merrimd" /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
-              dotnet build
+              dotnet build tradingbrain/tradingbrain.csproj
               ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
  
     build-and-deploy:
