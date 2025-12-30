@@ -21,8 +21,8 @@ jobs:
             username: ${{ secrets.REGISTRY_USERNAME }}
             password: ${{ secrets.REGISTRY_PASSWORD }}
         - run: |
-            docker build . -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/tradingbrain-grid-test::${{ github.run_number }}
-            docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/tradingbrain-grid-test::${{ github.run_number }}
+            docker build . -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/tradingbrain-grid-test:${{ github.run_number }}
+            docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/tradingbrain-grid-test:${{ github.run_number }}
 
         - name: 'Update Container App with new revision'
           run: |
