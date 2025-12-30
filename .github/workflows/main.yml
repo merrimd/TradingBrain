@@ -43,6 +43,7 @@ jobs:
               ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
  
     build-and-deploy:
+        needs: build
         runs-on: ubuntu-latest
         steps:
         # checkout the repo
