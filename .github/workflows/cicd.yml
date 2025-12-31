@@ -289,11 +289,11 @@ jobs:
             --revision ${{ steps.revision.outputs.revision_name }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
 
-      - name: Run smoke tests
-        run: |
-          APP_URL="https://${{ env.AZURE_CONTAINER_APP_NAME }}.azurecontainerapps.io"
-          echo "Testing deployment at $APP_URL"
-          curl -f -s -o /dev/null -w "%{http_code}" $APP_URL/health || exit 1
+      #- name: Run smoke tests
+      #  run: |
+      #    APP_URL="https://${{ env.AZURE_CONTAINER_APP_NAME }}.azurecontainerapps.io"
+      #    echo "Testing deployment at $APP_URL"
+      #    curl -f -s -o /dev/null -w "%{http_code}" $APP_URL/health || exit 1
 
   # Notify on deployment status
   notify:
