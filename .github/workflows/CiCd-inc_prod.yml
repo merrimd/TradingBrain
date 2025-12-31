@@ -357,6 +357,12 @@ jobs:
     name: Deploy to Production Environment
     runs-on: ubuntu-latest
     needs: [build-container, approval-production]
+    environment:
+      name: production
+      url: https://${{ env.AZURE_CONTAINER_APP_NAME_PROD }}.azurecontainerapps.io
+    permissions:
+      id-token: write
+      contents: read
   # Deploy to Azure Container Apps (Production)
   deploy-production:
     name: Deploy to Production Environment
