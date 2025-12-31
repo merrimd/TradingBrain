@@ -180,12 +180,6 @@ jobs:
           name: test-results
           path: '**/TestResults/**/*.trx'
 
-      - name: Code coverage report
-        uses: codecov/codecov-action@v4
-        with:
-          files: '**/coverage.cobertura.xml'
-          fail_ci_if_error: false
-
   # Build and push container image
   build-container:
     name: Build Container Image
