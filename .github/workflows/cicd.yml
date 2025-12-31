@@ -240,7 +240,9 @@ jobs:
     
     steps:
       - name: Wait for approval
-        run: echo "Deployment approved for production environment"
+        run: |
+          echo "✅ Deployment approved for production environment"
+          echo "📦 Image: ${{ needs.build-container.outputs.image-tag }}"
 
   # Deploy to Azure Container Apps
   deploy:
