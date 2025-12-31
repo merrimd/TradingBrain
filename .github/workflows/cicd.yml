@@ -264,20 +264,29 @@ jobs:
              creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Container Apps
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          containerAppName: ${{ env.AZURE_CONTAINER_APP_NAME }}
-          resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
-          imageToDeploy: ${{ needs.build-container.outputs.image-tag }}
-          targetPort: 8080
-
-      - name: Verify deployment
         run: |
-          az containerapp show \
+          az containerapp update \
+            --name ${{ env.AZURE_CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Get latest revision
+        id: revision
+        run: |
+          REVISION=$(az containerapp show \
             --name ${{ env.AZURE_CONTAINER_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --query "properties.latestRevisionName" \
-            --output tsv
+            --output tsv)
+          echo "revision_name=$REVISION" >> $GITHUB_OUTPUT
+
+      - name: Verify deployment
+        run: |
+          echo "Deployed revision: ${{ steps.revision.outputs.revision_name }}"
+          az containerapp revision show \
+            --name ${{ steps.revision.outputs.revision_name }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --app ${{ env.AZURE_CONTAINER_APP_NAME }}
 
       - name: Run smoke tests
         run: |
