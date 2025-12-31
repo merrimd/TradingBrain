@@ -227,7 +227,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=v1,enable={{is_default_branch}}
 
       - name: Build and push container image
         id: build
@@ -242,10 +242,17 @@ jobs:
           provenance: true
           sbom: true
 
+      - name: Output image details
+        run: |
+          echo "Image tags: ${{ steps.meta.outputs.tags }}"
+          echo "Image digest: ${{ steps.build.outputs.digest }}"
+          echo "Full image reference: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v1"
+
+          
       #- name: Scan container image
       #  uses: aquasecurity/trivy-action@master
       #  with:
-      #    image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      #    image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v1
       #    format: 'sarif'
       #    output: 'container-scan-results.sarif'
       #    severity: 'CRITICAL,HIGH'
@@ -306,7 +313,7 @@ jobs:
           az containerapp update \
             --name ${{ env.AZURE_CONTAINER_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v1
 
       - name: Get latest revision
         id: revision
