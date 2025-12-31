@@ -35,6 +35,14 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Verify project file exists
+        run: |
+          ls -la
+          if [ ! -f "tradingbrain.csproj" ]; then
+            echo "Error: tradingbrain.csproj not found in root directory"
+            exit 1
+          fi
+
       # Static code analysis
       - name: Run code linting
         run: |
@@ -92,6 +100,14 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Verify project file exists
+        run: |
+          ls -la
+          if [ ! -f "tradingbrain.csproj" ]; then
+            echo "Error: tradingbrain.csproj not found in root directory"
+            exit 1
+          fi
 
       - name: Restore dependencies
         run: dotnet restore tradingbrain.csproj
