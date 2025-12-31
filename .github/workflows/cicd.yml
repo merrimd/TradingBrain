@@ -264,7 +264,16 @@ jobs:
         uses: azure/login@v2
         with:
              creds: ${{ secrets.AZURE_CREDENTIALS }}
-
+             
+      - name: Configure Container Registry credentials
+        run: |
+          az containerapp registry set \
+            --name ${{ env.AZURE_CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --server ${{ env.REGISTRY }} \
+            --username ${{ github.actor }} \
+            --password ${{ secrets.GHCR_PAT }}
+            
       - name: Deploy to Azure Container Apps
         run: |
           az containerapp update \
