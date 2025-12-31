@@ -38,21 +38,21 @@ jobs:
       - name: Verify project file exists
         run: |
           ls -la
-          if [ ! -f "tradingbrain.csproj" ]; then
-            echo "Error: tradingbrain.csproj not found in root directory"
+          if [ ! -f "TradingBrain.csproj" ]; then
+            echo "Error: TradingBrain.csproj not found in root directory"
             exit 1
           fi
 
       # Static code analysis
       - name: Run code linting
         run: |
-          dotnet format tradingbrain.csproj --verify-no-changes --verbosity diagnostic
+          dotnet format TradingBrain.csproj --verify-no-changes --verbosity diagnostic
         continue-on-error: true
 
       # Dependency vulnerability scanning
       - name: Run dependency scan
         run: |
-          dotnet list tradingbrain.csproj package --vulnerable --include-transitive
+          dotnet list TradingBrain.csproj package --vulnerable --include-transitive
         continue-on-error: true
 
       # GitHub Code Scanning (CodeQL)
@@ -64,7 +64,7 @@ jobs:
 
       - name: Build for CodeQL analysis
         run: |
-          dotnet build tradingbrain.csproj --configuration Release
+          dotnet build TradingBrain.csproj --configuration Release
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
@@ -104,19 +104,19 @@ jobs:
       - name: Verify project file exists
         run: |
           ls -la
-          if [ ! -f "tradingbrain.csproj" ]; then
-            echo "Error: tradingbrain.csproj not found in root directory"
+          if [ ! -f "TradingBrain.csproj" ]; then
+            echo "Error: TradingBrain.csproj not found in root directory"
             exit 1
           fi
 
       - name: Restore dependencies
-        run: dotnet restore tradingbrain.csproj
+        run: dotnet restore TradingBrain.csproj
 
       - name: Build application
-        run: dotnet build tradingbrain.csproj --configuration Release --no-restore
+        run: dotnet build TradingBrain.csproj --configuration Release --no-restore
 
       - name: Run unit tests
-        run: dotnet test tradingbrain.csproj --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+        run: dotnet test TradingBrain.csproj --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
