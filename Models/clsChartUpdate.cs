@@ -85,21 +85,25 @@ namespace TradingBrain.Models
                 catch (CosmosException de)
                 {
                     CommonFunctions.AddStatusMessage(de.ToString(), "ERROR");
-                    var log = new Log();
-                    log.Log_Message = de.ToString();
-                    log.Log_Type = "Error";
-                    log.Log_App = "clsChartUpdate/Add";
-                    log.Epic = this.Epic;
+                    var log = new Log
+                    {
+                        Log_Message = de.ToString(),
+                        Log_Type = "Error",
+                        Log_App = "clsChartUpdate/Add",
+                        Epic = this.Epic
+                    };
                     await log.Save();
                 }
                 catch (Exception e)
                 {
                     CommonFunctions.AddStatusMessage(e.ToString(), "ERROR");
-                    var log = new Log();
-                    log.Log_Message = e.ToString();
-                    log.Log_Type = "Error";
-                    log.Log_App = "clsChartUpdate/Add";
-                    log.Epic = this.Epic;
+                    var log = new Log
+                    {
+                        Log_Message = e.ToString(),
+                        Log_Type = "Error",
+                        Log_App = "clsChartUpdate/Add",
+                        Epic = this.Epic
+                    };
                     await log.Save();
                 }
             }

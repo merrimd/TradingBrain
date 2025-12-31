@@ -10563,10 +10563,12 @@ namespace TradingBrain.Models
                     }
                     catch (Exception ex)
                     {
-                        Log log = new Log(the_app_db);
-                        log.Log_Message = ex.ToString();
-                        log.Log_Type = "Error";
-                        log.Log_App = "RunCode";
+                        Log log = new Log(the_app_db)
+                        {
+                            Log_Message = ex.ToString(),
+                            Log_Type = "Error",
+                            Log_App = "RunCode"
+                        };
                         await log.Save();
                     }
 
