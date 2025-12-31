@@ -97,20 +97,20 @@ jobs:
           dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
       # Container image scanning
-      #- name: Run Trivy vulnerability scanner
-      #  uses: aquasecurity/trivy-action@master
-      #  with:
-      #    scan-type: 'fs'
-      #    scan-ref: '.'
-      #    format: 'sarif'
-      #    output: 'trivy-results.sarif'
-      #    severity: 'CRITICAL,HIGH'
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
 
-      #- name: Upload Trivy results to GitHub Security
-      #  uses: github/codeql-action/upload-sarif@v3
-      #  if: always()
-      #  with:
-      #    sarif_file: 'trivy-results.sarif'
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
 
   # Build and Test
   build-and-test:
@@ -154,11 +154,11 @@ jobs:
           name: test-results
           path: '**/TestResults/**/*.trx'
 
-      - name: Code coverage report
-        uses: codecov/codecov-action@v4
-        with:
-          files: '**/coverage.cobertura.xml'
-          fail_ci_if_error: false
+      #- name: Code coverage report
+      #  uses: codecov/codecov-action@v4
+      #  with:
+      #    files: '**/coverage.cobertura.xml'
+      #    fail_ci_if_error: false
 
   # Build and push container image (only on main branch or after PR approval)
   build-container:
