@@ -18,9 +18,9 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  AZURE_CONTAINER_APP_NAME: my-container-app
-  AZURE_RESOURCE_GROUP: my-resource-group
-  AZURE_CONTAINER_APP_ENVIRONMENT: my-environment
+  AZURE_CONTAINER_APP_NAME: tradingbrain-grid-test
+  AZURE_RESOURCE_GROUP: IGContainerGrp
+  AZURE_CONTAINER_APP_ENVIRONMENT: managedEnvironment-IGContainerGrp-93fe
 
 jobs:
   # Code Quality and Security Checks
