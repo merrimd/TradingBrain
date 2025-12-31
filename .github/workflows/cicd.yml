@@ -284,9 +284,8 @@ jobs:
         run: |
           echo "Deployed revision: ${{ steps.revision.outputs.revision_name }}"
           az containerapp revision show \
-            --name ${{ steps.revision.outputs.revision_name }} \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --app ${{ env.AZURE_CONTAINER_APP_NAME }}
+            --revision ${{ steps.revision.outputs.revision_name }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
 
       - name: Run smoke tests
         run: |
