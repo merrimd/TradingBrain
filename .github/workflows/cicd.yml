@@ -10,9 +10,9 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  AZURE_CONTAINER_APP_NAME: tradingbrain-grid-test
-  AZURE_RESOURCE_GROUP: IGContainerGrp
-  AZURE_CONTAINER_APP_ENVIRONMENT: managedEnvironment-IGContainerGrp-93fe
+  AZURE_CONTAINER_APP_NAME: my-container-app
+  AZURE_RESOURCE_GROUP: my-resource-group
+  AZURE_CONTAINER_APP_ENVIRONMENT: my-environment
 
 jobs:
   # Code Quality and Security Checks
@@ -44,7 +44,7 @@ jobs:
       # Dependency vulnerability scanning
       - name: Run dependency scan
         run: |
-           dotnet list tradingbrain.csproj package --vulnerable --include-transitive package --vulnerable --include-transitive
+          dotnet list tradingbrain.csproj package --vulnerable --include-transitive
         continue-on-error: true
 
       # GitHub Code Scanning (CodeQL)
@@ -94,7 +94,7 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore tradingbrain.csproj
 
       - name: Build application
         run: dotnet build tradingbrain.csproj --configuration Release --no-restore
