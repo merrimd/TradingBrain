@@ -816,7 +816,7 @@ namespace TradingBrain.Models
 
             try
             {
-                if (the_db == null) { throw new Exception("Database is null"); }
+                if (the_db == null) { throw new InvalidOperationException("Database is null"); }
                 Container container = the_db.GetContainer("TradingBrainSettings");
                 Container container_opt = the_db.GetContainer("OptimizeRunData");
 
@@ -918,7 +918,7 @@ namespace TradingBrain.Models
 
             //        if (thisApp.model == null)
             //        {
-            //            throw new Exception("thisApp.model is null");
+            //            throw new InvalidOperationException("thisApp.model is null");
             //        }
 
             //        double quantity = Math.Min(thisApp.model.thisModel.currentTrade.quantity * thisApp.model.modelVar.suppQuantityMultiplier, thisApp.model.modelVar.maxQuantity);

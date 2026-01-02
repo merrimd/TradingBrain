@@ -156,7 +156,7 @@ namespace TradingBrain.Models
             {
                 if (the_app_db == null)
                 {
-                    throw new Exception("Application database is null in setInitialModelVar");
+                    throw new InvalidOperationException("Application database is null in setInitialModelVar");
                 }
                 Task<TradingBrainSettings> tb = Task.Run<TradingBrainSettings>(async () => await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution));
                 //return tb.Result;
@@ -183,11 +183,11 @@ namespace TradingBrain.Models
             {
                 if (igContainer == null)
                 {
-                    throw new Exception("IG Container is null in MainApp");
+                    throw new InvalidOperationException("IG Container is null in MainApp");
                 }
                 if (igContainer2 == null && strategy == "GRID")
                 {
-                    throw new Exception("IG Container2 is null in MainApp");
+                    throw new InvalidOperationException("IG Container2 is null in MainApp");
                 }
 
                 igAccountId = "";
@@ -200,11 +200,11 @@ namespace TradingBrain.Models
                 the_app_db = appDb;
                 if (the_db == null)
                 {
-                    throw new Exception("Database is null in MainApp");
+                    throw new InvalidOperationException("Database is null in MainApp");
                 }
                 if (the_app_db == null)
                 {
-                    throw new Exception("Application Database is null in MainApp");
+                    throw new InvalidOperationException("Application Database is null in MainApp");
                 }
 
                 candles_RSI_container = the_db.GetContainer("Candles_RSI");
@@ -429,11 +429,11 @@ namespace TradingBrain.Models
             {
                 if (_igContainer == null)
                 {
-                    throw new Exception("IG Container is null in PlaceOrder");
+                    throw new InvalidOperationException("IG Container is null in PlaceOrder");
                 }
                 if (_igContainer2 == null && strategy == "GRID")
                 {
-                    throw new Exception("IG Container2 is null in PlaceOrder");
+                    throw new InvalidOperationException("IG Container2 is null in PlaceOrder");
                 }
                 //Get IG container based on account ID
                 IGContainer _igContainerToUse = new IGContainer();
@@ -452,9 +452,9 @@ namespace TradingBrain.Models
                     return ret;
                 }
 
-                if (_igContainerToUse == null) { throw new Exception("IG Container to use is null in PlaceOrder"); }
-                if (_igContainerToUse.igRestApiClient == null) { throw new Exception("IG Rest API Client is null in PlaceOrder"); }
-                if (_igContainerToUse.tbClient == null) { throw new Exception("tbClient is null in PlaceOrder"); }
+                if (_igContainerToUse == null) { throw new InvalidOperationException("IG Container to use is null in PlaceOrder"); }
+                if (_igContainerToUse.igRestApiClient == null) { throw new InvalidOperationException("IG Rest API Client is null in PlaceOrder"); }
+                if (_igContainerToUse.tbClient == null) { throw new InvalidOperationException("tbClient is null in PlaceOrder"); }
 
                 CommonFunctions.AddStatusMessage($"Placing new order = direction = {direction}, quantity = {quantity}, stopLoss = {stopLoss}, dealPrice = {dealPrice}, accountId = {accountId}", "INFO");
                 TradingBrain.Models.CommonFunctions.SaveLog("Info", "PlaceOrder", "Placing order - direction = " + direction + ", quantity = " + quantity + ", stopLoss = " + stopLoss + ", accountID = " + accountId, the_app_db);
@@ -523,11 +523,11 @@ namespace TradingBrain.Models
             {
                 if (_igContainer == null)
                 {
-                    throw new Exception("IG Container is null in DeleteOrder");
+                    throw new InvalidOperationException("IG Container is null in DeleteOrder");
                 }
                 if (_igContainer2 == null && strategy == "GRID")
                 {
-                    throw new Exception("IG Container2 is null in DeleteOrder");
+                    throw new InvalidOperationException("IG Container2 is null in DeleteOrder");
                 }
 
                 IGContainer _igContainerToUse = new IGContainer();
@@ -544,9 +544,9 @@ namespace TradingBrain.Models
                     // account ID not found
                     CommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
                 }
-                if (_igContainerToUse == null) { throw new Exception("IG Container to use is null in DeleteOrder"); }
-                if (_igContainerToUse.igRestApiClient == null) { throw new Exception("IG Rest API Client is null in DeleteOrder"); }
-                if (_igContainerToUse.tbClient == null) { throw new Exception("tbClient is null in DeleteOrder"); }
+                if (_igContainerToUse == null) { throw new InvalidOperationException("IG Container to use is null in DeleteOrder"); }
+                if (_igContainerToUse.igRestApiClient == null) { throw new InvalidOperationException("IG Rest API Client is null in DeleteOrder"); }
+                if (_igContainerToUse.tbClient == null) { throw new InvalidOperationException("tbClient is null in DeleteOrder"); }
 
                 bool newsession = false;
                 TradingBrain.Models.CommonFunctions.SaveLog("Info", "DeleteOrder", "Deleting order", the_app_db);
@@ -599,11 +599,11 @@ namespace TradingBrain.Models
             {
                 if (_igContainer == null)
                 {
-                    throw new Exception("IG Container is null in PlaceDeal");
+                    throw new InvalidOperationException("IG Container is null in PlaceDeal");
                 }
                 if (_igContainer2 == null && strategy == "GRID")
                 {
-                    throw new Exception("IG Container2 is null in PlaceDeal");
+                    throw new InvalidOperationException("IG Container2 is null in PlaceDeal");
                 }
 
                 IGContainer _igContainerToUse = new IGContainer();
@@ -620,9 +620,9 @@ namespace TradingBrain.Models
                     // account ID not found
                     CommonFunctions.AddStatusMessage($"PlaceOrder - Account ID {accountId} not found", "ERROR");
                 }
-                if (_igContainerToUse == null) { throw new Exception("IG Container to use is null in PlaceDeal"); }
-                if (_igContainerToUse.igRestApiClient == null) { throw new Exception("IG Rest API Client is null in PlaceDeal"); }
-                if (_igContainerToUse.tbClient == null) { throw new Exception("tbClient is null in PlaceDeal"); }
+                if (_igContainerToUse == null) { throw new InvalidOperationException("IG Container to use is null in PlaceDeal"); }
+                if (_igContainerToUse.igRestApiClient == null) { throw new InvalidOperationException("IG Rest API Client is null in PlaceDeal"); }
+                if (_igContainerToUse.tbClient == null) { throw new InvalidOperationException("tbClient is null in PlaceDeal"); }
 
                 bool newsession = false;
                 CommonFunctions.AddStatusMessage($"Placing new deal = direction = {direction}, quantity = {quantity}, stopLoss = {stopLoss}, target = {target}, accountId = {accountId} ", "INFO");
@@ -768,11 +768,11 @@ namespace TradingBrain.Models
             {
                 if (_igContainer == null)
                 {
-                    throw new Exception("IG Container is null in CloseDeal");
+                    throw new InvalidOperationException("IG Container is null in CloseDeal");
                 }
                 if (_igContainer2 == null && strategy == "GRID")
                 {
-                    throw new Exception("IG Container2 is null in CloseDeal");
+                    throw new InvalidOperationException("IG Container2 is null in CloseDeal");
                 }
 
                 IGContainer _igContainerToUse = new IGContainer();
@@ -789,9 +789,9 @@ namespace TradingBrain.Models
                     // account ID not found
                     CommonFunctions.AddStatusMessage($"CloseDeal - Account ID {accountId} not found", "ERROR");
                 }
-                if (_igContainerToUse == null) { throw new Exception("IG Container to use is null in CloseDeal"); }
-                if (_igContainerToUse.igRestApiClient == null) { throw new Exception("IG Rest API Client is null in CloseDeal"); }
-                if (_igContainerToUse.tbClient == null) { throw new Exception("tbClient is null in CloseDeal"); }
+                if (_igContainerToUse == null) { throw new InvalidOperationException("IG Container to use is null in CloseDeal"); }
+                if (_igContainerToUse.igRestApiClient == null) { throw new InvalidOperationException("IG Rest API Client is null in CloseDeal"); }
+                if (_igContainerToUse.tbClient == null) { throw new InvalidOperationException("tbClient is null in CloseDeal"); }
                 bool newsession = false;
                 //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "CloseDeal", "Closing deal", the_app_db);
                 dto.endpoint.positions.close.v1.ClosePositionRequest pos = new dto.endpoint.positions.close.v1.ClosePositionRequest();
@@ -865,11 +865,11 @@ namespace TradingBrain.Models
                 // closes all trades for the epic
                 if (_igContainer == null)
                 {
-                    throw new Exception("IG Container is null in CloseDealEpic");
+                    throw new InvalidOperationException("IG Container is null in CloseDealEpic");
                 }
                 if (_igContainer2 == null && strategy == "GRID")
                 {
-                    throw new Exception("IG Container2 is null in CloseDealEpic");
+                    throw new InvalidOperationException("IG Container2 is null in CloseDealEpic");
                 }
 
                 IGContainer _igContainerToUse = new IGContainer();
@@ -886,9 +886,9 @@ namespace TradingBrain.Models
                     // account ID not found
                     CommonFunctions.AddStatusMessage($"CloseDealEpic - Account ID {accountId} not found", "ERROR");
                 }
-                if (_igContainerToUse == null) { throw new Exception("IG Container to use is null in CloseDealEpic"); }
-                if (_igContainerToUse.igRestApiClient == null) { throw new Exception("IG Rest API Client is null in CloseDealEpic"); }
-                if (_igContainerToUse.tbClient == null) { throw new Exception("tbClient is null in CloseDealEpic"); }
+                if (_igContainerToUse == null) { throw new InvalidOperationException("IG Container to use is null in CloseDealEpic"); }
+                if (_igContainerToUse.igRestApiClient == null) { throw new InvalidOperationException("IG Rest API Client is null in CloseDealEpic"); }
+                if (_igContainerToUse.tbClient == null) { throw new InvalidOperationException("tbClient is null in CloseDealEpic"); }
                 List<tradeItem> trades = new List<tradeItem>();
 
                 bool newsession = false;
@@ -968,11 +968,11 @@ namespace TradingBrain.Models
             {
                 if (_igContainer == null)
                 {
-                    throw new Exception("IG Container is null in EditDeal");
+                    throw new InvalidOperationException("IG Container is null in EditDeal");
                 }
                 if (_igContainer2 == null && strategy == "GRID")
                 {
-                    throw new Exception("IG Container2 is null in EditDeal");
+                    throw new InvalidOperationException("IG Container2 is null in EditDeal");
                 }
 
                 IGContainer _igContainerToUse = new IGContainer();
@@ -989,9 +989,9 @@ namespace TradingBrain.Models
                     // account ID not found
                     CommonFunctions.AddStatusMessage($"EditDeal - Account ID {accountId} not found", "ERROR");
                 }
-                if (_igContainerToUse == null) { throw new Exception("IG Container to use is null in EditDeal"); }
-                if (_igContainerToUse.igRestApiClient == null) { throw new Exception("IG Rest API Client is null in EditDeal"); }
-                if (_igContainerToUse.tbClient == null) { throw new Exception("tbClient is null in EditDeal"); }
+                if (_igContainerToUse == null) { throw new InvalidOperationException("IG Container to use is null in EditDeal"); }
+                if (_igContainerToUse.igRestApiClient == null) { throw new InvalidOperationException("IG Rest API Client is null in EditDeal"); }
+                if (_igContainerToUse.tbClient == null) { throw new InvalidOperationException("tbClient is null in EditDeal"); }
 
                 CommonFunctions.AddStatusMessage("Editing deal. StopLoss = " + stopLoss + " - dealId = " + dealID, "INFO");
                 bool newsession = false;
@@ -1901,10 +1901,10 @@ namespace TradingBrain.Models
 
                 DateTime _endTime = _startTime;
 
-                if (model == null) { throw new Exception("Model is null in RunCodeV5"); }
-                if (_igContainer == null || _igContainer.tbClient == null) { throw new Exception("IG Container is null in RunCodeV5"); }
-                if (modelVar == null) { throw new Exception("ModelVars is null in RunCodeV5"); }
-                if (currentStatus == null) { throw new Exception("CurrentStatus is null in RunCodeV5"); }
+                if (model == null) { throw new InvalidOperationException("Model is null in RunCodeV5"); }
+                if (_igContainer == null || _igContainer.tbClient == null) { throw new InvalidOperationException("IG Container is null in RunCodeV5"); }
+                if (modelVar == null) { throw new InvalidOperationException("ModelVars is null in RunCodeV5"); }
+                if (currentStatus == null) { throw new InvalidOperationException("CurrentStatus is null in RunCodeV5"); }
 
 
                 if (!paused || paused && model.onMarket || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
@@ -1937,7 +1937,7 @@ namespace TradingBrain.Models
 
                         if (this.tb == null || this.tb.runDetails == null || this.tb.runDetails.inputs == null || this.tb.lastRunVars == null)
                         {
-                            throw new Exception("Trading Brain settings not found");
+                            throw new InvalidOperationException("Trading Brain settings not found");
                         }
                         CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
@@ -2043,7 +2043,7 @@ namespace TradingBrain.Models
                             CommonFunctions.AddStatusMessage("Getting current candle data");
                             //Get the last tick from the list of ticks
                             LOepic? thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epicName).FirstOrDefault();
-                            if (thisEpic == null) { throw new Exception("Epic not found in PriceEpicList"); }
+                            if (thisEpic == null) { throw new InvalidOperationException("Epic not found in PriceEpicList"); }
                             DateTime tickStart = _startTime;
                             DateTime tickeEnd = _startTime.AddMinutes(1).AddMilliseconds(-1);
                             List<tick> ticks = new List<tick>();
@@ -2764,11 +2764,11 @@ namespace TradingBrain.Models
 
             // Check to see if we have a list of candles to work with, if not, go get some
 
-            if (model == null) { throw new Exception("Model is null in RunCode_GRID"); }
-            if (_igContainer == null || _igContainer.tbClient == null) { throw new Exception("IG Container is null in RunCode_GRID"); }
-            if (_igContainer2 == null || _igContainer2.tbClient == null) { throw new Exception("IG Container2 is null in RunCode_GRID"); }
-            if (modelVar == null) { throw new Exception("ModelVars is null in RunCode_GRID"); }
-            if (currentStatus == null) { throw new Exception("CurrentStatus is null in RunCode_GRID"); }
+            if (model == null) { throw new InvalidOperationException("Model is null in RunCode_GRID"); }
+            if (_igContainer == null || _igContainer.tbClient == null) { throw new InvalidOperationException("IG Container is null in RunCode_GRID"); }
+            if (_igContainer2 == null || _igContainer2.tbClient == null) { throw new InvalidOperationException("IG Container2 is null in RunCode_GRID"); }
+            if (modelVar == null) { throw new InvalidOperationException("ModelVars is null in RunCode_GRID"); }
+            if (currentStatus == null) { throw new InvalidOperationException("CurrentStatus is null in RunCode_GRID"); }
 
             if (!paused || paused && model.onMarket || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
             {
@@ -2796,7 +2796,7 @@ namespace TradingBrain.Models
 
                         if (this.tb == null || this.tb.runDetails == null || this.tb.runDetails.inputs == null || this.tb.lastRunVars == null)
                         {
-                            throw new Exception("Trading Brain settings not found");
+                            throw new InvalidOperationException("Trading Brain settings not found");
                         }
 
                         CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
@@ -2866,7 +2866,7 @@ namespace TradingBrain.Models
 
                             //Get the last tick from the list of ticks
                             LOepic? thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epicName).FirstOrDefault();
-                            if (thisEpic == null) { throw new Exception("Epic not found in PriceEpicList"); }
+                            if (thisEpic == null) { throw new InvalidOperationException("Epic not found in PriceEpicList"); }
 
                             DateTime tickStart = _startTime.AddSeconds(-1);
                             DateTime tickeEnd = _startTime.AddSeconds(1).AddMilliseconds(-1);
@@ -3894,7 +3894,7 @@ namespace TradingBrain.Models
             {
                 if (this.the_app_db == null || this.the_db == null)
                 {
-                    throw new Exception("DBs are null in OPUUpdate");
+                    throw new InvalidOperationException("DBs are null in OPUUpdate");
                 }
 
                 this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
@@ -4915,7 +4915,7 @@ namespace TradingBrain.Models
                                     string accountId = "";
                                     if (this.strategy == "GRID")
                                     {
-                                        if (this._igContainer2 == null) { throw new Exception("IG Container 2 is null for GRID strategy"); }
+                                        if (this._igContainer2 == null) { throw new InvalidOperationException("IG Container 2 is null for GRID strategy"); }
                                         if (tsm.Direction == "BUY")
                                         {
                                             osDealRef = this.newGRIDLDealReference;
@@ -5183,7 +5183,7 @@ namespace TradingBrain.Models
             {
                 if (this.the_app_db == null)
                 {
-                    throw new Exception("Database not set in ConfirmUpdate");
+                    throw new InvalidOperationException("Database not set in ConfirmUpdate");
                 }
 
                 TradeSubUpdate? tradeSubUpdate = JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
@@ -8322,7 +8322,7 @@ namespace TradingBrain.Models
         //                    if (indCandles == null)
         //                    {
         //                        CommonFunctions.AddStatusMessage("No candles found from DB (indCandles = null)", "INFO", logName);
-        //                        throw new Exception(param + " - No candles found from DB (indCandles = null)");
+        //                        throw new InvalidOperationException(param + " - No candles found from DB (indCandles = null)");
         //                    }
 
         //                    AddStatusMessage("Getting Moving Averages quotes from indCandles.......");
@@ -9906,7 +9906,7 @@ namespace TradingBrain.Models
             {
                 if (this.the_app_db == null)
                 {
-                    throw new Exception("Database connection not set for messaging");
+                    throw new InvalidOperationException("Database connection not set for messaging");
                 }
 
                 string strat = this.strategy.Replace("-", "_");
@@ -10007,11 +10007,11 @@ namespace TradingBrain.Models
                             Task taskC = Task.Run(() => CommonFunctions.AddStatusMessage("Stop request received", "INFO", logName));
                             if (this.currentTrade == null)
                             {
-                                throw new Exception("No current trade to stop");
+                                throw new InvalidOperationException("No current trade to stop");
                             }
                             //if (this.currentTrade.size == null)
                             //{
-                            //    throw new Exception("No current trade size to stop");
+                            //    throw new InvalidOperationException("No current trade size to stop");
                             //}
                             if (this.currentTrade != null && model != null && currentStatus != null)
                             {
@@ -11368,15 +11368,15 @@ namespace TradingBrain.Models
             {
                 if (_igContainer == null)
                 {
-                    throw new Exception("IG Container not set in GetPositions");
+                    throw new InvalidOperationException("IG Container not set in GetPositions");
                 }
                 if (_igContainer.igRestApiClient == null)
                 {
-                    throw new Exception("IG Rest API Client not set in GetPositions");
+                    throw new InvalidOperationException("IG Rest API Client not set in GetPositions");
                 }
                 if (model == null)
                 {
-                    throw new Exception("model not set in GetPositions");
+                    throw new InvalidOperationException("model not set in GetPositions");
                 }
                 if (this.strategy == "GRID")
                 {
@@ -11478,11 +11478,11 @@ namespace TradingBrain.Models
 
                         if (_igContainer2 == null)
                         {
-                            throw new Exception("IG Container not set in GetPositions");
+                            throw new InvalidOperationException("IG Container not set in GetPositions");
                         }
                         if (_igContainer2.igRestApiClient == null)
                         {
-                            throw new Exception("IG Rest API Client not set in GetPositions");
+                            throw new InvalidOperationException("IG Rest API Client not set in GetPositions");
                         }
 
                         ret = await _igContainer2.igRestApiClient.getOTCOpenPositionsV1();

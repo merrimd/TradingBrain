@@ -726,11 +726,11 @@ namespace TradingBrain.Models
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
             if (_igContainer == null)
             {
-                throw new Exception("IG Container is null in UpdateTsConfirm");
+                throw new InvalidOperationException("IG Container is null in UpdateTsConfirm");
             }
             if (_igContainer.the_app_db == null)
             {
-                throw new Exception("IG Container the_app_db is null in UpdateTsConfirm");
+                throw new InvalidOperationException("IG Container the_app_db is null in UpdateTsConfirm");
             }
             try
             {
@@ -806,7 +806,7 @@ namespace TradingBrain.Models
                 {
                     if (client == null)
                     {
-                        throw new Exception("Lightstreamer client is null in Connect");
+                        throw new InvalidOperationException("Lightstreamer client is null in Connect");
                     }
                     if (ph != this.phase)
                         return;
@@ -838,7 +838,7 @@ namespace TradingBrain.Models
             {
                 if (client == null)
                 {
-                    throw new Exception("Lightstreamer client is null in Disconnect");
+                    throw new InvalidOperationException("Lightstreamer client is null in Disconnect");
                 }
                 client.disconnect();
             }
@@ -861,14 +861,14 @@ namespace TradingBrain.Models
             //would fail again and again (btw this should never happen)
             if (_igContainer == null)
             {
-                throw new Exception("IG Container is null in ChartSubscribe");
+                throw new InvalidOperationException("IG Container is null in ChartSubscribe");
             }
             try
             {
                 //string chartName = "CHART:IX.D.NASDAQ.CASH.IP:TICK";
                 if (client == null)
                 {
-                    throw new Exception("Lightstreamer client is null in ChartSubscribe");
+                    throw new InvalidOperationException("Lightstreamer client is null in ChartSubscribe");
                 }
                 List<string> epics = new List<string>();
 
@@ -926,7 +926,7 @@ namespace TradingBrain.Models
             {
                 if (client == null)
                 {
-                    throw new Exception("Lightstreamer client is null in TradeSubscribe");
+                    throw new InvalidOperationException("Lightstreamer client is null in TradeSubscribe");
                 }
                 subscription = new Subscription("DISTINCT", new string[1] { "TRADE:" + accountId }, new string[3] { "CONFIRMS", "OPU", "WOU" });
 
