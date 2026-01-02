@@ -83,4 +83,12 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <EditorConfigFiles Remove="E:\Workarea\Source\Repos\TradingBrain\.editorconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="E:\Workarea\Source\Repos\TradingBrain\.editorconfig" />
+  </ItemGroup>
+
 </Project>

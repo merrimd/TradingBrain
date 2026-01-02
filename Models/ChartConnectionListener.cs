@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace TradingBrain.Models
 {
-     class ChartConnectionListener : ClientListener
+    class ChartConnectionListener : ClientListener
     {
         public const int VOID = -1;
         public const int DISCONNECTED = 0;
@@ -29,7 +29,7 @@ namespace TradingBrain.Models
         {
             this.slClient.StatusChanged(this.phase, DISCONNECTED, status);
             this.slClient.Start(this.phase);
-           
+
         }
 
         public void OnClose()

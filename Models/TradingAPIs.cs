@@ -24,7 +24,7 @@ namespace TradingBrain.Models
             pos.size = (decimal?)trade.quantity;
             pos.orderType = "MARKET";
             pos.guaranteedStop = true;
-            pos.stopDistance =  (decimal?)trade.stopLossValue;
+            pos.stopDistance = (decimal?)trade.stopLossValue;
             pos.forceOpen = true;
             pos.currencyCode = "GBP";
             //pos.limitDistance = 50;

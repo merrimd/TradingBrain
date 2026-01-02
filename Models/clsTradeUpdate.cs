@@ -174,7 +174,7 @@ namespace TradingBrain.Models
         ///<Summary>
         ///Limit distance
         ///</Summary>
-        public decimal limitDistance { get; set; } = new decimal();     
+        public decimal limitDistance { get; set; } = new decimal();
         ///<Summary>
         ///True if guaranteed stop
         ///</Summary>

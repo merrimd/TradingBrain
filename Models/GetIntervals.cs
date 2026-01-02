@@ -9,9 +9,9 @@ namespace TradingBrain.Models
 {
     public static class GetIntervals
     {
- 
 
-        public static double GetIntervalWithResolution(string region,string resolution)
+
+        public static double GetIntervalWithResolution(string region, string resolution)
         {
             DateTime now = DateTime.Now;
             DateTime nextRun = DateTime.MinValue;
@@ -58,10 +58,10 @@ namespace TradingBrain.Models
                     //}
                     //else
                     //{
-                        if (now.Minute < 30)
-                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0, DateTimeKind.Utc); // Next half-hour
-                        else
-                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0, DateTimeKind.Utc).AddHours(1); // Next hour
+                    if (now.Minute < 30)
+                        nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0, DateTimeKind.Utc); // Next half-hour
+                    else
+                        nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0, DateTimeKind.Utc).AddHours(1); // Next hour
                     //}
                     break;
 
@@ -85,7 +85,7 @@ namespace TradingBrain.Models
             //    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour + 1, 0, 0, 0); // Next hour
 
 
-                nextRun = nextRun.AddSeconds(150);
+            nextRun = nextRun.AddSeconds(150);
 
 
 
@@ -100,7 +100,7 @@ namespace TradingBrain.Models
             return interval;
 
         }
-        public static double GetInterval(string region,string strat = "")
+        public static double GetInterval(string region, string strat = "")
         {
             DateTime now = DateTime.Now;
 
@@ -125,7 +125,7 @@ namespace TradingBrain.Models
             }
             return ((now.Second > 30 ? 120 : 60) - now.Second + testOffset) * 1000 - now.Millisecond;
         }
-        public static double GetIntervalSecond(string region,string strat = "")
+        public static double GetIntervalSecond(string region, string strat = "")
         {
 
             var now = DateTime.UtcNow;

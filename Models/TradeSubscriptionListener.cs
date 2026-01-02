@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace TradingBrain.Models
 {
-     class TradeSubscriptionListener : SubscriptionListener
+    class TradeSubscriptionListener : SubscriptionListener
     {
         private int phase;
         private TBStreamingClient slClient;
@@ -32,7 +32,7 @@ namespace TradingBrain.Models
 
         void SubscriptionListener.onClearSnapshot(string itemName, int itemPos)
         {
-            CommonFunctions.AddStatusMessage("Trade - On cleasrsnapshot called","INFO");
+            CommonFunctions.AddStatusMessage("Trade - On cleasrsnapshot called", "INFO");
             // ...
         }
 
@@ -64,7 +64,7 @@ namespace TradingBrain.Models
         {
             slClient.TradeUpdateReceived(phase, itemUpdate.ItemPos, itemUpdate);
 
-   
+
 
         }
 

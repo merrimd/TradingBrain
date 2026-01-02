@@ -1,44 +1,42 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Azure.Cosmos;
-using System.Collections.Specialized;
-using System.Configuration;
-using System.Net.Http.Headers;
-//using IGCandleCreator.Models;
-using System.ComponentModel;
-using IGModels;
-using Container = Microsoft.Azure.Cosmos.Container;
-using Microsoft.AspNetCore.Http.Features;
-using System.Runtime.InteropServices;
-using System.ComponentModel.Design;
-using IGCandleCreator.Models;
-using Microsoft.Extensions.Options;
-using static IGModels.ModellingModels.GetModelClass;
-using System.Reflection.Metadata;
-using TradingBrain.Models;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.AspNetCore.SignalR.Client;
+﻿using Azure.Storage.Blobs;
 using com.lightstreamer.client;
-
+using IGCandleCreator.Models;
+using IGModels;
+using IGWebApiClient;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using MimeKit.Encodings;
 using NLog;
 using NLog.Extensions.AzureBlobStorage;
 using NLog.Targets;
-
-using IGWebApiClient;
+using Org.BouncyCastle.Pqc.Crypto.Lms;
+using Org.BouncyCastle.Tsp;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Collections.Specialized;
+//using IGCandleCreator.Models;
+using System.ComponentModel;
+using System.ComponentModel.Design;
+using System.Configuration;
+using System.Drawing.Text;
+using System.Linq;
+using System.Net.Http.Headers;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+using System.Timers;
+using TradingBrain.Models;
+using static IGModels.ModellingModels.GetModelClass;
 using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 using static TradingBrain.Models.TBStreamingClient;
-using System.Drawing.Text;
-using System.Collections.Concurrent;
-using Org.BouncyCastle.Pqc.Crypto.Lms;
-using MimeKit.Encodings;
-using Org.BouncyCastle.Tsp;
-using System.Timers;
-using System.Runtime.CompilerServices;
-using Azure.Storage.Blobs;
+using Container = Microsoft.Azure.Cosmos.Container;
 
 
 namespace TradingBrain.Models
@@ -56,14 +54,14 @@ namespace TradingBrain.Models
 
         public static List<MainApp> workerList = new List<MainApp>();
 
-       // public TBStreamingClient tbClient;
+        // public TBStreamingClient tbClient;
         private bool isDirty = false;
 
         //private string pushServerUrl;
         //public string forceT;
         //private string forceTransport = "no";
 
-       // public IgRestApiClient? igRestApiClient;
+        // public IgRestApiClient? igRestApiClient;
 
         public delegate void StopDelegate();
         public static string region = "";
@@ -240,11 +238,11 @@ namespace TradingBrain.Models
             ScopeContext.PushProperty("strategy", "");
             ScopeContext.PushProperty("resolution", "");
             //Connect to IG & Lightstreamer
-                         
+
             IGContainer? igContainer = null;
             IGContainer? igContainer2 = null;
             IgApiCreds? creds = new IgApiCreds();
-            IgApiCreds?   creds2 = new IgApiCreds();
+            IgApiCreds? creds2 = new IgApiCreds();
 
             SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
 
@@ -313,7 +311,7 @@ namespace TradingBrain.Models
             else
             {
                 igContainer2 = null;
-            
+
             }
 
             Database? the_db = IGModels.clsCommonFunctions.Get_Database("IX.D.NASDAQ.CASH.IP").Result;
@@ -324,7 +322,7 @@ namespace TradingBrain.Models
                 string jobId = IGModels.clsCommonFunctions.GetLogName(tbepic.epic, tbepic.strategy, tbepic.resolution);
                 //MappedDiagnosticsLogicalContext.Set("jobId", jobId);
                 ScopeContext.PushProperty("app", "TRADINGBRAIN/");
-                ScopeContext.PushProperty("epic", tbepic.epic + "/") ;
+                ScopeContext.PushProperty("epic", tbepic.epic + "/");
                 ScopeContext.PushProperty("strategy", tbepic.strategy + "/");
                 ScopeContext.PushProperty("resolution", tbepic.resolution + "/");
 
@@ -339,11 +337,11 @@ namespace TradingBrain.Models
                 {
 
 
-                   
+
                     tbLog.Info("Initialising app");
 
-                    workerList.Add(new MainApp(the_db, the_app_db,  tbepic.epic,   igContainer,igContainer2, tbepic.strategy, tbepic.resolution));
-         
+                    workerList.Add(new MainApp(the_db, the_app_db, tbepic.epic, igContainer, igContainer2, tbepic.strategy, tbepic.resolution));
+
                     ;
 
                 }
@@ -366,41 +364,41 @@ namespace TradingBrain.Models
             //}
             //else
             //{
-                if (epcs[0].strategy == "RSI" ||
-                epcs[0].strategy == "REI" ||
-                epcs[0].strategy == "RSI-ATR" ||
-                epcs[0].strategy == "RSI-CUML" ||
-                epcs[0].strategy == "CASEYC" ||
-                epcs[0].strategy == "CASEYCSHORT" ||
-                epcs[0].strategy == "VWAP" ||
-                epcs[0].strategy == "CASEYCEQUITIES")
+            if (epcs[0].strategy == "RSI" ||
+            epcs[0].strategy == "REI" ||
+            epcs[0].strategy == "RSI-ATR" ||
+            epcs[0].strategy == "RSI-CUML" ||
+            epcs[0].strategy == "CASEYC" ||
+            epcs[0].strategy == "CASEYCSHORT" ||
+            epcs[0].strategy == "VWAP" ||
+            epcs[0].strategy == "CASEYCEQUITIES")
+            {
+                ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
+                ti.Interval = GetIntervalWithResolution("HOUR");
+                //ti.Interval = 1000;
+            }
+            else
+            {
+
+                ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
+                if (epcs[0].strategy == "GRID")
                 {
-                    ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
-                    ti.Interval = GetIntervalWithResolution("HOUR");
-                    //ti.Interval = 1000;
+
+
+                    ti.Interval = GetIntervalSecond();
+
+                    //var now = DateTime.UtcNow;
+                    ////var next = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second , 100).AddSeconds(1);// now.AddSeconds(1).AddMilliseconds(-50);
+                    //var next = now.AddSeconds(1);
+                    ////var delay = (next - now).TotalMilliseconds - now.Millisecond;
+                    //ti.Interval = (next - now).TotalMilliseconds;
+
                 }
                 else
-                {
+                    ti.Interval = GetInterval(epcs[0].strategy);
+            }
 
-                    ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
-                    if (epcs[0].strategy == "GRID")
-                    {
-
-
-                        ti.Interval = GetIntervalSecond();
-
-                        //var now = DateTime.UtcNow;
-                        ////var next = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second , 100).AddSeconds(1);// now.AddSeconds(1).AddMilliseconds(-50);
-                        //var next = now.AddSeconds(1);
-                        ////var delay = (next - now).TotalMilliseconds - now.Millisecond;
-                        //ti.Interval = (next - now).TotalMilliseconds;
-
-                    }
-                    else
-                        ti.Interval = GetInterval(epcs[0].strategy);
-                }
-
-                ti.Start();
+            ti.Start();
 
             //}
             int i = await WaitForChanges();
@@ -411,7 +409,7 @@ namespace TradingBrain.Models
         public static async void RunMainAppCode(object? sender, System.Timers.ElapsedEventArgs e)
         {
             var parallelTasks = new List<Task<RunRet>>();
-     
+
             try
             {
                 if (sender == null) { throw new Exception("Timer sender is null"); }
@@ -496,7 +494,7 @@ namespace TradingBrain.Models
         //        bool ret = await app.GetPositions();
 
         //        Task<RunRet> task;
- 
+
         //        task = Task.Run(() => app.RunCode_GRID());
         //        parallelTasks.Add(task);
         //        break;                 
@@ -584,12 +582,12 @@ namespace TradingBrain.Models
                 //else
                 //{
 
-               // nextRun = nextRun.AddSeconds(10);
+                // nextRun = nextRun.AddSeconds(10);
 
                 nextRun = nextRun.AddSeconds(150);
-                
-                
-                
+
+
+
                 //}
             }
             else
@@ -644,7 +642,9 @@ namespace TradingBrain.Models
             var next = now.AddSeconds(1);
             //var delay = (next - now).TotalMilliseconds - now.Millisecond;
             var delay = (next - now).TotalMilliseconds - now.Millisecond;
-            if (delay <= 0) { delay = 50;
+            if (delay <= 0)
+            {
+                delay = 50;
             }
             //clsCommonFunctions.AddStatusMessage($"Interval set : now = {now.Second}:{now.Millisecond}, next = {next.Second}:{next.Millisecond}, delay = {delay}", "INFO");
             return delay + 75;

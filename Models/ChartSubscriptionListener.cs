@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace TradingBrain.Models
 {
-     class ChartSubscriptionListener :SubscriptionListener
+    class ChartSubscriptionListener : SubscriptionListener
     {
         private readonly int phase;
         private readonly TBStreamingClient slClient;
@@ -20,7 +20,7 @@ namespace TradingBrain.Models
 
         public void OnUpdate(int itemPos, string itemName, ItemUpdate update)
         {
-            
+
             this.slClient.ChartUpdateReceived(this.phase, itemPos, update);
         }
 
@@ -91,7 +91,7 @@ namespace TradingBrain.Models
 
         void SubscriptionListener.onRealMaxFrequency(string frequency)
         {
-            CommonFunctions.AddStatusMessage("Chart - On realmaxfrequency called", "INFO" );
+            CommonFunctions.AddStatusMessage("Chart - On realmaxfrequency called", "INFO");
             // ...
         }
 

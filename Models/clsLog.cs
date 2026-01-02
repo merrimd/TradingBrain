@@ -85,7 +85,7 @@ namespace TradingBrain.Models
                         this.Log_Timestamp = DateTime.UtcNow;
                     }
 
-                     await container.CreateItemAsync<Log>(this, new PartitionKey(this.Log_Type));
+                    await container.CreateItemAsync<Log>(this, new PartitionKey(this.Log_Type));
 
                 }
 

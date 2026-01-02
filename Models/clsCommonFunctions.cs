@@ -1,24 +1,23 @@
 ﻿using IGCandleCreator.Models;
 using IGModels;
+using IGModels.ModellingModels;
+using Lightstreamer.DotNet.Client;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json;
+using NLog;
+using Org.BouncyCastle.Pqc.Crypto.Lms;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Configuration;
 using System.Linq;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
-
-using IGModels.ModellingModels;
-using NLog;
 using static TradingBrain.Models.CommonFunctions;
-using Org.BouncyCastle.Pqc.Crypto.Lms;
-using System.Net.Http;
-using Lightstreamer.DotNet.Client;
 
 namespace TradingBrain.Models
 {
@@ -670,72 +669,72 @@ namespace TradingBrain.Models
             HttpClient client = new HttpClient();
             client.Timeout = TimeSpan.FromSeconds(3);
 
-                try
+            try
+            {
+                string url = "";
+                url = Environment.GetEnvironmentVariable("MessagingEndPoint") ?? "";
+                if (url == "")
                 {
-                    string url = "";
-                    url = Environment.GetEnvironmentVariable("MessagingEndPoint") ?? "";
-                    if (url == "")
+                    var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
+                    if (igWebApiConnectionConfig != null)
                     {
-                        var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
-                        if (igWebApiConnectionConfig != null)
+                        if (igWebApiConnectionConfig.Count > 0)
                         {
-                            if (igWebApiConnectionConfig.Count > 0)
-                            {
-                                url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
-                            }
+                            url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
                         }
                     }
-                    IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
-                    newMsg.messageType = messageType;
-                    newMsg.messageValue = messageValue;
-
-
-                    url = url + "/broadcast";
-
-                    string msg = JsonConvert.SerializeObject(newMsg);
-                    HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
-
-                    HttpResponseMessage response = await client.PostAsync(url, content);
-                    string results = await response.Content.ReadAsStringAsync();
                 }
-                catch (TaskCanceledException)
+                IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
+                newMsg.messageType = messageType;
+                newMsg.messageValue = messageValue;
+
+
+                url = url + "/broadcast";
+
+                string msg = JsonConvert.SerializeObject(newMsg);
+                HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
+
+                HttpResponseMessage response = await client.PostAsync(url, content);
+                string results = await response.Content.ReadAsStringAsync();
+            }
+            catch (TaskCanceledException)
+            {
+                //Could have been caused by cancellation or timeout if you used one.  
+                //If that was the case, rethrow.  
+                //cancellationToken.ThrowIfCancellationRequested();  
+
+                //HttpClient throws TaskCanceledException when the request times out. That's dumb.  
+                //Throw TimeoutException instead and say how long we waited.  
+                string time;
+                if (client.Timeout.TotalHours > 1)
                 {
-                    //Could have been caused by cancellation or timeout if you used one.  
-                    //If that was the case, rethrow.  
-                    //cancellationToken.ThrowIfCancellationRequested();  
-
-                    //HttpClient throws TaskCanceledException when the request times out. That's dumb.  
-                    //Throw TimeoutException instead and say how long we waited.  
-                    string time;
-                    if (client.Timeout.TotalHours > 1)
-                    {
-                        time = $"{client.Timeout.TotalHours:N1} hours";
-                    }
-                    else if (client.Timeout.TotalMinutes > 1)
-                    {
-                        time = $"{client.Timeout.TotalMinutes:N1} minutes";
-                    }
-                    else if (client.Timeout.TotalSeconds > 1)
-                    {
-                        time = $"{client.Timeout.TotalSeconds:N1} seconds";
-                    }
-                    else
-                    {
-                        time = $"{client.Timeout.TotalMilliseconds:N0} milliseconds";
-                    }
-                    CommonFunctions.AddStatusMessage("Message timed out.");
-                    //throw new TimeoutException($"No response after waiting {time}.");
+                    time = $"{client.Timeout.TotalHours:N1} hours";
                 }
-                catch (Exception e)
+                else if (client.Timeout.TotalMinutes > 1)
                 {
-                    AddStatusMessage("Error sending broadcast message: " + e.ToString(), "ERROR");
-                    //Log log = new Log(the_app_db);
-                    //log.Log_Message = e.ToString();
-                    //log.Log_Type = "Error";
-                    //log.Log_App = "SendMessage";
-                    //await log.Save();
+                    time = $"{client.Timeout.TotalMinutes:N1} minutes";
                 }
-            
+                else if (client.Timeout.TotalSeconds > 1)
+                {
+                    time = $"{client.Timeout.TotalSeconds:N1} seconds";
+                }
+                else
+                {
+                    time = $"{client.Timeout.TotalMilliseconds:N0} milliseconds";
+                }
+                CommonFunctions.AddStatusMessage("Message timed out.");
+                //throw new TimeoutException($"No response after waiting {time}.");
+            }
+            catch (Exception e)
+            {
+                AddStatusMessage("Error sending broadcast message: " + e.ToString(), "ERROR");
+                //Log log = new Log(the_app_db);
+                //log.Log_Message = e.ToString();
+                //log.Log_Type = "Error";
+                //log.Log_App = "SendMessage";
+                //await log.Save();
+            }
+
         }
         public static async void SendMessage(string userid, string messageType, string messageValue, Database? the_app_db)
         {

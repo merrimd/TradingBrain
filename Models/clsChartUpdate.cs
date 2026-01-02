@@ -153,7 +153,7 @@ namespace TradingBrain.Models
                 CommonFunctions.AddStatusMessage(de.ToString(), "ERROR");
                 var log = new Log();
                 log.Log_Message = de.ToString();
-                log.Log_Type = "Error"; 
+                log.Log_Type = "Error";
                 log.Log_App = "clsChartUpdate/DoesThisTickExist";
                 log.Epic = this.Epic;
                 await log.Save();
@@ -189,5 +189,3 @@ namespace TradingBrain.Models
         }
     }
 }
-
-

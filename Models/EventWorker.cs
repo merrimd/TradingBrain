@@ -78,7 +78,7 @@ namespace TradingBrain.Models
 
     //    public EventWorker(EventParams pams )
     //    {
- 
+
     //        //_thread = new Thread(() => Run(pams))
 
     //        //{
@@ -87,17 +87,17 @@ namespace TradingBrain.Models
     //        //};
     //        // _thread.Start();
     //        //logName = IGModels.clsCommonFunctions.GetLogName(pams.epic, pams.strategy, pams.resolution);
-        
+
     //    }
     //    private void Run(EventParams pams)
     //    {
 
 
-            
+
     //       //EventParams pms =  pams;
 
     //       // this.logger = LogManager.GetLogger(this.logName);
-            
+
     //       // logger.Info("-------------------------------------------------------------");
     //       // logger.Info($"-- TradingBrain started - strategy: {pms.strategy + " " + pms.resolution} : {pms.epic} --");
     //       // logger.Info("-------------------------------------------------------------");
@@ -137,7 +137,7 @@ namespace TradingBrain.Models
     //       //             break;
     //       //     }
 
-           
+
 
     //       //     //if (pms.strategy == "RSI" || 
     //       //     //    pms.strategy == "REI" || 
@@ -178,7 +178,7 @@ namespace TradingBrain.Models
     //       //     catch (Exception ex)
     //       //     {
     //       //         logger.Error(ex, "Unhandled exception in EventWorker.");
-                     
+
     //       //     }
 
     //       //     if (_thisApp != null)
@@ -195,7 +195,7 @@ namespace TradingBrain.Models
     //       //     static void Exiting(Exception exception, MainApp app)
     //       //     {
     //       //         //Put common cleanup code here (or at the end of the method)
- 
+
 
     //       //         if (exception == null)
     //       //         {
@@ -210,7 +210,7 @@ namespace TradingBrain.Models
 
 
 
- 
+
 
     //       // }
 
@@ -253,14 +253,14 @@ namespace TradingBrain.Models
     //        //_thread.Join();
     //    }
 
- 
+
     //    //public async Task OpuUpdate(string inputData,string itemName)
     //    //{
     //    //    var tsm = new IgPublicApiData.TradeSubscriptionModel();
 
     //    //    try
     //    //    {
- 
+
     //    //        TradeSubUpdate tradeSubUpdate =  JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
     //    //        tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString();
     //    //        tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString();
@@ -291,9 +291,9 @@ namespace TradingBrain.Models
     //    //            tsm.TradeType = "OPU";
     //    //            if (tsm.Reason != null && tsm.Reason != "")
     //    //            {
- 
+
     //    //                    tradeSubUpdate.reasonDescription = _thisApp.TradeErrors[tsm.Reason];
-                 
+
     //    //            }
 
     //    //            if (tsm.Epic == _thisApp.epicName)

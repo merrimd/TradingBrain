@@ -134,7 +134,7 @@ namespace Lightstreamer.DotNet.Client.Test
             this.wrapped.Error(line);
         }
 
- 
+
         public void Error(string line, System.Exception exception)
         {
             this.wrapped.Error(exception, line);
@@ -145,7 +145,7 @@ namespace Lightstreamer.DotNet.Client.Test
             this.wrapped.Warn(line);
         }
 
- 
+
         public void Warn(string line, System.Exception exception)
         {
             this.wrapped.Warn(exception, line);
@@ -156,10 +156,10 @@ namespace Lightstreamer.DotNet.Client.Test
             this.wrapped.Info(line);
         }
 
- 
+
         public void Info(string line, System.Exception exception)
         {
-            this.wrapped.Info( exception,line);
+            this.wrapped.Info(exception, line);
         }
 
         public void Debug(string line)
@@ -167,7 +167,7 @@ namespace Lightstreamer.DotNet.Client.Test
             this.wrapped.Debug(line);
         }
 
- 
+
         public void Debug(string line, System.Exception exception)
         {
             this.wrapped.Debug(exception, line);

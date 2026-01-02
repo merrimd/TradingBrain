@@ -66,17 +66,17 @@ namespace TradingBrain.Models
                         // DatabaseResponse db = await the_db.ReadAsync();
                         //Container container = the_db.GetContainer("Candles");
 
-                         await container.CreateItemAsync<CandleUpdate>(this, new PartitionKey(this.Epic));
+                        await container.CreateItemAsync<CandleUpdate>(this, new PartitionKey(this.Epic));
                         blnLoop = false;
                     }
                 }
                 catch (CosmosException de)
                 {
-                    CommonFunctions.AddStatusMessage(de.ToString(),"ERROR");
+                    CommonFunctions.AddStatusMessage(de.ToString(), "ERROR");
                 }
                 catch (Exception e)
                 {
-                    CommonFunctions.AddStatusMessage(e.ToString(),"ERROR");
+                    CommonFunctions.AddStatusMessage(e.ToString(), "ERROR");
                 }
 
 

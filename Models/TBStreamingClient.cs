@@ -8,7 +8,7 @@ using IGWebApiClient.Common;
 using IGWebApiClient.Models;
 using Lightstreamer.DotNet.Client;
 using Lightstreamer.DotNet.Client.Test;
-using Lightstreamer.DotNet.Logging.Log; 
+using Lightstreamer.DotNet.Logging.Log;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Identity.Client;
@@ -84,7 +84,8 @@ namespace TradingBrain.Models
                 SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
 
                 string env = Environment.GetEnvironmentVariable("environment") ?? "";
-                if (env == "") {
+                if (env == "")
+                {
                     object v = ConfigurationManager.GetSection("appSettings");
                     NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
                     env = igWebApiConnectionConfig["environment"] ?? "DEMO";
@@ -124,13 +125,13 @@ namespace TradingBrain.Models
                     throw new InvalidOperationException("IG creds are null in ConnectToRest");
                 }
                 string env = _igContainer.creds.igEnvironment;
-            string userName = _igContainer.creds.igUsername;
-            string password = _igContainer.creds.igPassword;
-            string apiKey = _igContainer.creds.igApiKey;
-            string accountId = _igContainer.creds.igAccountId;
+                string userName = _igContainer.creds.igUsername;
+                string password = _igContainer.creds.igPassword;
+                string apiKey = _igContainer.creds.igApiKey;
+                string accountId = _igContainer.creds.igAccountId;
 
-            var ar = new AuthenticationRequest { identifier = userName, password = password };
-            _igContainer.Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
+                var ar = new AuthenticationRequest { identifier = userName, password = password };
+                _igContainer.Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
 
                 var response = await _igContainer.igRestApiClient.SecureAuthenticate(ar, apiKey);
                 if (response && (response.Response != null) && (response.Response.accounts.Count > 0))
@@ -204,22 +205,22 @@ namespace TradingBrain.Models
                 {
                     throw new InvalidOperationException("IG credentials are null in LogIn");
                 }
-                if(_igContainer.igRestApiClient == null)
+                if (_igContainer.igRestApiClient == null)
                 {
                     throw new InvalidOperationException("IG REST API Client is null in LogIn");
                 }
-                if(_igContainer.creds == null)
+                if (_igContainer.creds == null)
                 {
                     throw new InvalidOperationException("IG creds are null in LogIn");
                 }
                 string env = _igContainer.creds.igEnvironment;
-            string userName = _igContainer.creds.igUsername;
-            string password = _igContainer.creds.igPassword;
-            string apiKey = _igContainer.creds.igApiKey;
-            string accountId = _igContainer.creds.igAccountId;
+                string userName = _igContainer.creds.igUsername;
+                string password = _igContainer.creds.igPassword;
+                string apiKey = _igContainer.creds.igApiKey;
+                string accountId = _igContainer.creds.igAccountId;
 
-            var ar = new AuthenticationRequest { identifier = userName, password = password };
-            _igContainer.Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
+                var ar = new AuthenticationRequest { identifier = userName, password = password };
+                _igContainer.Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
 
 
                 var response = await _igContainer.igRestApiClient.SecureAuthenticate(ar, apiKey);
@@ -450,7 +451,7 @@ namespace TradingBrain.Models
                 //this._igContainer.igAccountId = CurrentAccountId;
                 // this.subscribeChart()
             }
-            catch (Exception )
+            catch (Exception)
             {
 
                 //Log log = new Log(_thisApp.the_app_db);
@@ -483,7 +484,7 @@ namespace TradingBrain.Models
                     }
                 }
             }
-            catch (Exception )
+            catch (Exception)
             {
 
                 //Log log = new Log(_thisApp.the_app_db);
@@ -603,7 +604,7 @@ namespace TradingBrain.Models
 
             }
 
-            catch (Exception )
+            catch (Exception)
             {
                 //Log log = new Log(_thisApp.the_app_db);
                 //log.Log_Message = ex.ToString();
@@ -683,7 +684,7 @@ namespace TradingBrain.Models
             }
             //if (_igContainer.the_app_db == null)
             //{
-                throw new InvalidOperationException("_igContainer.the_app_db is null in UpdateTsOpu");
+            //     throw new InvalidOperationException("_igContainer.the_app_db is null in UpdateTsOpu");
             //}
             //try
             //{
@@ -691,7 +692,7 @@ namespace TradingBrain.Models
             TradeSubUpdate? tradeSubUpdate = JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
             if (tradeSubUpdate != null)
             {
-                tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString() ??"";
+                tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString() ?? "";
                 tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString() ?? "";
                 tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString() ?? "";
                 tradeSubUpdate.updateType = "OPU";
@@ -708,7 +709,7 @@ namespace TradingBrain.Models
                         msg.itemName = update.ItemName;
                         msg.updateData = inputData;
                         msg.updateType = "UPDATE";
-                        RunRet taskRet =  wrk.iGUpdate(msg);
+                        RunRet taskRet = wrk.iGUpdate(msg);
 
                         CommonFunctions.SendBroadcast("UpdateOPU", inputData);
                         //Console.WriteLine("UpdateOPU: " + inputData);
@@ -725,7 +726,7 @@ namespace TradingBrain.Models
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
             if (_igContainer == null)
             {
-               throw new Exception("IG Container is null in UpdateTsConfirm");
+                throw new Exception("IG Container is null in UpdateTsConfirm");
             }
             if (_igContainer.the_app_db == null)
             {
@@ -738,7 +739,7 @@ namespace TradingBrain.Models
                 TradeSubUpdate? tradeSubUpdate = JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
                 if (tradeSubUpdate != null)
                 {
-                    tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString()?? "";
+                    tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString() ?? "";
                     tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString() ?? "";
                     tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString() ?? "";
                     tradeSubUpdate.updateType = "OPU";
@@ -805,7 +806,7 @@ namespace TradingBrain.Models
                 {
                     if (client == null)
                     {
-                       throw new Exception("Lightstreamer client is null in Connect");
+                        throw new Exception("Lightstreamer client is null in Connect");
                     }
                     if (ph != this.phase)
                         return;
@@ -837,7 +838,7 @@ namespace TradingBrain.Models
             {
                 if (client == null)
                 {
-                   throw new Exception("Lightstreamer client is null in Disconnect");
+                    throw new Exception("Lightstreamer client is null in Disconnect");
                 }
                 client.disconnect();
             }
@@ -860,14 +861,14 @@ namespace TradingBrain.Models
             //would fail again and again (btw this should never happen)
             if (_igContainer == null)
             {
-               throw new Exception("IG Container is null in ChartSubscribe");
+                throw new Exception("IG Container is null in ChartSubscribe");
             }
             try
             {
                 //string chartName = "CHART:IX.D.NASDAQ.CASH.IP:TICK";
                 if (client == null)
                 {
-                   throw new Exception("Lightstreamer client is null in ChartSubscribe");
+                    throw new Exception("Lightstreamer client is null in ChartSubscribe");
                 }
                 List<string> epics = new List<string>();
 
@@ -925,7 +926,7 @@ namespace TradingBrain.Models
             {
                 if (client == null)
                 {
-                   throw new Exception("Lightstreamer client is null in TradeSubscribe");
+                    throw new Exception("Lightstreamer client is null in TradeSubscribe");
                 }
                 subscription = new Subscription("DISTINCT", new string[1] { "TRADE:" + accountId }, new string[3] { "CONFIRMS", "OPU", "WOU" });
 
@@ -946,7 +947,7 @@ namespace TradingBrain.Models
                 //    });
                 if (_igContainer == null)
                 {
-                                       return;
+                    return;
                 }
                 var log = new TradingBrain.Models.Log(_igContainer.the_app_db);
                 log.Log_Message = e.ToString();
@@ -1333,7 +1334,7 @@ namespace TradingBrain.Models
             igAccountId = "";
             primary = false;
         }
-        public IgApiCreds(string environment,string apiKey, string username, string password, string accountId,bool _primary)
+        public IgApiCreds(string environment, string apiKey, string username, string password, string accountId, bool _primary)
         {
             igEnvironment = environment;
             igApiKey = apiKey;
