@@ -29,6 +29,7 @@ namespace TradingBrain.Models
         {
             this.slClient.StatusChanged(this.phase, DISCONNECTED, status);
             this.slClient.Start(this.phase);
+           
         }
 
         public void OnClose()
@@ -58,6 +59,9 @@ namespace TradingBrain.Models
 
         void ClientListener.onStatusChange(string status)
         {
+            if (status == null) return;
+
+            // Use status safely now
             if (status.StartsWith("CONNECTED:WS"))
             {
                 if (status.EndsWith("POLLING"))
@@ -98,5 +102,10 @@ namespace TradingBrain.Models
         {
             // ...
         }
+
+        //public void onStatusChange(string status)
+        //{
+        //    throw new NotImplementedException();
+        //}
     }
 }

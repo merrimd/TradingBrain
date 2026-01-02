@@ -22,9 +22,9 @@ using Lightstreamer.DotNet.Client;
 
 namespace TradingBrain.Models
 {
-    public  static class CommonFunctions
+    public static class CommonFunctions
     {
-        public async static void AddStatusMessage(string message, string level = "INFO")
+        public static void AddStatusMessage(string message, string level = "INFO")
         {
             Logger tbLog = LogManager.GetCurrentClassLogger();
             //Console.WriteLine(message);
@@ -190,7 +190,8 @@ namespace TradingBrain.Models
                             }
 
                         }
-                    };
+                    }
+                    ;
                 }
             }
             catch (Exception ex)
@@ -252,7 +253,11 @@ namespace TradingBrain.Models
 
         public static string GetClientIp(HttpRequest req)
         {
-            String RemoteIP = req.HttpContext.Connection.RemoteIpAddress.ToString(); //  + ":" + req.HttpContext.Connection.RemotePort.ToString();
+            if (req == null || req.HttpContext == null || req.HttpContext.Connection == null || req.HttpContext.Connection.RemoteIpAddress == null)
+            {
+                return "unknown";
+            }
+            String RemoteIP = req.HttpContext.Connection.RemoteIpAddress.ToString() ?? ""; //  + ":" + req.HttpContext.Connection.RemotePort.ToString();
 
             return RemoteIP;
         }
@@ -382,36 +387,38 @@ namespace TradingBrain.Models
             return ret;
         }
 
-        public static async Task<IG_Epic> Get_IG_Epic(Database the_db, string epicName)
+        public static async Task<IG_Epic> Get_IG_Epic(Database? the_db, string epicName)
         {
             // find the data
             IG_Epic epic = new IG_Epic();
             try
             {
-                Container container = the_db.GetContainer("Epics");
-
-                var parameterizedQuery = new QueryDefinition(
-                    query: "SELECT * FROM Epics c WHERE c.Epic= @epicName"
-                )
-                .WithParameter("@epicName", epicName);
-
-                using FeedIterator<IG_Epic> filteredFeed = container.GetItemQueryIterator<IG_Epic>(
-                    queryDefinition: parameterizedQuery
-                );
-
-                while (filteredFeed.HasMoreResults)
+                if (the_db != null)
                 {
-                    FeedResponse<IG_Epic> response = await filteredFeed.ReadNextAsync();
+                    Container container = the_db.GetContainer("Epics");
 
-                    // Iterate query results
-                    foreach (IG_Epic item in response)
+                    var parameterizedQuery = new QueryDefinition(
+                        query: "SELECT * FROM Epics c WHERE c.Epic= @epicName"
+                    )
+                    .WithParameter("@epicName", epicName);
+
+                    using FeedIterator<IG_Epic> filteredFeed = container.GetItemQueryIterator<IG_Epic>(
+                        queryDefinition: parameterizedQuery
+                    );
+
+                    while (filteredFeed.HasMoreResults)
                     {
-                        epic = item;
+                        FeedResponse<IG_Epic> response = await filteredFeed.ReadNextAsync();
+
+                        // Iterate query results
+                        foreach (IG_Epic item in response)
+                        {
+                            epic = item;
+                        }
                     }
+
+                    //epic = await container.ReadItemAsync<IG_Epic>(id, new PartitionKey(id), null, default);
                 }
-
-                //epic = await container.ReadItemAsync<IG_Epic>(id, new PartitionKey(id), null, default);
-
             }
             catch (CosmosException de)
             {
@@ -658,65 +665,110 @@ namespace TradingBrain.Models
             return (settings);
         }
 
-        public static async void SendBroadcast(string messageType, string messageValue, Database the_app_db)
+        public static async void SendBroadcast(string messageType, string messageValue)
         {
             HttpClient client = new HttpClient();
             client.Timeout = TimeSpan.FromSeconds(3);
-            try
-            {
-                string url = "";
-                url = Environment.GetEnvironmentVariable("MessagingEndPoint") ?? "";
-                if (url == "")
+
+                try
                 {
-                    var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
-                    if (igWebApiConnectionConfig != null)
+                    string url = "";
+                    url = Environment.GetEnvironmentVariable("MessagingEndPoint") ?? "";
+                    if (url == "")
                     {
-                        if (igWebApiConnectionConfig.Count > 0)
+                        var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
+                        if (igWebApiConnectionConfig != null)
                         {
-                            url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                            if (igWebApiConnectionConfig.Count > 0)
+                            {
+                                url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                            }
                         }
                     }
+                    IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
+                    newMsg.messageType = messageType;
+                    newMsg.messageValue = messageValue;
+
+
+                    url = url + "/broadcast";
+
+                    string msg = JsonConvert.SerializeObject(newMsg);
+                    HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
+
+                    HttpResponseMessage response = await client.PostAsync(url, content);
+                    string results = await response.Content.ReadAsStringAsync();
                 }
-                IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
-                newMsg.messageType = messageType;
-                newMsg.messageValue = messageValue;
+                catch (TaskCanceledException)
+                {
+                    //Could have been caused by cancellation or timeout if you used one.  
+                    //If that was the case, rethrow.  
+                    //cancellationToken.ThrowIfCancellationRequested();  
 
-
-                url = url + "/broadcast";
-
-                string msg = JsonConvert.SerializeObject(newMsg);
-                HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
-
-                HttpResponseMessage response = await client.PostAsync(url, content);
-                string results = await response.Content.ReadAsStringAsync();
-            }
-            catch (TaskCanceledException)
+                    //HttpClient throws TaskCanceledException when the request times out. That's dumb.  
+                    //Throw TimeoutException instead and say how long we waited.  
+                    string time;
+                    if (client.Timeout.TotalHours > 1)
+                    {
+                        time = $"{client.Timeout.TotalHours:N1} hours";
+                    }
+                    else if (client.Timeout.TotalMinutes > 1)
+                    {
+                        time = $"{client.Timeout.TotalMinutes:N1} minutes";
+                    }
+                    else if (client.Timeout.TotalSeconds > 1)
+                    {
+                        time = $"{client.Timeout.TotalSeconds:N1} seconds";
+                    }
+                    else
+                    {
+                        time = $"{client.Timeout.TotalMilliseconds:N0} milliseconds";
+                    }
+                    CommonFunctions.AddStatusMessage("Message timed out.");
+                    //throw new TimeoutException($"No response after waiting {time}.");
+                }
+                catch (Exception e)
+                {
+                    AddStatusMessage("Error sending broadcast message: " + e.ToString(), "ERROR");
+                    //Log log = new Log(the_app_db);
+                    //log.Log_Message = e.ToString();
+                    //log.Log_Type = "Error";
+                    //log.Log_App = "SendMessage";
+                    //await log.Save();
+                }
+            
+        }
+        public static async void SendMessage(string userid, string messageType, string messageValue, Database? the_app_db)
+        {
+            try
             {
-                //Could have been caused by cancellation or timeout if you used one.  
-                //If that was the case, rethrow.  
-                //cancellationToken.ThrowIfCancellationRequested();  
+                if (the_app_db != null)
+                {
+                    string url = "";
+                    url = Environment.GetEnvironmentVariable("MessagingEndPoint") ?? "";
+                    if (url == "")
+                    {
+                        var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
+                        if (igWebApiConnectionConfig != null)
+                        {
+                            if (igWebApiConnectionConfig.Count > 0)
+                            {
+                                url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
+                            }
+                        }
+                    }
+                    IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
+                    newMsg.messageType = messageType;
+                    newMsg.messageValue = messageValue;
 
-                //HttpClient throws TaskCanceledException when the request times out. That's dumb.  
-                //Throw TimeoutException instead and say how long we waited.  
-                string time;
-                if (client.Timeout.TotalHours > 1)
-                {
-                    time = $"{client.Timeout.TotalHours:N1} hours";
+                    HttpClient client = new HttpClient();
+                    url = url + "/sendmessage?userid=" + userid;
+
+                    string msg = JsonConvert.SerializeObject(newMsg);
+                    HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
+
+                    HttpResponseMessage response = client.PostAsync(url, content).Result;
+                    string results = response.Content.ReadAsStringAsync().Result;
                 }
-                else if (client.Timeout.TotalMinutes > 1)
-                {
-                    time = $"{client.Timeout.TotalMinutes:N1} minutes";
-                }
-                else if (client.Timeout.TotalSeconds > 1)
-                {
-                    time = $"{client.Timeout.TotalSeconds:N1} seconds";
-                }
-                else
-                {
-                    time = $"{client.Timeout.TotalMilliseconds:N0} milliseconds";
-                }
-                CommonFunctions.AddStatusMessage("Message timed out.");
-                //throw new TimeoutException($"No response after waiting {time}.");
             }
             catch (Exception e)
             {
@@ -726,67 +778,31 @@ namespace TradingBrain.Models
                 log.Log_App = "SendMessage";
                 await log.Save();
             }
+
         }
-        public static async void SendMessage(string userid, string messageType, string messageValue, Database the_app_db)
+        public static async void SaveLog(string logType, string logApp, string logMessage, Database? the_db)
         {
-            try
+            if (the_db != null)
             {
-                string url = "";
-                url = Environment.GetEnvironmentVariable("MessagingEndPoint") ?? "";
-                if (url == "")
-                {
-                    var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
-                    if (igWebApiConnectionConfig != null)
-                    {
-                        if (igWebApiConnectionConfig.Count > 0)
-                        {
-                            url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
-                        }
-                    }
-                }
-                IGModels.ModellingModels.message newMsg = new IGModels.ModellingModels.message();
-                newMsg.messageType = messageType;
-                newMsg.messageValue = messageValue;
-
-                HttpClient client = new HttpClient();
-                url = url + "/sendmessage?userid=" + userid;
-
-                string msg = JsonConvert.SerializeObject(newMsg);
-                HttpContent content = new StringContent(msg, Encoding.UTF8, "application/json");
-
-                HttpResponseMessage response = client.PostAsync(url, content).Result;
-                string results = response.Content.ReadAsStringAsync().Result;
-            }
-            catch (Exception e)
-            {
-                Log log = new Log(the_app_db);
-                log.Log_Message = e.ToString();
-                log.Log_Type = "Error";
-                log.Log_App = "SendMessage";
+                Log log = new Log(the_db);
+                log.Log_Message = logMessage;
+                log.Log_Type = logType;
+                log.Log_App = logApp;
                 await log.Save();
             }
-
-        }
-        public static async void SaveLog(string logType, string logApp, string logMessage, Database the_db)
-        {
-            Log log = new Log(the_db);
-            log.Log_Message = logMessage;
-            log.Log_Type = logType;
-            log.Log_App = logApp;
-            await log.Save();
         }
 
-        public static async Task<TradingBrainSettings> GetTradingBrainSettings(Database the_db, string epicName, string accountId,string strategy = "SMA", string resolution = "")
+        public static async Task<TradingBrainSettings> GetTradingBrainSettings(Database? the_db, string epicName, string accountId, string strategy = "SMA", string resolution = "")
         {
             // find the data
             var ret = new TradingBrainSettings();
-   
+
 
             string logName = epicName + "." + strategy;
-            if (strategy == "RSI" || 
-                strategy == "REI" || 
-                strategy == "RSI-ATR" || 
-                strategy == "RSI-CUML" || 
+            if (strategy == "RSI" ||
+                strategy == "REI" ||
+                strategy == "RSI-ATR" ||
+                strategy == "RSI-CUML" ||
                 strategy == "CASEYC" ||
                  strategy == "VWAP" ||
                 strategy == "CASEYCSHORT" ||
@@ -801,6 +817,7 @@ namespace TradingBrain.Models
 
             try
             {
+                if (the_db == null) { throw new Exception("Database is null"); }
                 Container container = the_db.GetContainer("TradingBrainSettings");
                 Container container_opt = the_db.GetContainer("OptimizeRunData");
 
@@ -834,7 +851,7 @@ namespace TradingBrain.Models
 
 
 
-                    CommonFunctions.AddStatusMessage("Getting latest vars (if necessary)", "INFO",logName);
+                    CommonFunctions.AddStatusMessage("Getting latest vars (if necessary)", "INFO", logName);
 
 
 
@@ -895,55 +912,68 @@ namespace TradingBrain.Models
                 targetPrice = 0;
             }
 
-            public void SetOrderValues(string direction, MainApp thisApp)
-            {
-                double quantity = Math.Min(thisApp.model.thisModel.currentTrade.quantity * thisApp.model.modelVar.suppQuantityMultiplier, thisApp.model.modelVar.maxQuantity);
-                modelInstanceInputs thisInput = IGModels.clsCommonFunctions.GetInputsFromSpread(thisApp.model.thisModel.inputs, thisApp.model.candles.currentCandle.candleData);
-                double targetVar = thisInput.targetVarInput / 100 + 1;
-                double targetVarShort = thisInput.targetVarInputShort / 100 + 1;
-                decimal targetPrice = 0;
-                double suppStopPercentage = thisApp.model.modelVar.suppStopPercentage;
-                if (suppStopPercentage == 0) { suppStopPercentage = 1; }
+            //public void SetOrderValues(string direction, MainApp thisApp)
+            //{
+            //    try
+            //    {
 
-                // Now set up the order for the supp trade
+            //        if (thisApp.model == null)
+            //        {
+            //            throw new Exception("thisApp.model is null");
+            //        }
 
-                //Calculate the open level and stop limits
-                decimal dealPrice = 0;
-                double targetUnits = 0;
-                double suppTargetUnits = 0;
-                decimal newLevel = 0;
-                double newStop = 0;
+            //        double quantity = Math.Min(thisApp.model.thisModel.currentTrade.quantity * thisApp.model.modelVar.suppQuantityMultiplier, thisApp.model.modelVar.maxQuantity);
+            //        modelInstanceInputs thisInput = IGModels.clsCommonFunctions.GetInputsFromSpread(thisApp.model.thisModel.inputs, thisApp.model.candles.currentCandle.candleData);
+            //        double targetVar = thisInput.targetVarInput / 100 + 1;
+            //        double targetVarShort = thisInput.targetVarInputShort / 100 + 1;
+            //        decimal targetPrice = 0;
+            //        double suppStopPercentage = thisApp.model.modelVar.suppStopPercentage;
+            //        if (suppStopPercentage == 0) { suppStopPercentage = 1; }
 
-                if (direction.ToUpper() == "BUY")
-                {
-                    dealPrice = thisApp.model.thisModel.currentTrade.buyPrice;
-                    targetPrice = thisApp.model.thisModel.currentTrade.buyPrice + Math.Abs((decimal)targetVar * (decimal)thisApp.model.candles.currentCandle.mATypicalLongTypical - (decimal)thisApp.model.candles.currentCandle.mATypicalLongTypical);
-                    targetUnits = (double)(targetPrice - dealPrice);
-                    suppTargetUnits = targetUnits * 0.9;
-                    newLevel = dealPrice + (decimal)suppTargetUnits;
-                }
-                else
-                {
-                    dealPrice = thisApp.model.thisModel.currentTrade.sellPrice;
-                    targetPrice = thisApp.model.thisModel.currentTrade.sellPrice - Math.Abs((decimal)targetVarShort * (decimal)thisApp.model.candles.currentCandle.mATypicalShortTypical - (decimal)thisApp.model.candles.currentCandle.mATypicalShortTypical);
-                    targetUnits = (double)(dealPrice - targetPrice);
-                    suppTargetUnits = targetUnits * 0.9;
-                    newLevel = dealPrice - (decimal)suppTargetUnits;
-                }
+            //        // Now set up the order for the supp trade
 
-                newStop = targetUnits - (targetUnits * suppStopPercentage) - (targetUnits - suppTargetUnits);
+            //        //Calculate the open level and stop limits
+            //        decimal dealPrice = 0;
+            //        double targetUnits = 0;
+            //        double suppTargetUnits = 0;
+            //        decimal newLevel = 0;
+            //        double newStop = 0;
 
-                this.quantity = quantity;
-                this.stopDistance = Math.Round(newStop, 1);
-                this.level = Math.Round(newLevel,1);
-                this.targetPrice = Math.Round(targetPrice,1);
+            //        if (direction.ToUpper() == "BUY")
+            //        {
+            //            dealPrice = thisApp.model.thisModel.currentTrade.buyPrice;
+            //            targetPrice = thisApp.model.thisModel.currentTrade.buyPrice + Math.Abs((decimal)targetVar * (decimal)thisApp.model.candles.currentCandle.mATypicalLongTypical - (decimal)thisApp.model.candles.currentCandle.mATypicalLongTypical);
+            //            targetUnits = (double)(targetPrice - dealPrice);
+            //            suppTargetUnits = targetUnits * 0.9;
+            //            newLevel = dealPrice + (decimal)suppTargetUnits;
+            //        }
+            //        else
+            //        {
+            //            dealPrice = thisApp.model.thisModel.currentTrade.sellPrice;
+            //            targetPrice = thisApp.model.thisModel.currentTrade.sellPrice - Math.Abs((decimal)targetVarShort * (decimal)thisApp.model.candles.currentCandle.mATypicalShortTypical - (decimal)thisApp.model.candles.currentCandle.mATypicalShortTypical);
+            //            targetUnits = (double)(dealPrice - targetPrice);
+            //            suppTargetUnits = targetUnits * 0.9;
+            //            newLevel = dealPrice - (decimal)suppTargetUnits;
+            //        }
 
-                if (thisApp.model.doSuppTrades)
-                {
-                    CommonFunctions.AddStatusMessage($"order values - dealPrice={this.level}, targetPrice= {targetPrice}, targetUnits = {targetUnits}, suppTargetUnits = {suppTargetUnits}, newLevel = {newLevel}, stop level {newStop}, suppStopPercentage {suppStopPercentage}", "DEBUG");
-                }
-            }
+            //        newStop = targetUnits - (targetUnits * suppStopPercentage) - (targetUnits - suppTargetUnits);
+
+            //        this.quantity = quantity;
+            //        this.stopDistance = Math.Round(newStop, 1);
+            //        this.level = Math.Round(newLevel, 1);
+            //        this.targetPrice = Math.Round(targetPrice, 1);
+
+            //        if (thisApp.model.doSuppTrades)
+            //        {
+            //            CommonFunctions.AddStatusMessage($"order values - dealPrice={this.level}, targetPrice= {targetPrice}, targetUnits = {targetUnits}, suppTargetUnits = {suppTargetUnits}, newLevel = {newLevel}, stop level {newStop}, suppStopPercentage {suppStopPercentage}", "DEBUG");
+            //        }
+            //    }
+            //    catch (Exception ex)
+            //    {
+            //        CommonFunctions.AddStatusMessage("Error calculating order values: " + ex.ToString(), "ERROR");
+            //    }
+            //}
         }
-    }
 
+    }
 }

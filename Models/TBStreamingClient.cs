@@ -66,6 +66,10 @@ namespace TradingBrain.Models
         {
             try
             {
+                if (igContainer == null)
+                {
+                    throw new ArgumentNullException(nameof(igContainer));
+                }
                 _igContainer = igContainer;
                 //_igRestApiClient = igContainer.igRestApiClient;
                 Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
@@ -88,7 +92,7 @@ namespace TradingBrain.Models
                 _igContainer.igRestApiClient = new IgRestApiClient(env, smartDispatcher);
                 //_thisApp.igAccountId = this.client.connectionDetails.User;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 //Log log = new Log(_thisApp.the_app_db);
                 //log.Log_Message = ex.ToString();
@@ -105,16 +109,21 @@ namespace TradingBrain.Models
 
         public async void ConnectToRest()
         {
-            //object v = ConfigurationManager.GetSection("appSettings");
-            //NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
-
-            //string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
-            //string userName = igWebApiConnectionConfig["username." + env] ?? "";
-            //string password = igWebApiConnectionConfig["password." + env] ?? "";
-            //string apiKey = igWebApiConnectionConfig["apikey." + env] ?? "";
-            //string accountId = igWebApiConnectionConfig["accountId." + env] ?? "";
-
-            string env = _igContainer.creds.igEnvironment;
+            try
+            {
+                if (_igContainer == null)
+                {
+                    throw new InvalidOperationException("IG credentials are null in ConnectToRest");
+                }
+                if (_igContainer.igRestApiClient == null)
+                {
+                    throw new InvalidOperationException("IG REST API Client is null in ConnectToRest");
+                }
+                if (_igContainer.creds == null)
+                {
+                    throw new InvalidOperationException("IG creds are null in ConnectToRest");
+                }
+                string env = _igContainer.creds.igEnvironment;
             string userName = _igContainer.creds.igUsername;
             string password = _igContainer.creds.igPassword;
             string apiKey = _igContainer.creds.igApiKey;
@@ -122,8 +131,7 @@ namespace TradingBrain.Models
 
             var ar = new AuthenticationRequest { identifier = userName, password = password };
             _igContainer.Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
-            try
-            {
+
                 var response = await _igContainer.igRestApiClient.SecureAuthenticate(ar, apiKey);
                 if (response && (response.Response != null) && (response.Response.accounts.Count > 0))
                 {
@@ -189,16 +197,22 @@ namespace TradingBrain.Models
         }
         public async void LogIn()
         {
-            //object v = ConfigurationManager.GetSection("appSettings");
-            //NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
 
-            //string env = igWebApiConnectionConfig["environment"] ?? "DEMO";
-            //string userName = igWebApiConnectionConfig["username." + env] ?? "";
-            //string password = igWebApiConnectionConfig["password." + env] ?? "";
-            //string apiKey = igWebApiConnectionConfig["apikey." + env] ?? "";
-            //string accountId = igWebApiConnectionConfig["accountId." + env] ?? "";
-
-            string env = _igContainer.creds.igEnvironment;
+            try
+            {
+                if (_igContainer == null)
+                {
+                    throw new InvalidOperationException("IG credentials are null in LogIn");
+                }
+                if(_igContainer.igRestApiClient == null)
+                {
+                    throw new InvalidOperationException("IG REST API Client is null in LogIn");
+                }
+                if(_igContainer.creds == null)
+                {
+                    throw new InvalidOperationException("IG creds are null in LogIn");
+                }
+                string env = _igContainer.creds.igEnvironment;
             string userName = _igContainer.creds.igUsername;
             string password = _igContainer.creds.igPassword;
             string apiKey = _igContainer.creds.igApiKey;
@@ -207,8 +221,7 @@ namespace TradingBrain.Models
             var ar = new AuthenticationRequest { identifier = userName, password = password };
             _igContainer.Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
 
-            try
-            {
+
                 var response = await _igContainer.igRestApiClient.SecureAuthenticate(ar, apiKey);
                 if (response && (response.Response != null) && (response.Response.accounts.Count > 0))
                 {
@@ -309,7 +322,7 @@ namespace TradingBrain.Models
                     //log.Save();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
 
                 //Log log = new Log(_thisApp.the_app_db);
@@ -324,11 +337,19 @@ namespace TradingBrain.Models
 
 
         }
-        public void OnTimedEvent(object source, ElapsedEventArgs e)
+        public void OnTimedEvent(object? source, ElapsedEventArgs e)
         {
             CommonFunctions.AddStatusMessage("Calling the AccountDetails API to ensure token doesn't expire", "INFO");
             try
             {
+                if (_igContainer == null)
+                {
+                    throw new InvalidOperationException("IG credentials are null in OnTimedEvent");
+                }
+                if (_igContainer.igRestApiClient == null)
+                {
+                    throw new InvalidOperationException("IG REST API Client is null in OnTimedEvent");
+                }
                 IgResponse<dto.endpoint.accountbalance.AccountDetailsResponse> ret = _igContainer.igRestApiClient.accountBalance().Result;
                 if (ret != null)
                 {
@@ -341,7 +362,7 @@ namespace TradingBrain.Models
                     }
                 }
             }
-            catch (Exception ex) { }
+            catch (Exception) { }
         }
         private int phase = 0;
 
@@ -408,6 +429,11 @@ namespace TradingBrain.Models
         {
             try
             {
+                if (this._igContainer == null)
+                {
+                    throw new InvalidOperationException("IG credentials are null in Execute");
+                }
+
                 if (ph != this.phase)
                 {
                     return;
@@ -424,7 +450,7 @@ namespace TradingBrain.Models
                 //this._igContainer.igAccountId = CurrentAccountId;
                 // this.subscribeChart()
             }
-            catch (Exception ex)
+            catch (Exception )
             {
 
                 //Log log = new Log(_thisApp.the_app_db);
@@ -457,7 +483,7 @@ namespace TradingBrain.Models
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception )
             {
 
                 //Log log = new Log(_thisApp.the_app_db);
@@ -480,6 +506,10 @@ namespace TradingBrain.Models
             var epic = update.ItemName.Replace("L1:", "").Replace("CHART:", "").Replace(":1MINUTE", "").Replace(":TICK", "").Replace(":SECOND", "");
             try
             {
+                if (_igContainer == null)
+                {
+                    throw new InvalidOperationException("_igContainer is null in ChartUpdateReceived");
+                }
                 var wlmUpdate = update;
 
                 //clsCommonFunctions.AddStatusMessage($"Chart update received for {epic} - UTM:{(DateTime)EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"))} BID:{wlmUpdate.getValue("BID")} OFR:{wlmUpdate.getValue("OFR")}", "INFO");
@@ -490,94 +520,27 @@ namespace TradingBrain.Models
                     DateTime thisUTM = DateTime.MinValue;
                     if (wlmUpdate.getValue("UTM") != null)
                     {
-                        thisUTM = (DateTime)EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"));
+                        DateTime? utmValue = EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"));
+                        if (utmValue.HasValue)
+                        {
+                            thisUTM = utmValue.Value;
+                        }
+                        else
+                        {
+                            thisUTM = DateTime.MinValue; // or handle as appropriate for your logic
+                        }
                     }
 
                     LOepic? thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epic).FirstOrDefault();
+                    if (thisEpic != null)
+                    {
+                        tick thisTick = new tick();
+                        thisTick.bid = Convert.ToDecimal(wlmUpdate.getValue("BID"));
+                        thisTick.offer = Convert.ToDecimal(wlmUpdate.getValue("OFR"));
+                        thisTick.UTM = thisUTM;
 
-                    tick thisTick = new tick();
-                    thisTick.bid = Convert.ToDecimal(wlmUpdate.getValue("BID"));
-                    thisTick.offer = Convert.ToDecimal(wlmUpdate.getValue("OFR"));
-                    thisTick.UTM = thisUTM;
-
-                    thisEpic.ticks.Add(thisTick);
-
-                    //if ( thisUTM != DateTime.MinValue && thisUTM != thisEpic.lastUTM && thisEpic.lastUpdate.UTM != DateTime.MinValue)
-                    //{
-                    //    try
-                    //    {
-
-                    //        // TODO: Convert to correct candle_rsi format
-
-                    //        AddStatusMessage($"New Minute for {epic} UTM:{thisUTM.ToString("o")} LastUTM:{thisEpic.lastUTM.ToString("o")} - bid_open:{thisEpic.lastUpdate.Bid_Open}, bid_close{thisEpic.lastUpdate.Bid_Close}");
-
-                    //        //bool r = objLastMinUpdate.Add(the_db, this.the_chart_min_container).Result;
-                    //        tbPrice rsiCandle = new tbPrice();
-                    //        rsiCandle.epic = epic;
-                    //        rsiCandle.resolution = "MINUTE";
-                    //        rsiCandle.startDate = new DateTime(thisEpic.lastUpdate.UTM.Year, thisEpic.lastUpdate.UTM.Month, thisEpic.lastUpdate.UTM.Day, thisEpic.lastUpdate.UTM.Hour, thisEpic.lastUpdate.UTM.Minute, 0, 0, DateTimeKind.Utc);
-                    //        rsiCandle.endDate = new DateTime(thisEpic.lastUpdate.UTM.Year, thisEpic.lastUpdate.UTM.Month, thisEpic.lastUpdate.UTM.Day, thisEpic.lastUpdate.UTM.Hour, thisEpic.lastUpdate.UTM.Minute, 59, 999, DateTimeKind.Utc);
-
-                    //        rsiCandle.spread = (double)(thisEpic.lastUpdate.Offer_Open - thisEpic.lastUpdate.Bid_Open);
-                    //        rsiCandle.typicalPrice.bid = (thisEpic.lastUpdate.Bid_High + thisEpic.lastUpdate.Bid_Low + thisEpic.lastUpdate.Bid_Close) / 3;
-                    //        rsiCandle.typicalPrice.ask = (thisEpic.lastUpdate.Offer_High + thisEpic.lastUpdate.Offer_Low + thisEpic.lastUpdate.Offer_Close) / 3;
-                    //        rsiCandle.openPrice = new dto.endpoint.prices.v2.Price();
-                    //        rsiCandle.closePrice = new dto.endpoint.prices.v2.Price();
-                    //        rsiCandle.highPrice = new dto.endpoint.prices.v2.Price();
-                    //        rsiCandle.lowPrice = new dto.endpoint.prices.v2.Price();
-
-                    //        rsiCandle.openPrice.bid = thisEpic.lastUpdate.Bid_Open;
-                    //        rsiCandle.openPrice.ask = thisEpic.lastUpdate.Offer_Open;
-                    //        rsiCandle.closePrice.bid = thisEpic.lastUpdate.Bid_Close;
-                    //        rsiCandle.closePrice.ask = thisEpic.lastUpdate.Offer_Close;
-                    //        rsiCandle.highPrice.bid = thisEpic.lastUpdate.Bid_High;
-                    //        rsiCandle.highPrice.ask = thisEpic.lastUpdate.Offer_High;
-                    //        rsiCandle.lowPrice.bid = thisEpic.lastUpdate.Bid_Low;
-                    //        rsiCandle.lowPrice.ask = thisEpic.lastUpdate.Offer_Low;
-                    //        rsiCandle.snapshotTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-                    //        rsiCandle.lastTradedVolume = thisEpic.lastUpdate.LTV;
-
-                    //        StandardDeviation sd = new StandardDeviation(thisEpic.closePrices);
-                    //        rsiCandle.stdDev = sd.Value;
-
-                    //        thisEpic.latestCandle = rsiCandle;
-
-                    //        //bool r = rsiCandle.Add(the_db, this.the_chart_min_container).Result;
-
-                    //        thisEpic.lastUTM = thisUTM;
-                    //        thisEpic.closePrices.Clear();
-
-                    //    }
-                    //    catch (Exception ex)
-                    //    {
-                    //        AddStatusMessage("Error saving minute data:" + ex.Message);
-                    //        //var log = new Log(this.the_db);
-                    //        //log.Log_Message = e.ToString();
-                    //        //log.Log_Type = "Error";
-                    //        //log.Log_App = "MainApp/OnMinUpdate";
-                    //        //log.Epic = epic;
-                    //        //log.Save();
-                    //    }
-
-                    //}
-
-                    //thisEpic.lastUpdate = new clsChartMinUpdate();
-                    //thisEpic.lastUpdate.Epic = epic;
-                    //thisEpic.lastUpdate.Bid_Open = Convert.ToDecimal(wlmUpdate.getValue("BID_OPEN")) ;
-                    //thisEpic.lastUpdate.Bid_Close = Convert.ToDecimal(wlmUpdate.getValue("BID_CLOSE"));
-                    //thisEpic.lastUpdate.Bid_High = Convert.ToDecimal(wlmUpdate.getValue("BID_HIGH"));
-                    //thisEpic.lastUpdate.Bid_Low = Convert.ToDecimal(wlmUpdate.getValue("BID_LOW"));
-                    //thisEpic.lastUpdate.Offer_Open = Convert.ToDecimal(wlmUpdate.getValue("OFR_OPEN"));
-                    //thisEpic.lastUpdate.Offer_Close = Convert.ToDecimal(wlmUpdate.getValue("OFR_CLOSE"));
-                    //thisEpic.lastUpdate.Offer_High = Convert.ToDecimal(wlmUpdate.getValue("OFR_HIGH"));
-                    //thisEpic.lastUpdate.Offer_Low = Convert.ToDecimal(wlmUpdate.getValue("OFR_LOW"));
-
-                    //thisEpic.lastUpdate.LTV = Convert.ToDecimal(wlmUpdate.getValue("LTV"));
-                    //if (wlmUpdate.getValue("UTM")  != "")
-                    //{
-                    //    thisEpic.lastUpdate.UTM = (DateTime)EpocStringToNullableDateTime(wlmUpdate.getValue("UTM"));
-                    //}
-                    //thisEpic.closePrices.Add((double)(thisEpic.lastUpdate.Bid_Close + thisEpic.lastUpdate.Offer_Close / 2));
+                        thisEpic.ticks.Add(thisTick);
+                    }
 
 
                 }
@@ -640,7 +603,7 @@ namespace TradingBrain.Models
 
             }
 
-            catch (Exception ex)
+            catch (Exception )
             {
                 //Log log = new Log(_thisApp.the_app_db);
                 //log.Log_Message = ex.ToString();
@@ -679,12 +642,12 @@ namespace TradingBrain.Models
                         if (!(String.IsNullOrEmpty(opu)))
                         {
                             //clsCommonFunctions.AddStatusMessage("Trade update - OPU" + opu);
-                            await UpdateTsOpu(itemPos, update.ItemName, update, opu, TradeSubscriptionType.Opu);
+                            Task taskA = Task.Run(() => UpdateTsOpu(itemPos, update.ItemName, update, opu, TradeSubscriptionType.Opu));
                         }
                         if (!(String.IsNullOrEmpty(wou)))
                         {
                             //clsCommonFunctions.AddStatusMessage("Trade update - WOU" + wou);
-                            await UpdateTsWou(itemPos, update.ItemName, update, wou, TradeSubscriptionType.Wou);
+                            //await UpdateTsWou(itemPos, update.ItemName, update, wou, TradeSubscriptionType.Wou);
                         }
                         if (!(String.IsNullOrEmpty(confirms)))
                         {
@@ -695,19 +658,14 @@ namespace TradingBrain.Models
                     }
                     catch (Exception ex)
                     {
-                        //_applicationViewModel.ApplicationDebugData += "Exception thrown in TradeSubscription Lightstreamer update" + ex.Message;
+                        var a = ex;
                     }
                 }
                 else { this.FirstConfirmUpdate = false; }
             }
             catch (Exception ex)
             {
-                //var log = new TradingBrain.Models.Log(_thisApp.the_app_db);
-                //log.Log_Message = ex.ToString();
-                //log.Log_Type = "Error";
-                //log.Log_App = "TradeUpdateReceived";
-                //log.Epic = "";
-                //log.Save();
+                var a = ex;
             }
 
 
@@ -715,357 +673,104 @@ namespace TradingBrain.Models
 
         }
 
-        private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsOpu(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
+        private IgPublicApiData.TradeSubscriptionModel UpdateTsOpu(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
         {
 
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
-
+            if (_igContainer == null)
+            {
+                throw new InvalidOperationException("_igContainer is null in UpdateTsOpu");
+            }
+            //if (_igContainer.the_app_db == null)
+            //{
+                throw new InvalidOperationException("_igContainer.the_app_db is null in UpdateTsOpu");
+            //}
             //try
             //{
             //    //var tradeSubUpdate = JsonConvert.DeserializeObject<LsTradeSubscriptionData>(inputData);
             TradeSubUpdate? tradeSubUpdate = JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
-            tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString();
-            tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString();
-            tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString();
-            tradeSubUpdate.updateType = "OPU";
-
-            //MainApp _thisApp = null;
-
-            foreach (MainApp wrk in _igContainer.workerList)
+            if (tradeSubUpdate != null)
             {
-                //List<string> parm = new List<string>();
-                //parm = wrk._thread.Name.Split("|").ToList();
-                if (wrk.epicName == tradeSubUpdate.epic)
-                {
-                    UpdateMessage msg = new UpdateMessage();
-                    msg.itemName = update.ItemName;
-                    msg.updateData = inputData;
-                    msg.updateType = "UPDATE";
-                    RunRet taskRet = await wrk.iGUpdate(msg);
+                tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString() ??"";
+                tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString() ?? "";
+                tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString() ?? "";
+                tradeSubUpdate.updateType = "OPU";
 
-                    CommonFunctions.SendBroadcast("UpdateOPU", inputData, _igContainer.the_app_db);
-                    //Console.WriteLine("UpdateOPU: " + inputData);
+                //MainApp _thisApp = null;
+
+                foreach (MainApp wrk in _igContainer.workerList)
+                {
+                    //List<string> parm = new List<string>();
+                    //parm = wrk._thread.Name.Split("|").ToList();
+                    if (wrk.epicName == tradeSubUpdate.epic)
+                    {
+                        UpdateMessage msg = new UpdateMessage();
+                        msg.itemName = update.ItemName;
+                        msg.updateData = inputData;
+                        msg.updateType = "UPDATE";
+                        RunRet taskRet =  wrk.iGUpdate(msg);
+
+                        CommonFunctions.SendBroadcast("UpdateOPU", inputData);
+                        //Console.WriteLine("UpdateOPU: " + inputData);
+                    }
                 }
             }
 
-
             return tsm;
         }
-        private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsWou(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
-        {
 
-            var tsm = new IgPublicApiData.TradeSubscriptionModel();
-
-            //try
-            //{
-            //    //var tradeSubUpdate = JsonConvert.DeserializeObject<LsTradeSubscriptionData>(inputData);
-            //    TradeSubUpdate tradeSubUpdate =  JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
-            //    tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString();
-            //    tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString();
-            //    tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString();
-            //    tradeSubUpdate.updateType = "WOU";
-
-            //    if (tradeSubUpdate.epic == _thisApp.epicName )
-            //    {
-            //        tradeSubUpdate.date = tradeSubUpdate.timestamp;
-            //        tsm.Channel = tradeSubUpdate.channel;
-            //        tsm.DealId = tradeSubUpdate.dealId;
-            //        tsm.AffectedDealId = tradeSubUpdate.affectedDealId;
-            //        tsm.DealReference = tradeSubUpdate.dealReference;
-            //        tsm.DealStatus = tradeSubUpdate.dealStatus.ToString();
-            //        tsm.Direction = tradeSubUpdate.direction.ToString();
-            //        tsm.ItemName = itemName;
-            //        tsm.Epic = tradeSubUpdate.epic;
-            //        tsm.Expiry = tradeSubUpdate.expiry;
-            //        tsm.GuaranteedStop = tradeSubUpdate.guaranteedStop;
-            //        tsm.Level = tradeSubUpdate.level;
-            //        tsm.Limitlevel = tradeSubUpdate.limitLevel;
-            //        tsm.Size = tradeSubUpdate.size;
-            //        tsm.Status = tradeSubUpdate.status.ToString();
-            //        tsm.StopLevel = tradeSubUpdate.stopLevel;
-            //        tsm.Reason = tradeSubUpdate.reason;
-            //        tsm.date = tradeSubUpdate.timestamp;
-            //        tsm.StopDistance = tradeSubUpdate.stopDistance;
-            //        tsm.TradeType = "WOU";
-            //        if(tsm.Reason == null) { tsm.Reason = ""; }
-            //        tradeSubUpdate.reasonDescription = _thisApp.TradeErrors[tsm.Reason];
-
-            //        //////////////////////////////
-            //        /// Working order updates   //
-            //        //////////////////////////////
-            //        if (tsm.Epic == _thisApp.epicName)
-            //        {
-            //            clsCommonFunctions.AddStatusMessage($"Order update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
-
-            //            if (tsm.Status == "OPEN" )
-            //            {
-            //                if (tsm.DealStatus == "ACCEPTED")
-            //                {
-            //                    requestedTrade reqTrade = new requestedTrade();
-            //                    reqTrade = _thisApp.requestedTrades.Where(i => i.dealReference == tsm.DealReference).FirstOrDefault();
-
-            //                    if (reqTrade != null)
-            //                    {
-            //                        reqTrade.dealStatus = tsm.DealStatus;
-
-            //                        orderItem thisOrder = new orderItem();
-            //                        thisOrder.dealId = tsm.DealId;
-            //                        thisOrder.direction = tsm.Direction;
-            //                        thisOrder.createdDate = DateTime.Now; ;
-            //                        thisOrder.createdDateUTC = DateTime.UtcNow;
-            //                        thisOrder.status = tsm.Status;
-            //                        thisOrder.epic = tsm.Epic;
-            //                        thisOrder.orderLevel = Convert.ToDecimal(tsm.Level);
-            //                        thisOrder.orderSize = Convert.ToDouble(tsm.Size);
-            //                        thisOrder.accountId = _thisApp.igAccountId;
-            //                        thisOrder.channel = tsm.Channel;
-            //                        thisOrder.stopDistance = Convert.ToDecimal(tsm.StopDistance);
-            //                        thisOrder.stopLevel = Convert.ToDecimal(tsm.StopLevel);
-            //                        thisOrder.dealReference = tsm.DealReference;
-            //                        thisOrder.dealStatus = tsm.DealStatus;
-            //                        thisOrder.associatedDealId = _thisApp.model.thisModel.currentTrade.tbDealId;
-            //                        _thisApp.model.thisModel.currentTrade.suppOrderId = tsm.DealId;
-            //                        _thisApp.model.thisModel.currentTrade.attachedOrder = thisOrder;
-
-            //                        if (tsm.Direction == "BUY")
-            //                        {
-            //                            thisOrder.stopLevel = thisOrder.orderLevel - thisOrder.stopDistance;
-            //                        }
-            //                        else
-            //                        {
-            //                            thisOrder.stopLevel = thisOrder.orderLevel + thisOrder.stopDistance;
-            //                        }
-
-            //                        // reset any retry logic if needs be as this order has been successful
-            //                        _thisApp.retryOrder = false;
-            //                        _thisApp.retryOrderCount = 0;
-
-            //                        //Save current trade with this suppOrderId
-            //                        await _thisApp.model.thisModel.currentTrade.SaveDocument(_thisApp.trade_container);
-            //                        clsCommonFunctions.AddStatusMessage($"Order {thisOrder.dealId} saved to current trade - {_thisApp.model.thisModel.currentTrade.tbDealId}", "INFO");
-            //                    }
-            //                }
-            //                await tradeSubUpdate.Add(_thisApp.the_app_db);
-            //            }
-            //            if (tsm.Status == "DELETED" )
-            //            {
-            //                if (tsm.DealStatus == "ACCEPTED")
-            //                {
-            //                    string orderDealId = tsm.DealId;
-
-            //                    if (_thisApp.model.thisModel.currentTrade != null)
-            //                    {
-            //                        if (_thisApp.model.thisModel.currentTrade.attachedOrder.dealId == orderDealId)
-            //                        {
-            //                            _thisApp.model.thisModel.currentTrade.attachedOrder.deletedDate = DateTime.Now;
-            //                            _thisApp.model.thisModel.currentTrade.attachedOrder.status = tsm.Status;
-            //                            await _thisApp.model.thisModel.currentTrade.SaveDocument(_thisApp.trade_container);
-            //                        }
-            //                    }
-            //                    else
-            //                    {
-            //                        //Get trade by the attachedOrder dealid
-            //                        tradeItem thisTrade = await _thisApp.GetTradeFromDBByOrder(orderDealId);
-            //                        thisTrade.attachedOrder.deletedDate = DateTime.Now;
-            //                        thisTrade.attachedOrder.status = tsm.Status;
-            //                        await thisTrade.SaveDocument(_thisApp.trade_container);
-            //                    }
-            //                }
-            //                await tradeSubUpdate.Add(_thisApp.the_app_db);
-            //            }
-            //            if (tsm.Status == "UPDATED")
-            //            {
-            //                if (tsm.DealStatus == "ACCEPTED")
-            //                {
-            //                    string orderDealId = tsm.DealId;
-
-            //                    if (_thisApp.model.thisModel.currentTrade != null)
-            //                    {
-            //                        if (_thisApp.model.thisModel.currentTrade.attachedOrder.dealId == orderDealId)
-            //                        {
-            //                            _thisApp.model.thisModel.currentTrade.attachedOrder.stopDistance = Convert.ToDecimal(tsm.StopDistance);
-            //                            _thisApp.model.thisModel.currentTrade.attachedOrder.stopLevel = Convert.ToDecimal(tsm.StopLevel);
-            //                            _thisApp.model.thisModel.currentTrade.attachedOrder.orderLevel = Convert.ToDecimal(tsm.Level);
-            //                            _thisApp.model.thisModel.currentTrade.attachedOrder.status = tsm.Status;
-            //                            await _thisApp.model.thisModel.currentTrade.SaveDocument(_thisApp.trade_container);
-            //                        }
-            //                    }
-            //                    else
-            //                    {
-            //                        //Get trade by the attachedOrder dealid
-            //                        tradeItem thisTrade = await _thisApp.GetTradeFromDBByOrder(orderDealId);
-            //                        thisTrade.attachedOrder.stopDistance =Convert.ToDecimal(tsm.StopDistance);
-            //                        thisTrade.attachedOrder.stopLevel = Convert.ToDecimal(tsm.StopLevel);
-            //                        thisTrade.attachedOrder.orderLevel = Convert.ToDecimal(tsm.Level);
-            //                        await thisTrade.SaveDocument(_thisApp.trade_container);
-            //                    }
-
-            //                }
-            //                await tradeSubUpdate.Add(_thisApp.the_app_db);
-
-            //            }
-            //        }
-
-
-            //    }
-
-            //}
-            //catch (Exception ex)
-            //{
-            //    var log = new TradingBrain.Models.Log(_thisApp.the_app_db);
-            //    log.Log_Message = ex.ToString();
-            //    log.Log_Type = "Error";
-            //    log.Log_App = "UpdateTsWOU";
-            //    log.Epic = "";
-            //    await log.Save();
-            //}
-            return tsm;
-        }
         private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsConfirm(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
         {
 
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
-
-            //try
-            //{
-            //    //var tradeSubUpdate = JsonConvert.DeserializeObject<LsTradeSubscriptionData>(inputData);
-            TradeSubUpdate? tradeSubUpdate = JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
-            tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString();
-            tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString();
-            tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString();
-            tradeSubUpdate.updateType = "OPU";
-
-            //MainApp _thisApp = null;
-
-            foreach (MainApp wrk in _igContainer.workerList)
+            if (_igContainer == null)
             {
-                //List<string> parm = new List<string>();
-                //parm = wrk._thread.Name.Split("|").ToList();
-                if (wrk.epicName == tradeSubUpdate.epic)
+               throw new Exception("IG Container is null in UpdateTsConfirm");
+            }
+            if (_igContainer.the_app_db == null)
+            {
+                throw new Exception("IG Container the_app_db is null in UpdateTsConfirm");
+            }
+            try
+            {
+
+
+                TradeSubUpdate? tradeSubUpdate = JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
+                if (tradeSubUpdate != null)
                 {
-                    UpdateMessage msg = new UpdateMessage();
-                    msg.itemName = update.ItemName;
-                    msg.updateData = inputData;
-                    msg.updateType = "CONFIRM";
-                    RunRet taskRet = await wrk.iGUpdate(msg);
-                    CommonFunctions.SendBroadcast("UpdateConfirm", inputData, _igContainer.the_app_db);
-                    //Console.WriteLine("updateConfirm: " + inputData);
+                    tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString()?? "";
+                    tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString() ?? "";
+                    tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString() ?? "";
+                    tradeSubUpdate.updateType = "OPU";
+
+                    //MainApp _thisApp = null;
+
+                    foreach (MainApp wrk in _igContainer.workerList)
+                    {
+                        //List<string> parm = new List<string>();
+                        //parm = wrk._thread.Name.Split("|").ToList();
+                        if (wrk.epicName == tradeSubUpdate.epic)
+                        {
+                            UpdateMessage msg = new UpdateMessage();
+                            msg.itemName = update.ItemName;
+                            msg.updateData = inputData;
+                            msg.updateType = "CONFIRM";
+                            RunRet taskRet = wrk.iGUpdate(msg);
+                            CommonFunctions.SendBroadcast("UpdateConfirm", inputData);
+                            //Console.WriteLine("updateConfirm: " + inputData);
+                        }
+                    }
                 }
             }
-            //try
-            //{
-            //    var tradeSubUpdate = JsonConvert.DeserializeObject<TradeSubUpdate>(inputData);
-
-            //    if (tradeSubUpdate.epic == _thisApp.epicName )
-            //    {
-            //        tsm.Channel = tradeSubUpdate.channel;
-            //        tsm.DealId = tradeSubUpdate.dealId;
-            //        tsm.AffectedDealId = tradeSubUpdate.affectedDealId;
-            //        tsm.DealReference = tradeSubUpdate.dealReference;
-            //        tsm.DealStatus = tradeSubUpdate.dealStatus.ToString();
-            //        tsm.Direction = tradeSubUpdate.direction.ToString();
-            //        tsm.ItemName = itemName;
-            //        tsm.Epic = tradeSubUpdate.epic;
-            //        tsm.Expiry = tradeSubUpdate.expiry;
-            //        tsm.GuaranteedStop = tradeSubUpdate.guaranteedStop;
-            //        tsm.Level = tradeSubUpdate.level;
-            //        tsm.Limitlevel = tradeSubUpdate.limitLevel;
-            //        tsm.Size = tradeSubUpdate.size;
-            //        tsm.Status = tradeSubUpdate.status.ToString();
-            //        tsm.StopLevel = tradeSubUpdate.stopLevel;
-            //        tsm.Reason = tradeSubUpdate.reason;
-            //        tsm.date = tradeSubUpdate.date;
-            //        tsm.StopDistance = tradeSubUpdate.stopDistance;
-            //        tsm.TradeType = "CONFIRM";
-
-            //        tradeSubUpdate.statusVal = tradeSubUpdate.status.ToString();
-            //        tradeSubUpdate.directionVal = tradeSubUpdate.direction.ToString();
-            //        tradeSubUpdate.dealStatusVal = tradeSubUpdate.dealStatus.ToString();
-            //        if (tsm.Reason != null)
-            //        {
-            //            if (tsm.Reason != "")
-            //            {
-            //                tradeSubUpdate.reasonDescription = _thisApp.TradeErrors[tsm.Reason];
-            //            }
-            //        }
-
-            //        tradeSubUpdate.updateType = tsm.TradeType;
-
-            //        if (tsm.Epic == _thisApp.epicName)
-            //        {
-
-            //            // Find this trade from the list of requested trades to tie in with the requested type (position or order)
-            //            requestedTrade reqTrade = new requestedTrade();
-            //            reqTrade = _thisApp.requestedTrades.Where(i => i.dealReference == tsm.DealReference).FirstOrDefault();
-
-            //            if (reqTrade != null)
-            //            {
-            //                await tradeSubUpdate.Add(_thisApp.the_app_db);
-
-            //                reqTrade.dealStatus = tsm.DealStatus;
-
-            //                clsCommonFunctions.AddStatusMessage($"CONFIRM - deal reference = {reqTrade.dealReference}, deal type = {reqTrade.dealType}, deal status = {reqTrade.dealStatus}");
-
-
-            //                if (tsm.Status == "OPEN" && tsm.Reason == "SUCCESS")
-            //                {
-            //                    // trade/order opened successfully
-            //                    clsCommonFunctions.AddStatusMessage($"CONFIRM - successful", "INFO");
-            //                }
-
-            //                if (reqTrade.dealType == "ORDER" && reqTrade.dealStatus == "REJECTED")
-            //                {
-
-            //                    clsCommonFunctions.AddStatusMessage($"ORDER REJECTED -  {tsm.Reason} - {_thisApp.TradeErrors[tsm.Reason]} : retryCount = {_thisApp.retryOrderCount}, retryOrderLimit = {_thisApp.retryOrderLimit}");
-            //                    // Order has been rejected, possibly because the market is moving too fast. Try again next time.
-            //                    if (_thisApp.retryOrderCount < _thisApp.retryOrderLimit)
-            //                    {
-            //                        _thisApp.retryOrder = true;
-            //                        _thisApp.retryOrderCount += 1;
-            //                        clsCommonFunctions.AddStatusMessage($"ORDER REJECTED. Retry set for next run");
-
-            //                    }
-            //                    else
-            //                    {
-            //                        clsCommonFunctions.AddStatusMessage($"ORDER REJECTED. Retry limit hit. Just forget about it.");
-            //                        _thisApp.retryOrder = false;
-            //                        _thisApp.retryOrderCount = 0;
-            //                    }
-            //                }
-
-            //                if (tsm.Status == null & tsm.Reason != "SUCCESS")
-            //                {
-            //                    // trade/order not successful (could be update or open or delete)
-            //                    clsCommonFunctions.AddStatusMessage($"CONFIRM - failed - deal type = {reqTrade.dealType} - {tsm.Reason} - {_thisApp.TradeErrors[tsm.Reason]}", "INFO");
-
-            //                    if (reqTrade.dealType == "POSITION")
-            //                    {
-            //                        clsCommonFunctions.AddStatusMessage($"CONFIRM - Resetting values due to {reqTrade.dealType} failure", "INFO");
-            //                        _thisApp.model.sellShort = false;
-            //                        _thisApp.model.sellLong = false;
-            //                        _thisApp.model.buyShort = false;
-            //                        _thisApp.model.shortOnMarket = false;
-            //                        _thisApp.model.buyLong = false;
-            //                        _thisApp.model.longOnmarket = false;
-            //                        _thisApp.model.onMarket = false;
-            //                    }
-
-            //                }
-            //            }
-
-            //        }
-            //    }
-
-            //}
-            //catch (Exception ex)
-            //{
-            //    var log = new TradingBrain.Models.Log(_thisApp.the_app_db);
-            //    log.Log_Message = ex.ToString();
-            //    log.Log_Type = "Error";
-            //    log.Log_App = "UpdateTsCONFIRM";
-            //    log.Epic = "";
-            //    await log.Save();
-            //}
+            catch (Exception ex)
+            {
+                var log = new TradingBrain.Models.Log(_igContainer.the_app_db);
+                log.Log_Message = ex.ToString();
+                log.Log_Type = "Error";
+                log.Log_App = "UpdateTsConfirm";
+                log.Epic = "";
+                await log.Save();
+            }
             return tsm;
         }
 
@@ -1098,6 +803,10 @@ namespace TradingBrain.Models
             {
                 try
                 {
+                    if (client == null)
+                    {
+                       throw new Exception("Lightstreamer client is null in Connect");
+                    }
                     if (ph != this.phase)
                         return;
                     ph = Interlocked.Increment(ref this.phase);
@@ -1108,7 +817,7 @@ namespace TradingBrain.Models
                 }
                 catch (Exception e)
                 {
-
+                    var a = e;
                 }
 
                 if (!connected)
@@ -1126,10 +835,15 @@ namespace TradingBrain.Models
             //    });
             try
             {
+                if (client == null)
+                {
+                   throw new Exception("Lightstreamer client is null in Disconnect");
+                }
                 client.disconnect();
             }
             catch (Exception e)
             {
+                var a = e;
                 //demoForm.Invoke(statusChangeDelegate, new Object[] {
                 //        StocklistConnectionListener.VOID, e.Message
                 //    });
@@ -1144,11 +858,17 @@ namespace TradingBrain.Models
             //event will be (or was) sent to the ConnectionListener that will handle the case.
             //If we're connected but the subscription fails we can't do anything as the same subscription 
             //would fail again and again (btw this should never happen)
-
+            if (_igContainer == null)
+            {
+               throw new Exception("IG Container is null in ChartSubscribe");
+            }
             try
             {
                 //string chartName = "CHART:IX.D.NASDAQ.CASH.IP:TICK";
-
+                if (client == null)
+                {
+                   throw new Exception("Lightstreamer client is null in ChartSubscribe");
+                }
                 List<string> epics = new List<string>();
 
                 foreach (EpicList epic in _igContainer.EpicList)
@@ -1189,7 +909,7 @@ namespace TradingBrain.Models
                 log.Log_Type = "Error";
                 log.Log_App = "ChartSubscribe";
                 log.Epic = "";
-                log.Save();
+                _ = log.Save();
             }
         }
         private async void TradeSubscribe(string accountId)
@@ -1203,7 +923,10 @@ namespace TradingBrain.Models
 
             try
             {
-
+                if (client == null)
+                {
+                   throw new Exception("Lightstreamer client is null in TradeSubscribe");
+                }
                 subscription = new Subscription("DISTINCT", new string[1] { "TRADE:" + accountId }, new string[3] { "CONFIRMS", "OPU", "WOU" });
 
 
@@ -1221,6 +944,10 @@ namespace TradingBrain.Models
                 //demoForm.Invoke(statusChangeDelegate, new Object[] {
                 //        StocklistConnectionListener.VOID, e.Message
                 //    });
+                if (_igContainer == null)
+                {
+                                       return;
+                }
                 var log = new TradingBrain.Models.Log(_igContainer.the_app_db);
                 log.Log_Message = e.ToString();
                 log.Log_Type = "Error";
@@ -1231,21 +958,30 @@ namespace TradingBrain.Models
         }
         internal void ForceTransport(string selectedText)
         {
-            if (selectedText.StartsWith("no"))
+            if (client != null)
             {
-                client.connectionOptions.ForcedTransport = null;
-            }
-            else
-            {
-                client.connectionOptions.ForcedTransport = selectedText;
-            }
 
+
+                if (selectedText.StartsWith("no"))
+                {
+                    client.connectionOptions.ForcedTransport = null;
+                }
+                else
+                {
+                    client.connectionOptions.ForcedTransport = selectedText;
+                }
+            }
         }
 
         internal void MaxFrequency(int value)
         {
+            if (subscription == null)
+            {
+                return;
+            }
             switch (value)
             {
+
                 case 0:
                     subscription.RequestedMaxFrequency = "unlimited";
                     break;
@@ -1292,8 +1028,8 @@ namespace TradingBrain.Models
         public ObservableCollection<IgPublicApiData.AccountModel>? Accounts { get; set; }
         public string CurrentAccountId { get; set; }
         public string igAccountId { get; set; }
-        public List<EpicList> EpicList { get; set; }
-        public List<LOepic> PriceEpicList { get; set; }
+        public List<EpicList> EpicList { get; set; } = new List<EpicList>();
+        public List<LOepic> PriceEpicList { get; set; } = new List<LOepic>();
         public static bool LoggedIn { get; set; }
         public TBStreamingClient? tbClient { get; set; }
         private bool isDirty = false;
@@ -1304,7 +1040,7 @@ namespace TradingBrain.Models
         public Database? the_db { get; set; }
         public Database? the_app_db { get; set; }
         public List<MainApp> workerList { get; set; }
-        public IgApiCreds? creds { get; set; }
+        public IgApiCreds creds { get; set; }
         public IGContainer()
         {
             igRestApiClient = null;
