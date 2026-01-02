@@ -1,4 +1,5 @@
-﻿using com.lightstreamer.client;
+﻿#pragma warning disable S125
+using com.lightstreamer.client;
 using dto.endpoint.accountswitch;
 using dto.endpoint.auth.session.v2;
 using IGModels;
@@ -41,25 +42,34 @@ namespace TradingBrain.Models
 
     public class TBStreamingClient
     {
-        //private DemoForm demoForm;
-        private Delegates.LightstreamerUpdateDelegate? updateDelegate;
-        private Delegates.LightstreamerStatusChangedDelegate? statusChangeDelegate;
-
-        public LightstreamerClient? client;
-        private Subscription? subscription;
-        //private Dictionary<ChartQuotes, Subscription> charts = new Dictionary<ChartQuotes, Subscription>();
-
-
+        public IgRestApiClient? IgRestApiClient { get; set; }
+        public ConversationContext? Context { get; set; }
         public ObservableCollection<IgPublicApiData.AccountModel>? Accounts { get; set; }
-        public static string? CurrentAccountId;
-        public bool LoggedIn;
-        public bool connectionEstablished;
-        public bool FirstConfirmUpdate;
-        public IGContainer? _igContainer;
-        public int currentSecond = 0;
+        public string CurrentAccountId { get; set; } = "";
+        public string IgAccountId { get; set; } = "";
+        public List<EpicList> EpicList { get; set; } = new List<EpicList>();
+        public List<LOepic> PriceEpicList { get; set; } = new List<LOepic>();
+        public static bool LoggedIn { get; set; }
+        public TBStreamingClient? TbClient { get; set; }
+        public bool IsDirty { get; set; } = false;
+        //public string PushServerUrl { get; set; } = "";
+        //public string ForceT { get; set; } = "";
+        public Database? TheDb { get; set; }
+        public Database? TheAppDb { get; set; }
+        public List<MainApp> WorkerList { get; set; } = new List<MainApp>();
+        public IgApiCreds Creds { get; set; } = new IgApiCreds();
+        public Delegates.LightstreamerUpdateDelegate? updateDelegate { get; set; }
+        public Delegates.LightstreamerStatusChangedDelegate? statusChangeDelegate { get; set; }
+        public LightstreamerClient? client { get; set; }
+        private Subscription? subscription { get; set; }
+        public bool connectionEstablished { get; set; }
+        public bool FirstConfirmUpdate { get; set; }
+        public IGContainer? _igContainer { get; set; }
+        public int currentSecond { get; set; } = 0;
+
+
         public TBStreamingClient(
-                string pushServerUrl,
-                string forceT,
+
                 IGContainer igContainer,
                 Delegates.LightstreamerUpdateDelegate lsUpdateDelegate,
                 Delegates.LightstreamerStatusChangedDelegate lsStatusChangeDelegate)
@@ -71,15 +81,10 @@ namespace TradingBrain.Models
                     throw new ArgumentNullException(nameof(igContainer));
                 }
                 _igContainer = igContainer;
-                //_igRestApiClient = igContainer.igRestApiClient;
                 Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
-                //demoForm = form;
                 updateDelegate = lsUpdateDelegate;
                 statusChangeDelegate = lsStatusChangeDelegate;
                 FirstConfirmUpdate = true;
-
-
-                //bool connectionEstablished = false;
 
                 SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
 
@@ -91,7 +96,7 @@ namespace TradingBrain.Models
                     env = igWebApiConnectionConfig["environment"] ?? "DEMO";
                 }
                 _igContainer.igRestApiClient = new IgRestApiClient(env, smartDispatcher);
-                //_thisApp.igAccountId = this.client.connectionDetails.User;
+
             }
             catch (Exception)
             {
@@ -103,12 +108,15 @@ namespace TradingBrain.Models
             }
 
         }
+
+        private const string LOGGED_IN_MESSAGE = "Logged in, current account: ";
+
         //public static void AddStatusMessage(string message)
         //{
         //    clsCommonFunctions.AddStatusMessage(message);
         //}
 
-        public async void ConnectToRest()
+        public async Task ConnectToRest()
         {
             try
             {
@@ -124,7 +132,7 @@ namespace TradingBrain.Models
                 {
                     throw new InvalidOperationException("IG creds are null in ConnectToRest");
                 }
-                string env = _igContainer.creds.igEnvironment;
+                //string env = _igContainer.creds.igEnvironment;
                 string userName = _igContainer.creds.igUsername;
                 string password = _igContainer.creds.igPassword;
                 string apiKey = _igContainer.creds.igApiKey;
@@ -169,16 +177,16 @@ namespace TradingBrain.Models
 
                         if (response2 != null)
                         {
-                            CommonFunctions.AddStatusMessage("Logged in, current account: " + accountId, "INFO");
+                            CommonFunctions.AddStatusMessage(LOGGED_IN_MESSAGE + accountId, "INFO");
                         }
                         else
                         {
-                            CommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
+                            CommonFunctions.AddStatusMessage(LOGGED_IN_MESSAGE + response.Response.currentAccountId, "INFO");
                         }
                     }
                     else
                     {
-                        CommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
+                        CommonFunctions.AddStatusMessage(LOGGED_IN_MESSAGE + response.Response.currentAccountId, "INFO");
                     }
 
                     _igContainer.context = _igContainer.igRestApiClient.GetConversationContext();
@@ -186,8 +194,7 @@ namespace TradingBrain.Models
                 }
                 else
                 {
-                    CommonFunctions.AddStatusMessage("Failed to login. HttpResponse StatusCode = " +
-                      response.StatusCode, "ERROR");
+                    CommonFunctions.AddStatusMessage("Failed to login. HttpResponse StatusCode = " + response.StatusCode, "ERROR");
                 }
             }
             catch (Exception e)
@@ -196,7 +203,7 @@ namespace TradingBrain.Models
 
             }
         }
-        public async void LogIn()
+        public async Task LogIn()
         {
 
             try
@@ -213,7 +220,7 @@ namespace TradingBrain.Models
                 {
                     throw new InvalidOperationException("IG creds are null in LogIn");
                 }
-                string env = _igContainer.creds.igEnvironment;
+                //string env = _igContainer.creds.igEnvironment;
                 string userName = _igContainer.creds.igUsername;
                 string password = _igContainer.creds.igPassword;
                 string apiKey = _igContainer.creds.igApiKey;
@@ -258,18 +265,18 @@ namespace TradingBrain.Models
 
                         if (response2 != null)
                         {
-                            CommonFunctions.AddStatusMessage("Logged in, current account: " + accountId, "INFO");
+                            CommonFunctions.AddStatusMessage(LOGGED_IN_MESSAGE + accountId, "INFO");
                             _igContainer.igAccountId = accountId;
                         }
                         else
                         {
-                            CommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
+                            CommonFunctions.AddStatusMessage(LOGGED_IN_MESSAGE + response.Response.currentAccountId, "INFO");
                             _igContainer.igAccountId = response.Response.currentAccountId;
                         }
                     }
                     else
                     {
-                        CommonFunctions.AddStatusMessage("Logged in, current account: " + response.Response.currentAccountId, "INFO");
+                        CommonFunctions.AddStatusMessage(LOGGED_IN_MESSAGE + response.Response.currentAccountId, "INFO");
                         _igContainer.igAccountId = response.Response.currentAccountId;
                     }
 
@@ -363,7 +370,10 @@ namespace TradingBrain.Models
                     }
                 }
             }
-            catch (Exception) { }
+            catch (Exception)
+            {
+                // empty
+            }
         }
         private int phase = 0;
 
@@ -393,7 +403,7 @@ namespace TradingBrain.Models
         {
             if (Interlocked.CompareExchange(ref this.reset, 1, 0) == 0)
             {
-                Disconnect(this.phase);
+                Disconnect();
             }
         }
         public class SmartDispatcher : PropertyEventDispatcher
@@ -426,7 +436,7 @@ namespace TradingBrain.Models
                 //instance.addEventMessage(message);
             }
         }
-        private void Execute(int ph)
+        private async void Execute(int ph)
         {
             try
             {
@@ -440,14 +450,14 @@ namespace TradingBrain.Models
                     return;
                 }
                 ph = Interlocked.Increment(ref this.phase);
-                this.LogIn();
-                this.Connect(ph);
+                 await this.LogIn() ;
+                  this.Connect(ph);
                 if (this._igContainer.creds.primary)
                 {
                     //ony subscribe to charts on primary connection
                     this.ChartSubscribe();
                 }
-                this.TradeSubscribe(this._igContainer.igAccountId);
+               await this.TradeSubscribe(this._igContainer.igAccountId);
                 //this._igContainer.igAccountId = CurrentAccountId;
                 // this.subscribeChart()
             }
@@ -471,17 +481,15 @@ namespace TradingBrain.Models
             {
 
                 CommonFunctions.AddStatusMessage("Status changed to " + status + " (" + cStatus + ")", "INFO");
-                if (cStatus == 0)
+                if (cStatus == 0 && Interlocked.CompareExchange(ref this.reset, 0, 1) == 1)
                 {
-                    if (Interlocked.CompareExchange(ref this.reset, 0, 1) == 1)
+                    int phs = Interlocked.Increment(ref this.phase);
+                    Thread t = new Thread(new ThreadStart(delegate ()
                     {
-                        int phs = Interlocked.Increment(ref this.phase);
-                        Thread t = new Thread(new ThreadStart(delegate ()
-                        {
-                            Execute(phs);
-                        }));
-                        t.Start();
-                    }
+                        Execute(phs);
+                    }));
+                    t.Start();
+
                 }
             }
             catch (Exception)
@@ -532,7 +540,7 @@ namespace TradingBrain.Models
                         }
                     }
 
-                    LOepic? thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epic).FirstOrDefault();
+                    LOepic? thisEpic = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == epic);
                     if (thisEpic != null)
                     {
                         tick thisTick = new tick();
@@ -615,7 +623,7 @@ namespace TradingBrain.Models
 
         }
 
-        public async void TradeUpdateReceived(int ph, int itemPos, ItemUpdate update)
+        public async Task TradeUpdateReceived(int ph, int itemPos, ItemUpdate update)
         {
 
             // Deal with Trade updates here
@@ -630,8 +638,8 @@ namespace TradingBrain.Models
             {
                 if (!this.FirstConfirmUpdate)
                 {
-                    var sb = new StringBuilder();
-                    sb.AppendLine("Trade Subscription Update");
+                    //var sb = new StringBuilder();
+                    //sb.AppendLine("Trade Subscription Update");
                     //clsCommonFunctions.AddStatusMessage("Trade Subscription Update", "INFO");
                     try
                     {
@@ -643,7 +651,7 @@ namespace TradingBrain.Models
                         if (!(String.IsNullOrEmpty(opu)))
                         {
                             //clsCommonFunctions.AddStatusMessage("Trade update - OPU" + opu);
-                            Task taskA = Task.Run(() => UpdateTsOpu(itemPos, update.ItemName, update, opu, TradeSubscriptionType.Opu));
+                            _ = Task.Run(() => UpdateTsOpu( update, opu));
                         }
                         if (!(String.IsNullOrEmpty(wou)))
                         {
@@ -653,20 +661,20 @@ namespace TradingBrain.Models
                         if (!(String.IsNullOrEmpty(confirms)))
                         {
                             //clsCommonFunctions.AddStatusMessage("Trade update - CONFIRMS" + confirms);
-                            await UpdateTsConfirm(itemPos, update.ItemName, update, confirms, TradeSubscriptionType.Confirm);
+                            await UpdateTsConfirm( update, confirms);
                         }
 
                     }
-                    catch (Exception ex)
+                    catch (Exception )
                     {
-                        var a = ex;
+                        // empty
                     }
                 }
                 else { this.FirstConfirmUpdate = false; }
             }
-            catch (Exception ex)
+            catch (Exception )
             {
-                var a = ex;
+                // empty
             }
 
 
@@ -674,7 +682,7 @@ namespace TradingBrain.Models
 
         }
 
-        private IgPublicApiData.TradeSubscriptionModel UpdateTsOpu(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
+        private IgPublicApiData.TradeSubscriptionModel UpdateTsOpu( ItemUpdate update, string inputData)
         {
 
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
@@ -709,7 +717,7 @@ namespace TradingBrain.Models
                         msg.itemName = update.ItemName;
                         msg.updateData = inputData;
                         msg.updateType = "UPDATE";
-                        RunRet taskRet = wrk.iGUpdate(msg);
+                        _ = wrk.iGUpdate(msg);
 
                         CommonFunctions.SendBroadcast("UpdateOPU", inputData);
                         //Console.WriteLine("UpdateOPU: " + inputData);
@@ -720,7 +728,7 @@ namespace TradingBrain.Models
             return tsm;
         }
 
-        private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsConfirm(int itemPos, string itemName, ItemUpdate update, string inputData, TradeSubscriptionType updateType)
+        private async Task<IgPublicApiData.TradeSubscriptionModel> UpdateTsConfirm(ItemUpdate update, string inputData)
         {
 
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
@@ -756,7 +764,7 @@ namespace TradingBrain.Models
                             msg.itemName = update.ItemName;
                             msg.updateData = inputData;
                             msg.updateType = "CONFIRM";
-                            RunRet taskRet = wrk.iGUpdate(msg);
+                            _ = wrk.iGUpdate(msg);
                             CommonFunctions.SendBroadcast("UpdateConfirm", inputData);
                             //Console.WriteLine("updateConfirm: " + inputData);
                         }
@@ -775,26 +783,26 @@ namespace TradingBrain.Models
             return tsm;
         }
 
-        protected decimal? StringToNullableDecimal(string value)
+        protected static decimal? StringToNullableDecimal(string value)
         {
             decimal number;
             return decimal.TryParse(value, out number) ? number : (decimal?)null;
         }
 
-        protected int? StringToNullableInt(string value)
+        protected static int? StringToNullableInt(string value)
         {
             int number;
             return int.TryParse(value, out number) ? number : (int?)null;
         }
 
-        protected DateTime? EpocStringToNullableDateTime(string value)
+        protected static DateTime? EpocStringToNullableDateTime(string value)
         {
             ulong epoc;
             if (!ulong.TryParse(value, out epoc))
             {
                 return null;
             }
-            return new DateTime(1970, 1, 1, 0, 0, 0, 0).AddMilliseconds(epoc);
+            return DateTime.UnixEpoch.AddMilliseconds(epoc);
         }
         private void Connect(int ph)
         {
@@ -816,9 +824,9 @@ namespace TradingBrain.Models
                     client.connect();
                     connected = true;
                 }
-                catch (Exception e)
+                catch (Exception )
                 {
-                    var a = e;
+                    // empty
                 }
 
                 if (!connected)
@@ -828,7 +836,7 @@ namespace TradingBrain.Models
             }
         }
 
-        private void Disconnect(int ph)
+        private void Disconnect()
         {
             //demoForm.Invoke(statusChangeDelegate, new Object[] {
             //        StocklistConnectionListener.VOID,
@@ -842,12 +850,9 @@ namespace TradingBrain.Models
                 }
                 client.disconnect();
             }
-            catch (Exception e)
+            catch (Exception )
             {
-                var a = e;
-                //demoForm.Invoke(statusChangeDelegate, new Object[] {
-                //        StocklistConnectionListener.VOID, e.Message
-                //    });
+                //empty
             }
         }
 
@@ -913,7 +918,7 @@ namespace TradingBrain.Models
                 _ = log.Save();
             }
         }
-        private async void TradeSubscribe(string accountId)
+        private async Task TradeSubscribe(string accountId)
         {
             //this method will try just one subscription.
             //we know that when this method executes we should be already connected
@@ -1029,15 +1034,13 @@ namespace TradingBrain.Models
         public ObservableCollection<IgPublicApiData.AccountModel>? Accounts { get; set; }
         public string CurrentAccountId { get; set; }
         public string igAccountId { get; set; }
-        public List<EpicList> EpicList { get; set; } = new List<EpicList>();
-        public List<LOepic> PriceEpicList { get; set; } = new List<LOepic>();
+        public List<EpicList> EpicList { get; set; }  
+        public List<LOepic> PriceEpicList { get; set; } 
         public static bool LoggedIn { get; set; }
         public TBStreamingClient? tbClient { get; set; }
         private bool isDirty = false;
-
-        private string pushServerUrl;
-        public string forceT;
-        //private string forceTransport = "no";
+        //public string forceT { get; set; }  
+ 
         public Database? the_db { get; set; }
         public Database? the_app_db { get; set; }
         public List<MainApp> workerList { get; set; }
@@ -1056,8 +1059,8 @@ namespace TradingBrain.Models
             tbClient = null;
             workerList = new List<MainApp>();
             creds = new IgApiCreds();
-            forceT = "";
-            pushServerUrl = "";
+            //forceT = "";
+            //pushServerUrl = "";
         }
         public IGContainer(IgApiCreds _creds)
         {
@@ -1073,19 +1076,16 @@ namespace TradingBrain.Models
             the_app_db = null;
             tbClient = null;
             workerList = new List<MainApp>();
-            forceT = "";
-            pushServerUrl = "";
+            //forceT = "";
+            //pushServerUrl = "";
         }
         public void StartLightstreamer()
         {
 
             tbClient = new TBStreamingClient(
-                pushServerUrl,
-                forceT,
                 this,
                 new Delegates.LightstreamerUpdateDelegate(OnLightstreamerUpdate),
                 new Delegates.LightstreamerStatusChangedDelegate(OnLightstreamerStatusChanged));
-
 
             tbClient.Start();
 
@@ -1115,7 +1115,7 @@ namespace TradingBrain.Models
     public class LOepic
     {
         public string name { get; set; }
-        public clsChartMinUpdate lastUpdate { get; set; }
+        public ClsChartMinUpdate lastUpdate { get; set; }
         public DateTime lastUTM { get; set; }
         public List<double> closePrices { get; set; }
         public tbPrice latestCandle { get; set; }
@@ -1123,7 +1123,7 @@ namespace TradingBrain.Models
         public LOepic()
         {
             this.name = "";
-            this.lastUpdate = new clsChartMinUpdate();
+            this.lastUpdate = new ClsChartMinUpdate();
             this.lastUTM = DateTime.MinValue;
             this.closePrices = new List<double>();
             this.latestCandle = new tbPrice();
@@ -1133,7 +1133,7 @@ namespace TradingBrain.Models
         public LOepic(string _name)
         {
             this.name = _name;
-            this.lastUpdate = new clsChartMinUpdate();
+            this.lastUpdate = new ClsChartMinUpdate();
             this.lastUTM = DateTime.MinValue;
             this.closePrices = new List<double>();
             this.ticks = new List<tick>();
@@ -1161,7 +1161,7 @@ namespace TradingBrain.Models
             UTM = _UTM;
         }
     }
-    public class clsChartMinUpdate
+    public class ClsChartMinUpdate
     {
         public string Epic { get; set; }
         public Decimal Bid_Open { get; set; }
@@ -1182,7 +1182,7 @@ namespace TradingBrain.Models
 
 
 
-        public clsChartMinUpdate()
+        public ClsChartMinUpdate()
         {
             this.Epic = "";
             this.Bid_Open = new Decimal();
@@ -1225,7 +1225,7 @@ namespace TradingBrain.Models
                         if (!exist)
                         {
                             this.id = System.Guid.NewGuid().ToString();
-                            ItemResponse<clsChartMinUpdate> SaveResponse = await container.CreateItemAsync<clsChartMinUpdate>(this, new PartitionKey(this.id));
+                            ItemResponse<ClsChartMinUpdate> SaveResponse = await container.CreateItemAsync<ClsChartMinUpdate>(this, new PartitionKey(this.id));
                         }
                         blnLoop = false;
                     }

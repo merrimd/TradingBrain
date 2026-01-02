@@ -1,4 +1,5 @@
-﻿using Azure.Storage.Blobs;
+﻿#pragma warning disable S125
+using Azure.Storage.Blobs;
 using com.lightstreamer.client;
 using IGCandleCreator.Models;
 using IGModels;
@@ -43,18 +44,13 @@ namespace TradingBrain.Models
 {
     partial class ProgramV2
     {
-        public static Microsoft.Azure.Cosmos.Container? EpicContainer;
-        public static Microsoft.Azure.Cosmos.Container? hourly_container;
-        public static Microsoft.Azure.Cosmos.Container? minute_container;
-        public static Microsoft.Azure.Cosmos.Container? TicksContainer;
-        //public static Microsoft.Azure.Cosmos.Container? candlesContainer;
-        public static Microsoft.Azure.Cosmos.Container? trade_container;
-        public static Database? the_db;
-        public static Database? the_app_db;
+        private const string DEFAULT_EPIC = "IX.D.NASDAQ.CASH.IP|SMA";
+        public const string ENVIRONMENT = "environment";
 
-        public static List<MainApp> workerList = new List<MainApp>();
+        private static Database? the_db;
+        private static Database? the_app_db;
 
-        // public TBStreamingClient tbClient;
+        private static List<MainApp> workerList = [];
         private bool isDirty = false;
 
         //private string pushServerUrl;
@@ -64,7 +60,7 @@ namespace TradingBrain.Models
         // public IgRestApiClient? igRestApiClient;
 
         public delegate void StopDelegate();
-        public static string region = "";
+        private static string region = "";
         public async static Task<bool> SetupDB()
         {
             bool ret = true;
@@ -74,16 +70,16 @@ namespace TradingBrain.Models
                 the_db = await IGModels.clsCommonFunctions.Get_Database();
                 the_app_db = await IGModels.clsCommonFunctions.Get_App_Database();
 
-                if (the_db != null && the_app_db != null)
-                {
-                    EpicContainer = the_app_db.GetContainer("Epics");
-                    hourly_container = the_db.GetContainer("HourlyCandle");
-                    minute_container = the_db.GetContainer("MinuteCandle");
-                    TicksContainer = the_db.GetContainer("CandleTicks");
-                    //candlesContainer = the_db.GetContainer("Candles");
-                    trade_container = the_app_db.GetContainer("TradingBrainTrades");
+                //if (the_db != null && the_app_db != null)
+                //{
+                //    EpicContainer = the_app_db.GetContainer("Epics");
+                //    hourly_container = the_db.GetContainer("HourlyCandle");
+                //    minute_container = the_db.GetContainer("MinuteCandle");
+                //    TicksContainer = the_db.GetContainer("CandleTicks");
+                //    //candlesContainer = the_db.GetContainer("Candles");
+                //    trade_container = the_app_db.GetContainer("TradingBrainTrades");
 
-                }
+                //}
             }
             catch (Exception ex)
             {
@@ -101,28 +97,28 @@ namespace TradingBrain.Models
                 the_db = await IGModels.clsCommonFunctions.Get_Database(epic);
                 the_app_db = await IGModels.clsCommonFunctions.Get_App_Database(epic);
 
-                if (the_db != null && the_app_db != null)
-                {
-                    EpicContainer = the_app_db.GetContainer("Epics");
-                    hourly_container = the_db.GetContainer("HourlyCandle");
+                //if (the_db != null && the_app_db != null)
+                //{
+                //    EpicContainer = the_app_db.GetContainer("Epics");
+                //    hourly_container = the_db.GetContainer("HourlyCandle");
 
-                    if (epic == "IX.D.NIKKEI.DAILY.IP")
-                    {
-                        minute_container = the_db.GetContainer("MinuteCandle_NIKKEI");
-                        TicksContainer = the_db.GetContainer("CandleTicks_NIKKEI");
-                        trade_container = the_app_db.GetContainer("TradingBrainTrades");
-                    }
-                    else
-                    {
-                        minute_container = the_db.GetContainer("MinuteCandle");
-                        TicksContainer = the_db.GetContainer("CandleTicks");
-                        trade_container = the_app_db.GetContainer("TradingBrainTrades");
-                    }
+                //    if (epic == "IX.D.NIKKEI.DAILY.IP")
+                //    {
+                //        minute_container = the_db.GetContainer("MinuteCandle_NIKKEI");
+                //        TicksContainer = the_db.GetContainer("CandleTicks_NIKKEI");
+                //        trade_container = the_app_db.GetContainer("TradingBrainTrades");
+                //    }
+                //    else
+                //    {
+                //        minute_container = the_db.GetContainer("MinuteCandle");
+                //        TicksContainer = the_db.GetContainer("CandleTicks");
+                //        trade_container = the_app_db.GetContainer("TradingBrainTrades");
+                //    }
 
-                    //candlesContainer = the_db.GetContainer("Candles");
+                //    //candlesContainer = the_db.GetContainer("Candles");
 
 
-                }
+                //}
             }
             catch (Exception ex)
             {
@@ -141,8 +137,8 @@ namespace TradingBrain.Models
 
             //Get list of epics from config
 
-            List<TbEpics> epcs = new List<TbEpics>();
-            List<string> epicList = new List<string>();
+            List<TbEpics> epcs = [];
+            List<string> epicList = [];
             string settingEpics = "";
 
             region = Environment.GetEnvironmentVariable("Region") ?? "";
@@ -151,16 +147,16 @@ namespace TradingBrain.Models
             {
                 // not found in environment variables so get from config
                 region = igWebApiConnectionConfig["region"] ?? "test";
-                settingEpics = igWebApiConnectionConfig["epics"] ?? "IX.D.NASDAQ.CASH.IP|SMA";
+                settingEpics = igWebApiConnectionConfig["epics"] ?? DEFAULT_EPIC;
             }
             else
             {
                 useEnvironment = true;
-                settingEpics = Environment.GetEnvironmentVariable("epics") ?? "IX.D.NASDAQ.CASH.IP|SMA";
+                settingEpics = Environment.GetEnvironmentVariable("epics") ?? DEFAULT_EPIC;
             }
 
 
-            if (settingEpics != "IX.D.NASDAQ.CASH.IP|SMA")
+            if (settingEpics != DEFAULT_EPIC)
             {
                 foreach (string tmp in settingEpics.Split(",").ToList())
                 {
@@ -170,10 +166,10 @@ namespace TradingBrain.Models
             }
             else
             {
-                epcs.Add(new TbEpics("IX.D.NASDAQ.CASH.IP|SMA"));
-                epicList.Add("IX.D.NASDAQ.CASH.IP|SMA");
+                epcs.Add(new TbEpics(DEFAULT_EPIC));
+                epicList.Add(DEFAULT_EPIC);
             }
-            string[] epics = { epcs[0].epic };
+            //string[] epics = { epcs[0].epic };
 
             string strategy = epcs[0].strategy;
 
@@ -248,8 +244,8 @@ namespace TradingBrain.Models
 
             if (useEnvironment)
             {
-                CommonFunctions.AddStatusMessage(Environment.GetEnvironmentVariable("environment") ?? "DEMO", "INFO");
-                creds.igEnvironment = Environment.GetEnvironmentVariable("environment") ?? "DEMO";
+                CommonFunctions.AddStatusMessage(Environment.GetEnvironmentVariable(ENVIRONMENT) ?? "DEMO", "INFO");
+                creds.igEnvironment = Environment.GetEnvironmentVariable(ENVIRONMENT) ?? "DEMO";
                 creds.igUsername = Environment.GetEnvironmentVariable("username." + creds.igEnvironment) ?? "";
                 creds.igPassword = Environment.GetEnvironmentVariable("password." + creds.igEnvironment) ?? "";
                 creds.igApiKey = Environment.GetEnvironmentVariable("apikey." + creds.igEnvironment) ?? "";
@@ -258,8 +254,8 @@ namespace TradingBrain.Models
             else
             {
                 //Get credentials from config
-                CommonFunctions.AddStatusMessage(igWebApiConnectionConfig["environment"] ?? "DEMO", "INFO");
-                creds.igEnvironment = igWebApiConnectionConfig["environment"] ?? "DEMO";
+                CommonFunctions.AddStatusMessage(igWebApiConnectionConfig[ENVIRONMENT] ?? "DEMO", "INFO");
+                creds.igEnvironment = igWebApiConnectionConfig[ENVIRONMENT] ?? "DEMO";
                 creds.igUsername = igWebApiConnectionConfig["username." + creds.igEnvironment] ?? "";
                 creds.igPassword = igWebApiConnectionConfig["password." + creds.igEnvironment] ?? "";
                 creds.igApiKey = igWebApiConnectionConfig["apikey." + creds.igEnvironment] ?? "";
@@ -282,7 +278,7 @@ namespace TradingBrain.Models
 
                 if (useEnvironment)
                 {
-                    creds2.igEnvironment = Environment.GetEnvironmentVariable("environment") ?? "DEMO";
+                    creds2.igEnvironment = Environment.GetEnvironmentVariable(ENVIRONMENT) ?? "DEMO";
                     creds2.igUsername = Environment.GetEnvironmentVariable("username2." + creds2.igEnvironment) ?? "";
                     creds2.igPassword = Environment.GetEnvironmentVariable("password2." + creds2.igEnvironment) ?? "";
                     creds2.igApiKey = Environment.GetEnvironmentVariable("apikey2." + creds2.igEnvironment) ?? "";
@@ -291,7 +287,7 @@ namespace TradingBrain.Models
                 else
                 {
                     //Get credentials from config
-                    creds2.igEnvironment = igWebApiConnectionConfig["environment"] ?? "DEMO";
+                    creds2.igEnvironment = igWebApiConnectionConfig[ENVIRONMENT] ?? "DEMO";
                     creds2.igUsername = igWebApiConnectionConfig["username2." + creds2.igEnvironment] ?? "";
                     creds2.igPassword = igWebApiConnectionConfig["password2." + creds2.igEnvironment] ?? "";
                     creds2.igApiKey = igWebApiConnectionConfig["apikey2." + creds2.igEnvironment] ?? "";
@@ -314,8 +310,8 @@ namespace TradingBrain.Models
 
             }
 
-            Database? the_db = IGModels.clsCommonFunctions.Get_Database("IX.D.NASDAQ.CASH.IP").Result;
-            Database? the_app_db = IGModels.clsCommonFunctions.Get_App_Database("IX.D.NASDAQ.CASH.IP").Result;
+             the_db = IGModels.clsCommonFunctions.Get_Database("IX.D.NASDAQ.CASH.IP").Result;
+             the_app_db = IGModels.clsCommonFunctions.Get_App_Database("IX.D.NASDAQ.CASH.IP").Result;
 
             foreach (TbEpics tbepic in epcs)
             {
@@ -330,8 +326,7 @@ namespace TradingBrain.Models
                 tbLog = LogManager.GetLogger(jobId);
 
                 tbLog.Info("-------------------------------------------------------------");
-                tbLog.Info($"-- TradingBrain started - strategy: {tbepic.strategy + " " + tbepic.resolution} : {tbepic.epic} --");
-                tbLog.Info("-------------------------------------------------------------");
+                tbLog.Info("-- TradingBrain started - strategy: {strategy} {respolution} : {epic} --", tbepic.strategy, tbepic.resolution, tbepic.epic);
 
                 if (the_db != null && the_app_db != null)
                 {
@@ -342,7 +337,7 @@ namespace TradingBrain.Models
 
                     workerList.Add(new MainApp(the_db, the_app_db, tbepic.epic, igContainer, igContainer2, tbepic.strategy, tbepic.resolution));
 
-                    ;
+                 
 
                 }
                 igContainer.workerList = workerList;
@@ -399,9 +394,8 @@ namespace TradingBrain.Models
             }
 
             ti.Start();
-
-            //}
-            int i = await WaitForChanges();
+ 
+             await WaitForChanges();
 
 
         }
@@ -412,24 +406,18 @@ namespace TradingBrain.Models
 
             try
             {
-                if (sender == null) { throw new Exception("Timer sender is null"); }
+                if (sender == null) { throw new InvalidOperationException("Timer sender is null"); }
 
                 var t = (System.Timers.Timer?)sender;
 
-                if (t == null) { throw new Exception("Timer t is null"); }
+                if (t == null) { throw new InvalidOperationException("Timer t is null"); }
 
                 string strat = "";
                 foreach (MainApp app in workerList)
                 {
-                    //bool ret = await app.GetPositions();
-
                     Task<RunRet> task;
                     switch (app.strategy)
                     {
-                        //case "BOLLI":
-                        //    task = Task.Run(() => app.RunCode_BOLLI(sender, e));
-                        //    parallelTasks.Add(task);
-                        //    break;
                         case "GRID":
                             task = Task.Run(() => app.RunCode_GRID(sender, e));
                             parallelTasks.Add(task);
@@ -438,7 +426,6 @@ namespace TradingBrain.Models
                             task = Task.Run(() => app.RunCodeV5(sender, e));
                             parallelTasks.Add(task);
                             break;
-
                     }
                     if (strat == "") { strat = app.strategy; }
                 }
@@ -446,9 +433,9 @@ namespace TradingBrain.Models
                 {
                     await Task.WhenAll(parallelTasks);
                 }
-                catch (Exception ex)
+                catch (Exception )
                 {
-                    var exc = ex;
+                    // Log any exceptions from the tasks
                 }
                 if (workerList[0].strategy == "RSI" ||
                     workerList[0].strategy == "REI" ||
@@ -479,9 +466,9 @@ namespace TradingBrain.Models
                 }
                 t.Start();
             }
-            catch (Exception ex)
+            catch (Exception )
             {
-                var exc = ex;
+            // blank section
             }
         }
         //public static async void RunGridMainAppCode()
@@ -524,42 +511,24 @@ namespace TradingBrain.Models
                     resUnit = "HOUR";
                     resNum = 1;
                 }
-                //if (res.Length == 1 && res[0] == "HOUR")
-                //{
-                //    resUnit = "HOUR";
-                //    resNum = 1;
-                //}
-                //else
-                //{
-                //    if (res.Length == 2)
-                //    {
-                //        resUnit = res[0];
-                //        resNum = Convert.ToInt16(res[1]);
-                //    }
-                //}
             }
             switch (resUnit)
             {
                 case "MINUTE":
-                    if (resNum == 2)
-                    {
-                        nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, 0).AddMinutes(2 - (now.Minute % 2)); // Next minute
-                    }
-                    else
-                    {
+
                         if (now.Minute < 30)
-                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0); // Next half-hour
+                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0, DateTimeKind.Utc); // Next half-hour
                         else
-                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0).AddHours(1); // Next hour
-                    }
+                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0, DateTimeKind.Utc).AddHours(1); // Next hour
+
                     break;
 
                 case "HOUR":
-                    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0).AddHours(resNum - (now.Hour % resNum)); // Next x hour
+                    nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0, DateTimeKind.Utc).AddHours(resNum - (now.Hour % resNum)); // Next x hour
                     break;
 
                 case "DAY":
-                    nextRun = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, 0).AddDays(resNum - (now.Day % resNum)); // Next x day
+                    nextRun = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, 0, DateTimeKind.Utc).AddDays(resNum - (now.Day % resNum)); // Next x day
                     break;
 
             }
@@ -661,9 +630,9 @@ namespace TradingBrain.Models
                 {
                     //System.Threading.Thread.Sleep(1000);
                     await Task.Delay(1000);
-                    DateTime dtNow = DateTime.UtcNow;
+                    //DateTime dtNow = DateTime.UtcNow;
                     //clsCommonFunctions.AddStatusMessage(dtNow.ToString("o") + " Sleeping....");
-                }
+               }
 
                 // Unsubscriber. Commented out for now but may need to add later.
 
