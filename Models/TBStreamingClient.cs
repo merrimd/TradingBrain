@@ -450,14 +450,14 @@ namespace TradingBrain.Models
                     return;
                 }
                 ph = Interlocked.Increment(ref this.phase);
-                 await this.LogIn() ;
-                  this.Connect(ph);
+                await this.LogIn();
+                this.Connect(ph);
                 if (this._igContainer.creds.primary)
                 {
                     //ony subscribe to charts on primary connection
                     this.ChartSubscribe();
                 }
-               await this.TradeSubscribe(this._igContainer.igAccountId);
+                await this.TradeSubscribe(this._igContainer.igAccountId);
                 //this._igContainer.igAccountId = CurrentAccountId;
                 // this.subscribeChart()
             }
@@ -651,7 +651,7 @@ namespace TradingBrain.Models
                         if (!(String.IsNullOrEmpty(opu)))
                         {
                             //clsCommonFunctions.AddStatusMessage("Trade update - OPU" + opu);
-                            _ = Task.Run(() => UpdateTsOpu( update, opu));
+                            _ = Task.Run(() => UpdateTsOpu(update, opu));
                         }
                         if (!(String.IsNullOrEmpty(wou)))
                         {
@@ -661,18 +661,18 @@ namespace TradingBrain.Models
                         if (!(String.IsNullOrEmpty(confirms)))
                         {
                             //clsCommonFunctions.AddStatusMessage("Trade update - CONFIRMS" + confirms);
-                            await UpdateTsConfirm( update, confirms);
+                            await UpdateTsConfirm(update, confirms);
                         }
 
                     }
-                    catch (Exception )
+                    catch (Exception)
                     {
                         // empty
                     }
                 }
                 else { this.FirstConfirmUpdate = false; }
             }
-            catch (Exception )
+            catch (Exception)
             {
                 // empty
             }
@@ -682,7 +682,7 @@ namespace TradingBrain.Models
 
         }
 
-        private IgPublicApiData.TradeSubscriptionModel UpdateTsOpu( ItemUpdate update, string inputData)
+        private IgPublicApiData.TradeSubscriptionModel UpdateTsOpu(ItemUpdate update, string inputData)
         {
 
             var tsm = new IgPublicApiData.TradeSubscriptionModel();
@@ -824,7 +824,7 @@ namespace TradingBrain.Models
                     client.connect();
                     connected = true;
                 }
-                catch (Exception )
+                catch (Exception)
                 {
                     // empty
                 }
@@ -850,7 +850,7 @@ namespace TradingBrain.Models
                 }
                 client.disconnect();
             }
-            catch (Exception )
+            catch (Exception)
             {
                 //empty
             }
@@ -1034,13 +1034,13 @@ namespace TradingBrain.Models
         public ObservableCollection<IgPublicApiData.AccountModel>? Accounts { get; set; }
         public string CurrentAccountId { get; set; }
         public string igAccountId { get; set; }
-        public List<EpicList> EpicList { get; set; }  
-        public List<LOepic> PriceEpicList { get; set; } 
+        public List<EpicList> EpicList { get; set; }
+        public List<LOepic> PriceEpicList { get; set; }
         public static bool LoggedIn { get; set; }
         public TBStreamingClient? tbClient { get; set; }
         private bool isDirty = false;
         //public string forceT { get; set; }  
- 
+
         public Database? the_db { get; set; }
         public Database? the_app_db { get; set; }
         public List<MainApp> workerList { get; set; }

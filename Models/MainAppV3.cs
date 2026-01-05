@@ -36,7 +36,6 @@ using Newtonsoft.Json.Linq;
 using NLog;
 using Org.BouncyCastle.Ocsp;
 using Org.BouncyCastle.Pqc.Crypto.Saber;
-//using PInvoke;
 using Skender.Stock.Indicators;
 using System;
 using System.Collections;
@@ -49,7 +48,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Eventing.Reader;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
@@ -67,7 +65,6 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 using static TradingBrain.Models.CommonFunctions;
 using Timer = System.Timers.Timer;
 
-
 namespace TradingBrain.Models
 {
     public class RunRet
@@ -81,18 +78,18 @@ namespace TradingBrain.Models
     public class MainApp
     {
         //public event EventHandler igUpdate;
-        public StatusMessage? currentStatus;
+        public StatusMessage? currentStatus { get; set; }
         public delegate void StopDelegate();
-        public Database? the_db;
-        public Database? the_app_db;
-        public Microsoft.Azure.Cosmos.Container? the_container;
-        public Microsoft.Azure.Cosmos.Container? the_chart_container;
-        public Microsoft.Azure.Cosmos.Container? minute_container;
-        public Microsoft.Azure.Cosmos.Container? candles_RSI_container;
-        public Microsoft.Azure.Cosmos.Container? TicksContainer;
-        public Microsoft.Azure.Cosmos.Container? trade_container;
+        public Database? the_db { get; set; }
+        public Database? the_app_db { get; set; }
+        public Microsoft.Azure.Cosmos.Container? the_container { get; set; }
+        public Microsoft.Azure.Cosmos.Container? the_chart_container { get; set; }
+        public Microsoft.Azure.Cosmos.Container? minute_container { get; set; }
+        public Microsoft.Azure.Cosmos.Container? candles_RSI_container { get; set; }
+        public Microsoft.Azure.Cosmos.Container? TicksContainer { get; set; }
+        public Microsoft.Azure.Cosmos.Container? trade_container { get; set; }
 
-        public string epicName = "";
+        public string epicName { get; set; } = "";
 
         // private long _lngTickCount;
 
@@ -105,10 +102,10 @@ namespace TradingBrain.Models
         public clsTradeUpdate suppTrade { get; set; } = new clsTradeUpdate();
         public CandleUpdate currentCandle { get; set; } = new CandleUpdate();
 
-        public TradingBrainSettings? tb = new TradingBrainSettings();
-        public Dictionary<string, string> TradeErrors = new Dictionary<string, string>();
+        public TradingBrainSettings? tb { get; set; } = new TradingBrainSettings();
+        public Dictionary<string, string> TradeErrors { get; set; } = [];
 
-        public List<requestedTrade> requestedTrades { get; set; } = new List<requestedTrade>();
+        public List<requestedTrade> requestedTrades { get; set; } = [];
         public string modelID { get; set; } = "";
         public string bolliID { get; set; } = "";
         public string gridLID { get; set; } = "";
@@ -143,7 +140,7 @@ namespace TradingBrain.Models
         public string newGRIDLDealReference { get; set; } = "";
         public string newGRIDSDealReference { get; set; } = "";
         public modQuote lastCandle = new modQuote();
-        public List<modQuote> candleList = new List<modQuote>();
+        public List<modQuote> candleList = [];
 
         public IGContainer _igContainer = new IGContainer();
         public IGContainer? _igContainer2 = new IGContainer();
@@ -233,7 +230,7 @@ namespace TradingBrain.Models
                 this.newSIMSDealReference = "";
                 this.newGRIDLDealReference = "";
                 this.newGRIDSDealReference = "";
-                this.candleList = new List<modQuote>();
+                this.candleList = [];
 
                 IG_Epic epicObj = CommonFunctions.Get_IG_Epic(appDb, epic).Result;
                 this.futures = epicObj.futures;
@@ -244,7 +241,7 @@ namespace TradingBrain.Models
                 //tbClient = null;
                 //forceT = forceTransport;
                 currentStatus = new StatusMessage();
-                requestedTrades = new List<requestedTrade>();
+                requestedTrades = [];
                 ////////////////////////////////////
                 // Get account id from app config //
                 ////////////////////////////////////
@@ -265,7 +262,7 @@ namespace TradingBrain.Models
                 pausedAfterNGL = false;
                 epicName = epic;
 
-                Task.Run(() =>  setupTradeErrors());
+                Task.Run(() => setupTradeErrors());
                 Task.Run(() => setupMessaging());
 
                 currentTick = new ChartUpdate();
@@ -425,7 +422,7 @@ namespace TradingBrain.Models
                     throw new InvalidOperationException("IG Container2 is null in PlaceOrder");
                 }
                 //Get IG container based on account ID
-                IGContainer _igContainerToUse ;
+                IGContainer _igContainerToUse;
                 if (_igContainer.creds.igAccountId == accountId)
                 {
                     _igContainerToUse = _igContainer;
@@ -482,7 +479,7 @@ namespace TradingBrain.Models
 
                 if (newsession)
                 {
-                    _=_igContainerToUse.tbClient.ConnectToRest();
+                    _ = _igContainerToUse.tbClient.ConnectToRest();
                     req = await _igContainerToUse.igRestApiClient.createWorkingOrderV2(pos);
                     if (req != null)
                     {
@@ -557,7 +554,7 @@ namespace TradingBrain.Models
 
                 if (newsession)
                 {
-                   await Task.Run (() => _igContainerToUse.tbClient.ConnectToRest());
+                    await Task.Run(() => _igContainerToUse.tbClient.ConnectToRest());
                     ret = await _igContainerToUse.igRestApiClient.deleteWorkingOrder(dealID, pos);
                     if (ret != null)
                     {
@@ -726,7 +723,7 @@ namespace TradingBrain.Models
 
                 if (newsession)
                 {
-                   await Task.Run(() => _igContainerToUse.tbClient.ConnectToRest());
+                    await Task.Run(() => _igContainerToUse.tbClient.ConnectToRest());
                     resp = await _igContainerToUse.igRestApiClient.createPositionV2(pos);
                     if (resp != null && resp.Response != null && !string.IsNullOrEmpty(resp.Response.dealReference))
                     {
@@ -874,9 +871,9 @@ namespace TradingBrain.Models
                     // account ID not found
                     CommonFunctions.AddStatusMessage($"CloseDealEpic - Account ID {accountId} not found", "ERROR");
                 }
-                 if (_igContainerToUse.igRestApiClient == null) { throw new InvalidOperationException("IG Rest API Client is null in CloseDealEpic"); }
+                if (_igContainerToUse.igRestApiClient == null) { throw new InvalidOperationException("IG Rest API Client is null in CloseDealEpic"); }
                 if (_igContainerToUse.tbClient == null) { throw new InvalidOperationException("tbClient is null in CloseDealEpic"); }
-                List<tradeItem> trades = new List<tradeItem>();
+                List<tradeItem> trades = [];
 
                 bool newsession = false;
                 //TradingBrain.Models.clsCommonFunctions.SaveLog("Info", "CloseDeal", "Closing deal", the_app_db);
@@ -920,7 +917,7 @@ namespace TradingBrain.Models
 
                     if (newsession)
                     {
-                        _= _igContainerToUse.tbClient.ConnectToRest();
+                        _ = _igContainerToUse.tbClient.ConnectToRest();
                         ret = await _igContainerToUse.igRestApiClient.closePosition(pos);
                         if (ret != null)
                         {
@@ -976,7 +973,7 @@ namespace TradingBrain.Models
                     // account ID not found
                     CommonFunctions.AddStatusMessage($"EditDeal - Account ID {accountId} not found", "ERROR");
                 }
-                    if (_igContainerToUse.igRestApiClient == null) { throw new InvalidOperationException("IG Rest API Client is null in EditDeal"); }
+                if (_igContainerToUse.igRestApiClient == null) { throw new InvalidOperationException("IG Rest API Client is null in EditDeal"); }
                 if (_igContainerToUse.tbClient == null) { throw new InvalidOperationException("tbClient is null in EditDeal"); }
 
                 CommonFunctions.AddStatusMessage("Editing deal. StopLoss = " + stopLoss + " - dealId = " + dealID, "INFO");
@@ -987,7 +984,7 @@ namespace TradingBrain.Models
                     stopLevel = Convert.ToDecimal(stopLoss)
                 };
                 //this.model.modelVar.breakEvenVar
-                if (this.strategy == "SMA2" )
+                if (this.strategy == "SMA2")
                 {
                     // Still keep the trailing stop even when it hits BEven
                     //if (this.model.modelVar.breakEvenVar == 1)
@@ -1022,7 +1019,7 @@ namespace TradingBrain.Models
                 if (newsession)
                 {
                     CommonFunctions.AddStatusMessage("Trying to reconnect to REST", "INFO");
-                    _=_igContainerToUse.tbClient.ConnectToRest();
+                    _ = _igContainerToUse.tbClient.ConnectToRest();
                     ret = await _igContainerToUse.igRestApiClient.editPositionV2(dealID, pos);
                     if (ret != null)
                     {
@@ -1877,7 +1874,7 @@ namespace TradingBrain.Models
                 int seconds = dtNow.Second;
                 if (seconds < 59)
                 {
-                    _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour, dtNow.Minute, 0,DateTimeKind.Utc).AddMinutes(-1);
+                    _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour, dtNow.Minute, 0, DateTimeKind.Utc).AddMinutes(-1);
                 }
                 else
                 {
@@ -1996,7 +1993,7 @@ namespace TradingBrain.Models
                             _endTime = new DateTime(2024, 11, 12, 14, 30, 00, DateTimeKind.Utc);
                             //liveMode = false;
                         }
-            
+
                         //while (_startTime <= _endTime)
                         //{
                         //bigWatch.Restart();
@@ -2013,7 +2010,7 @@ namespace TradingBrain.Models
                         double thisSpread = await Get_SpreadFromLastCandleRSI(the_db, candles_RSI_container, _endTime, resolution, epicName);
 
                         CommonFunctions.AddStatusMessage($"Spread = {thisSpread}", "INFO", logName);
-                        modelInstanceInputs? thisInput =  tb.runDetails.inputs.FirstOrDefault(t => t.spread == thisSpread) ?? null;
+                        modelInstanceInputs? thisInput = tb.runDetails.inputs.FirstOrDefault(t => t.spread == thisSpread) ?? null;
 
                         if (thisInput == null)
                         {
@@ -2028,11 +2025,11 @@ namespace TradingBrain.Models
                         {
                             CommonFunctions.AddStatusMessage("Getting current candle data");
                             //Get the last tick from the list of ticks
-                            LOepic? thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epicName).FirstOrDefault();
+                            LOepic? thisEpic = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == epicName);
                             if (thisEpic == null) { throw new InvalidOperationException("Epic not found in PriceEpicList"); }
                             DateTime tickStart = _startTime;
                             DateTime tickeEnd = _startTime.AddMinutes(1).AddMilliseconds(-1);
-                            List<tick> ticks =  thisEpic.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
+                            List<tick> ticks = thisEpic.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
 
                             tbPrice thisPrice = new tbPrice();
 
@@ -2105,7 +2102,7 @@ namespace TradingBrain.Models
                             AddStatusMessage("Getting rsi quotes from DB.......");
 
 
-                            List<modQuote> rsiQuotes = new List<modQuote>();
+                            List<modQuote> rsiQuotes = [];
                             List<modQuote> indCandles = await RSI_LoadPrices.GetPriceDataSMA(the_db, epicName, "MINUTE", 0, _startTime, _endTime, strategy, true, 50);
 
                             indCandles.Add(thisCandle);
@@ -2137,7 +2134,7 @@ namespace TradingBrain.Models
 
                                     }
 
-                                    List<modQuote> sma30Quotes =  indCandles.Where(s => s.Date <= mq.Date).Where(s => s.Date == mq.Date || s.Date.Minute == 29 || s.Date.Minute == 59).ToList();
+                                    List<modQuote> sma30Quotes = indCandles.Where(s => s.Date <= mq.Date).Where(s => s.Date == mq.Date || s.Date.Minute == 29 || s.Date.Minute == 59).ToList();
 
                                     for (int sma30 = 1; sma30 <= 50; sma30 += 1)
                                     {
@@ -2641,7 +2638,7 @@ namespace TradingBrain.Models
                                     //save log to the database
                                     Container logContainer = the_app_db.GetContainer("ModelLogs");
                                     await log.SaveDocument(logContainer);
-                                    model.modelLogs.logs = new List<ModelLog>();
+                                    model.modelLogs.logs = [];
                                 }
                             }
                         }
@@ -2832,7 +2829,7 @@ namespace TradingBrain.Models
                         currentStatus.countervar = Math.Max(this.tb.runDetails.counterVar, 1000);
                         currentStatus.quantity = tb.lastRunVars.minQuantity;
 
-                        modelInstanceInputs_RSI? thisInput =  tb.runDetails.inputs_RSI.FirstOrDefault(t => t.spread == 0);
+                        modelInstanceInputs_RSI? thisInput = tb.runDetails.inputs_RSI.FirstOrDefault(t => t.spread == 0);
                         if (thisInput == null)
                         {
                             CommonFunctions.AddStatusMessage($"No inputs found for spread = 0", "ERROR", logName);
@@ -2845,14 +2842,14 @@ namespace TradingBrain.Models
                             bool gotCandle = false;
 
                             //Get the last tick from the list of ticks
-                            LOepic? thisEpic = _igContainer.PriceEpicList.Where(x => x.name == epicName).FirstOrDefault();
+                            LOepic? thisEpic = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == epicName);
                             if (thisEpic == null) { throw new InvalidOperationException("Epic not found in PriceEpicList"); }
 
                             DateTime tickStart = _startTime.AddSeconds(-1);
                             DateTime tickeEnd = _startTime.AddSeconds(1).AddMilliseconds(-1);
                             List<tick> ticks = thisEpic.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
                             modQuote thisCandle = new modQuote();
-            
+
                             //clsCommonFunctions.AddStatusMessage($"Ticks - {thisEpic.ticks.Count}");
                             //clsCommonFunctions.AddStatusMessage($"Ticks in period {tickStart} to {tickeEnd} - Last Tick = {thisEpic.ticks.Last().UTM}");
                             if (ticks != null && ticks.Count > 0)
@@ -2892,7 +2889,7 @@ namespace TradingBrain.Models
                                 thisPrice.typicalPrice.bid = (highPrice.bid + lowPrice.bid + closePrice.bid) / 3;
                                 thisPrice.typicalPrice.ask = (highPrice.ask + lowPrice.ask + closePrice.ask) / 3;
 
-                                List<double> closePrices =  ticks.Select(x => (double)(x.bid + x.offer) / 2).ToList();
+                                List<double> closePrices = ticks.Select(x => (double)(x.bid + x.offer) / 2).ToList();
                                 StandardDeviation sd = new StandardDeviation(closePrices);
                                 thisPrice.stdDev = sd.Value;
 
@@ -2961,8 +2958,11 @@ namespace TradingBrain.Models
                                 model.candles.currentCandle.grid_prev_long_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.var4).Average(s => s.Close));
                                 model.candles.currentCandle.grid_prev_short_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.svar4).Average(s => s.Close));
 
-                                CommonFunctions.AddStatusMessage($"Current : SMA Long = {model.candles.currentCandle.grid_long_sma}, Short = {model.candles.currentCandle.grid_short_sma}", "DEBUG", logName);
-                                CommonFunctions.AddStatusMessage($"Prev : SMA Long = {model.candles.currentCandle.grid_prev_long_sma}, Short = {model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
+                                //CommonFunctions.AddStatusMessage($"Current : SMA Long = {model.candles.currentCandle.grid_long_sma}, Short = {model.candles.currentCandle.grid_short_sma}", "DEBUG", logName);
+                                //CommonFunctions.AddStatusMessage($"Prev : SMA Long = {model.candles.currentCandle.grid_prev_long_sma}, Short = {model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
+
+                                CommonFunctions.AddStatusMessage($"current short sma = {model.candles.currentCandle.grid_short_sma}, prev sma = {model.candles.currentCandle.grid_prev_short_sma} : is current > prev - {model.candles.currentCandle.grid_short_sma > model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
+                                CommonFunctions.AddStatusMessage($"current long sma = {model.candles.currentCandle.grid_long_sma}, prev sma = {model.candles.currentCandle.grid_prev_long_sma} : is current < prev - {model.candles.currentCandle.grid_long_sma < model.candles.currentCandle.grid_prev_long_sma}", "DEBUG", logName);
 
                                 if (closeAttemptCount == 0)
                                 {
@@ -2983,7 +2983,6 @@ namespace TradingBrain.Models
                                     }
 
                                     CommonFunctions.AddStatusMessage($"Spread = {thisCandle.spread}, Short GridSize = {thisInput.svar0}, Long GridSize = {thisInput.var0}", "DEBUG", logName);
-
 
                                     model.RunProTrendCodeGRID(model.candles);
 
@@ -3173,7 +3172,7 @@ namespace TradingBrain.Models
 
                                 if (model.modelLogs.logs.Count > 0)
                                 {
-                                    ModelLog log =  model.modelLogs.logs[0];
+                                    ModelLog log = model.modelLogs.logs[0];
                                     log.modelRunID = modelID;
                                     log.runDate = _startTime;
                                     log.id = System.Guid.NewGuid().ToString();
@@ -3231,7 +3230,7 @@ namespace TradingBrain.Models
                                         //save log to the database
                                         Container logContainer = the_app_db.GetContainer("ModelLogs");
                                         await log.SaveDocument(logContainer);
-                                        model.modelLogs.logs = new List<ModelLog>();
+                                        model.modelLogs.logs = [];
                                     }
                                 }
                                 //}
@@ -3801,7 +3800,7 @@ namespace TradingBrain.Models
                 int hh = model.candles.currentCandle.candleStart.Hour;
                 if (mm <= 29) { mm = 29; } else { mm = 59; }
                 getStartDate = new DateTime(model.candles.currentCandle.candleStart.Year, model.candles.currentCandle.candleStart.Month, model.candles.currentCandle.candleStart.Day, model.candles.currentCandle.candleStart.Hour, mm, model.candles.currentCandle.candleStart.Second, DateTimeKind.Utc).AddMinutes(-30);
- 
+
                 //if (!await IGModels.clsCommonFunctions.IsTradingOpen(candles.currentCandle.candleStart, this.exchangeClosedDates))
                 if (!await IGModels.clsCommonFunctions.IsTradingOpen(getStartDate, model.exchangeClosedDates, epic))
                 //if (!IGModels.clsCommonFunctions.IsTradingOpen(getStartDate))
@@ -3910,15 +3909,15 @@ namespace TradingBrain.Models
                         tsm.TradeType = "OPU";
                         if (tsm.Reason != null && tsm.Reason != "")
                         {
-                                tradeSubUpdate.reasonDescription = this.TradeErrors[tsm.Reason ?? ""];                           
+                            tradeSubUpdate.reasonDescription = this.TradeErrors[tsm.Reason ?? ""];
                         }
 
                         if (tsm.Epic == this.epicName)
                         {
                             if (tsm.Status == "UPDATED" && currentTrade != null && this.model.thisModel.currentTrade != null)
                             {
-                                clsTradeUpdate thisTrade ;
-                                tradeItem thisModelTrade ;
+                                clsTradeUpdate thisTrade;
+                                tradeItem thisModelTrade;
                                 if (this.strategy == "GRID")
                                 {
                                     try
@@ -4491,8 +4490,8 @@ namespace TradingBrain.Models
                                         }
                                         else
                                         {
-                                            clsTradeUpdate? thisTrade  ;
-                                            tradeItem? thisModelTrade  ;
+                                            clsTradeUpdate? thisTrade;
+                                            tradeItem? thisModelTrade;
 
                                             if (this.currentTrade != null && this.model.thisModel.currentTrade != null && _igContainer != null && _igContainer.igRestApiClient != null && this.tb != null)
                                             {
@@ -5199,7 +5198,7 @@ namespace TradingBrain.Models
                             {
                                 // trade/order opened successfully
                                 CommonFunctions.AddStatusMessage($"CONFIRM - successful", "INFO");
-                            }                           
+                            }
 
                             if (tsm.Status == null && tsm.Reason != "SUCCESS")
                             {
@@ -9785,7 +9784,7 @@ namespace TradingBrain.Models
                     await Task.Delay(1000);
                     //DateTime dtNow = DateTime.UtcNow;
                     //clsCommonFunctions.AddStatusMessage(dtNow.ToString("o") + " Sleeping....");
-               }
+                }
 
                 // Unsubscriber. Commented out for now but may need to add later.
 
@@ -9913,7 +9912,7 @@ namespace TradingBrain.Models
                                 throw new InvalidOperationException("No current trade to stop");
                             }
 
-                            if ( model != null && currentStatus != null)
+                            if (model != null && currentStatus != null)
                             {
                                 paused = true;
                                 pausedAfterNGL = false;
@@ -10151,56 +10150,56 @@ namespace TradingBrain.Models
                                 currentStatus.currentGain = newVars.currentGain;
 
                                 if (this.strategy == "BOLLI" && (newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0))
-                                    {
-                                        // Get the input settings from the last run optimzerundata
-
-                                        OptimizeRunData optData = await IGModels.clsCommonFunctions.GetLatestOptimizeRunData_RSI(the_app_db, this.epicName, 0, this.strategy, this.resolution);
-
-                                        if (newVars.var1 > 0)
-                                        {
-                                            CommonFunctions.AddStatusMessage("New var1 to use = " + newVars.var1, "INFO", logName);
-                                            tb.runDetails.inputs_RSI[0].var1 = newVars.var1;
-                                        }
-                                        if (newVars.var2 > 0)
-                                        {
-                                            CommonFunctions.AddStatusMessage("New var2 to use = " + newVars.var2, "INFO", logName);
-                                            tb.runDetails.inputs_RSI[0].var2 = newVars.var2;
-                                        }
-                                        if (newVars.var3 > 0)
-                                        {
-                                            CommonFunctions.AddStatusMessage("New var3 to use = " + newVars.var3, "INFO", logName);
-                                            tb.runDetails.inputs_RSI[0].var3 = newVars.var3;
-                                        }
-                                        if (newVars.var4 > 0)
-                                        {
-                                            CommonFunctions.AddStatusMessage("New var4 to use = " + newVars.var4, "INFO", logName);
-                                            tb.runDetails.inputs_RSI[0].var4 = newVars.var4;
-                                        }
-                                        if (newVars.var5 > 0)
-                                        {
-                                            CommonFunctions.AddStatusMessage("New var5 to use = " + newVars.var5, "INFO", logName);
-                                            tb.runDetails.inputs_RSI[0].var5 = newVars.var5;
-                                        }
-                                        if (newVars.var6 > 0)
-                                        {
-                                            CommonFunctions.AddStatusMessage("New var6 to use = " + newVars.var6, "INFO", logName);
-                                            tb.runDetails.inputs_RSI[0].var6 = newVars.var6;
-                                        }
-
-                                        Container optContainer = the_app_db.GetContainer("OptimizeRunData");
-                                        optData.inputs_RSI = tb.runDetails.inputs_RSI.DeepCopy();
-                                        await optData.SaveDocument(the_app_db, optContainer);
-
-                                    }
-                                }
-
-                                // Save the last run vars into the TB settings table
-                                if (the_app_db != null && tb != null)
                                 {
-                                    Task<bool> res = tb.SaveDocument(the_app_db);
-                                    CommonFunctions.SendBroadcast("QuantityChanged", JsonConvert.SerializeObject(currentStatus));
-                                    CommonFunctions.AddStatusMessage("New values saved", "INFO", logName);
-                                }                          
+                                    // Get the input settings from the last run optimzerundata
+
+                                    OptimizeRunData optData = await IGModels.clsCommonFunctions.GetLatestOptimizeRunData_RSI(the_app_db, this.epicName, 0, this.strategy, this.resolution);
+
+                                    if (newVars.var1 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var1 to use = " + newVars.var1, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var1 = newVars.var1;
+                                    }
+                                    if (newVars.var2 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var2 to use = " + newVars.var2, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var2 = newVars.var2;
+                                    }
+                                    if (newVars.var3 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var3 to use = " + newVars.var3, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var3 = newVars.var3;
+                                    }
+                                    if (newVars.var4 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var4 to use = " + newVars.var4, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var4 = newVars.var4;
+                                    }
+                                    if (newVars.var5 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var5 to use = " + newVars.var5, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var5 = newVars.var5;
+                                    }
+                                    if (newVars.var6 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var6 to use = " + newVars.var6, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var6 = newVars.var6;
+                                    }
+
+                                    Container optContainer = the_app_db.GetContainer("OptimizeRunData");
+                                    optData.inputs_RSI = tb.runDetails.inputs_RSI.DeepCopy();
+                                    await optData.SaveDocument(the_app_db, optContainer);
+
+                                }
+                            }
+
+                            // Save the last run vars into the TB settings table
+                            if (the_app_db != null && tb != null)
+                            {
+                                Task<bool> res = tb.SaveDocument(the_app_db);
+                                CommonFunctions.SendBroadcast("QuantityChanged", JsonConvert.SerializeObject(currentStatus));
+                                CommonFunctions.AddStatusMessage("New values saved", "INFO", logName);
+                            }
 
 
 
@@ -10450,7 +10449,7 @@ namespace TradingBrain.Models
         {
 
             CandleMovingAverage ret = new CandleMovingAverage();
-            List<clsMinuteCandle> resp = new List<clsMinuteCandle>();
+            List<clsMinuteCandle> resp = [];
 
             //string epicName = epic.Epic;
             try
@@ -10545,11 +10544,11 @@ namespace TradingBrain.Models
                     //newMA.sequence = idx;
                     StartDate = resp[0].candleData.StartDate,
                     EndDate = resp[resp.Count - 1].candleData.EndDate,
-                    Close = resp.Select(x => x.candleData.Close).Average(),
-                    High = resp.Select(x => x.candleData.High).Average(),
-                    Low = resp.Select(x => x.candleData.Low).Average(),
-                    Open = resp.Select(x => x.candleData.Open).Average(),
-                    Typical = resp.Select(x => x.candleData.Typical).Average()
+                    Close = resp.Average(x => x.candleData.Close),
+                    High = resp.Average(x => x.candleData.High),
+                    Low = resp.Average(x => x.candleData.Low),
+                    Open = resp.Average(x => x.candleData.Open),
+                    Typical = resp.Average(x => x.candleData.Typical)
                 };
 
                 if (newMA.Close != 0)
@@ -10593,10 +10592,10 @@ namespace TradingBrain.Models
         {
 
             CandleMovingAverage ret = new CandleMovingAverage();
-            List<clsMinuteCandle> resp = new List<clsMinuteCandle>();
+            List<clsMinuteCandle> resp = [];
             //List<clsMinuteCandle> resp = new List<clsMinuteCandle>();
 
-            List<string> lstDates = new List<string>();
+            List<string> lstDates = [];
 
             //string epicName = epic.Epic;
             try
@@ -10814,7 +10813,7 @@ namespace TradingBrain.Models
         {
 
             CandleMovingAverage ret = new CandleMovingAverage();
-            List<clsMinuteCandle> resp = new List<clsMinuteCandle>();
+            List<clsMinuteCandle> resp = [];
 
             //string epicName = epic.Epic;
             try
@@ -10908,11 +10907,11 @@ namespace TradingBrain.Models
                     //newMA.sequence = idx;
                     StartDate = resp[0].candleData.StartDate,
                     EndDate = resp[resp.Count - 1].candleData.EndDate,
-                    Close = resp.Select(x => x.candleData.Close).Average(),
-                    High = resp.Select(x => x.candleData.High).Average(),
-                    Low = resp.Select(x => x.candleData.Low).Average(),
-                    Open = resp.Select(x => x.candleData.Open).Average(),
-                    Typical = resp.Select(x => x.candleData.Typical).Average()
+                    Close = resp.Average(x => x.candleData.Close),
+                    High = resp.Average(x => x.candleData.High),
+                    Low = resp.Average(x => x.candleData.Low),
+                    Open = resp.Average(x => x.candleData.Open),
+                    Typical = resp.Average(x => x.candleData.Typical)
                 };
 
                 if (newMA.Close != 0)
@@ -12016,5 +12015,6 @@ namespace TradingBrain.Models
 
 
     }
+
 
 }

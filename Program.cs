@@ -310,8 +310,8 @@ namespace TradingBrain.Models
 
             }
 
-             the_db = IGModels.clsCommonFunctions.Get_Database("IX.D.NASDAQ.CASH.IP").Result;
-             the_app_db = IGModels.clsCommonFunctions.Get_App_Database("IX.D.NASDAQ.CASH.IP").Result;
+            the_db = IGModels.clsCommonFunctions.Get_Database("IX.D.NASDAQ.CASH.IP").Result;
+            the_app_db = IGModels.clsCommonFunctions.Get_App_Database("IX.D.NASDAQ.CASH.IP").Result;
 
             foreach (TbEpics tbepic in epcs)
             {
@@ -337,7 +337,7 @@ namespace TradingBrain.Models
 
                     workerList.Add(new MainApp(the_db, the_app_db, tbepic.epic, igContainer, igContainer2, tbepic.strategy, tbepic.resolution));
 
-                 
+
 
                 }
                 igContainer.workerList = workerList;
@@ -394,8 +394,8 @@ namespace TradingBrain.Models
             }
 
             ti.Start();
- 
-             await WaitForChanges();
+
+            await WaitForChanges();
 
 
         }
@@ -433,7 +433,7 @@ namespace TradingBrain.Models
                 {
                     await Task.WhenAll(parallelTasks);
                 }
-                catch (Exception )
+                catch (Exception)
                 {
                     // Log any exceptions from the tasks
                 }
@@ -466,9 +466,9 @@ namespace TradingBrain.Models
                 }
                 t.Start();
             }
-            catch (Exception )
+            catch (Exception)
             {
-            // blank section
+                // blank section
             }
         }
         //public static async void RunGridMainAppCode()
@@ -516,10 +516,10 @@ namespace TradingBrain.Models
             {
                 case "MINUTE":
 
-                        if (now.Minute < 30)
-                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0, DateTimeKind.Utc); // Next half-hour
-                        else
-                            nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0, DateTimeKind.Utc).AddHours(1); // Next hour
+                    if (now.Minute < 30)
+                        nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 30, 0, 0, DateTimeKind.Utc); // Next half-hour
+                    else
+                        nextRun = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, 0, DateTimeKind.Utc).AddHours(1); // Next hour
 
                     break;
 
@@ -632,7 +632,7 @@ namespace TradingBrain.Models
                     await Task.Delay(1000);
                     //DateTime dtNow = DateTime.UtcNow;
                     //clsCommonFunctions.AddStatusMessage(dtNow.ToString("o") + " Sleeping....");
-               }
+                }
 
                 // Unsubscriber. Commented out for now but may need to add later.
 
