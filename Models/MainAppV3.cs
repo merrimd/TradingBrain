@@ -2956,7 +2956,7 @@ namespace TradingBrain.Models
                                 //CommonFunctions.AddStatusMessage($"Current : SMA Long = {model.candles.currentCandle.grid_long_sma}, Short = {model.candles.currentCandle.grid_short_sma}", "DEBUG", logName);
                                 //CommonFunctions.AddStatusMessage($"Prev : SMA Long = {model.candles.currentCandle.grid_prev_long_sma}, Short = {model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
 
-                               if (model.doShorts) CommonFunctions.AddStatusMessage($"current short sma = {model.candles.currentCandle.grid_short_sma}, prev sma = {model.candles.currentCandle.grid_prev_short_sma} : is current > prev - {model.candles.currentCandle.grid_short_sma > model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
+                                if (model.doShorts) CommonFunctions.AddStatusMessage($"current short sma = {model.candles.currentCandle.grid_short_sma}, prev sma = {model.candles.currentCandle.grid_prev_short_sma} : is current > prev - {model.candles.currentCandle.grid_short_sma > model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
                                 CommonFunctions.AddStatusMessage($"current long sma = {Math.Round(model.candles.currentCandle.grid_long_sma, 2)}, prev sma = {Math.Round(model.candles.currentCandle.grid_prev_long_sma, 2)} : is current < prev - {model.candles.currentCandle.grid_long_sma < model.candles.currentCandle.grid_prev_long_sma}", "DEBUG", logName);
 
                                 if (closeAttemptCount == 0)
@@ -2969,7 +2969,7 @@ namespace TradingBrain.Models
                                         CommonFunctions.AddStatusMessage($"Long quantites = {Math.Round(model.thisModel.gridLTrades.Sum(x => x.quantity), 2)}, position price = {Math.Round(model.thisModel.gridLTrades.Average(x => x.buyPrice), 2)}, last price = {Math.Round(model.thisModel.gridLTrades.Last().buyPrice, 2)} ", "DEBUG", logName);
                                     }
 
-                                    if (model.thisModel.gridSTrades.Count > 0 )
+                                    if (model.thisModel.gridSTrades.Count > 0)
                                     {
                                         CommonFunctions.AddStatusMessage($"Short bollid = {this.gridSID}", "DEBUG");
                                         CommonFunctions.AddStatusMessage($"Short quantites = {model.thisModel.gridSTrades.Sum(x => x.quantity)}, position price = {model.thisModel.gridSTrades.Average(x => x.sellPrice)}, last price = {model.thisModel.gridSTrades.Last().sellPrice} ", "DEBUG", logName);
