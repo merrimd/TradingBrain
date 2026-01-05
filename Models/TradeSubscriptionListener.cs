@@ -10,8 +10,8 @@ namespace TradingBrain.Models
 {
     class TradeSubscriptionListener : SubscriptionListener
     {
-        private int phase;
-        private TBStreamingClient slClient;
+        private readonly int phase;
+        private readonly TBStreamingClient slClient;
         public TradeSubscriptionListener(TBStreamingClient slClient, int phase)
         {
 
@@ -22,7 +22,7 @@ namespace TradingBrain.Models
         public void OnUpdate(int itemPos, string itemName, ItemUpdate update)
         {
 
-            this.slClient.TradeUpdateReceived(this.phase, itemPos, update);
+            Task.Run(() => this.slClient.TradeUpdateReceived(this.phase, itemPos, update));
 
 
 
@@ -62,9 +62,7 @@ namespace TradingBrain.Models
 
         void SubscriptionListener.onItemUpdate(ItemUpdate itemUpdate)
         {
-            slClient.TradeUpdateReceived(phase, itemUpdate.ItemPos, itemUpdate);
-
-
+            _ = Task.Run(() => slClient.TradeUpdateReceived(phase, itemUpdate.ItemPos, itemUpdate));
 
         }
 

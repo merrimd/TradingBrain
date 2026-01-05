@@ -16,7 +16,7 @@ namespace TradingBrain.Models
 
         public async void CreateLongPosition(IgRestApiClient igRestApiClient, tradeItem trade, string epicName)
         {
-            dto.endpoint.positions.create.otc.v1.CreatePositionRequest pos = new dto.endpoint.positions.create.otc.v1.CreatePositionRequest();
+            dto.endpoint.positions.create.otc.v1.CreatePositionRequest pos = new();
 
             pos.epic = epicName;
             pos.expiry = "DFB";

@@ -73,28 +73,26 @@ namespace TradingBrain.Models
                     {
                         this.db = the_db;
                     }
-
-                }
-
-                if (db != null)
-                {
-                    Container container = db.GetContainer("TradingBrainLogs");
-
-                    if (this.Log_Timestamp == DateTime.MinValue)
+                    else
                     {
-                        this.Log_Timestamp = DateTime.UtcNow;
+                        // If we can't get the database, just log to console and return
+                        System.Diagnostics.Debug.WriteLine($"[Log Error] {Log_Type}: {Log_Message}");
+                        return false;
                     }
-
-                    await container.CreateItemAsync<Log>(this, new PartitionKey(this.Log_Type));
-
                 }
 
+                Container container = db.GetContainer("TradingBrainLogs");
 
+                if (this.Log_Timestamp == DateTime.MinValue)
+                {
+                    this.Log_Timestamp = DateTime.UtcNow;
+                }
+
+                await container.CreateItemAsync<Log>(this, new PartitionKey(this.Log_Type));
 
             }
             catch (CosmosException de)
             {
-
                 this.Log_Message = de.ToString();
                 ret = false;
             }
@@ -104,8 +102,7 @@ namespace TradingBrain.Models
                 ret = false;
             }
 
-
-            return (ret);
+            return ret;
         }
     }
 

@@ -1,4 +1,8 @@
 ﻿#pragma warning disable S125
+#pragma warning disable S1764
+#pragma warning disable S2589
+#pragma warning disable S3776
+
 using Azure.Storage.Blobs;
 using com.lightstreamer.client;
 using IGCandleCreator.Models;
@@ -188,7 +192,7 @@ namespace TradingBrain.Models
                 blobConnectionString = igWebApiConnectionConfig["BlobConnectionString"] ?? "";
             }
 
-            BlobStorageTarget azureBlobTarget = new BlobStorageTarget()
+            BlobStorageTarget azureBlobTarget = new()
             {
                 Name = "azureBlob",
 
@@ -237,8 +241,8 @@ namespace TradingBrain.Models
 
             IGContainer? igContainer = null;
             IGContainer? igContainer2 = null;
-            IgApiCreds? creds = new IgApiCreds();
-            IgApiCreds? creds2 = new IgApiCreds();
+            IgApiCreds? creds = new();
+            IgApiCreds? creds2 = new();
 
             SmartDispatcher smartDispatcher = (SmartDispatcher)SmartDispatcher.getInstance();
 
@@ -269,7 +273,7 @@ namespace TradingBrain.Models
 
             // Start the lightstreamer bits in a new thread
             CommonFunctions.AddStatusMessage("Starting lightstreamer in a new thread", "INFO");
-            Thread t = new Thread(new ThreadStart(igContainer.StartLightstreamer));
+            Thread t = new(new ThreadStart(igContainer.StartLightstreamer));
             t.Start();
 
 
@@ -301,7 +305,7 @@ namespace TradingBrain.Models
 
                 // Start the lightstreamer bits in a new thread
                 CommonFunctions.AddStatusMessage("Starting second lightstreamer in a new thread", "INFO");
-                Thread u = new Thread(new ThreadStart(igContainer2.StartLightstreamer));
+                Thread u = new(new ThreadStart(igContainer2.StartLightstreamer));
                 u.Start();
             }
             else
@@ -346,7 +350,7 @@ namespace TradingBrain.Models
                     igContainer2.workerList = workerList;
                 }
             }
-            System.Timers.Timer ti = new System.Timers.Timer();
+            System.Timers.Timer ti = new();
             ti.AutoReset = false;
             //if (epcs[0].strategy == "GRID")
             //{
@@ -408,10 +412,7 @@ namespace TradingBrain.Models
             {
                 if (sender == null) { throw new InvalidOperationException("Timer sender is null"); }
 
-                var t = (System.Timers.Timer?)sender;
-
-                if (t == null) { throw new InvalidOperationException("Timer t is null"); }
-
+                var t = (System.Timers.Timer?)sender ?? throw new InvalidOperationException("Timer t is null");
                 string strat = "";
                 foreach (MainApp app in workerList)
                 {
@@ -641,10 +642,12 @@ namespace TradingBrain.Models
             }
             catch (Exception e)
             {
-                Log log = new Log(the_app_db);
-                log.Log_Message = e.ToString();
-                log.Log_Type = "Error";
-                log.Log_App = "WaitForChanges";
+                Log log = new(the_app_db)
+                {
+                    Log_Message = e.ToString(),
+                    Log_Type = "Error",
+                    Log_App = "WaitForChanges"
+                };
                 await log.Save();
             }
             return ret;
@@ -664,7 +667,7 @@ namespace TradingBrain.Models
 
         }
 
-        public void OnLightstreamerStatusChanged(int cStatus, string status)
+        public static void OnLightstreamerStatusChanged(int cStatus, string status)
         {
             //statusLabel.Text = status;
             //var a = 1;

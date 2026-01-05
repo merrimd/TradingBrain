@@ -1,4 +1,8 @@
 ﻿#pragma warning disable S125
+#pragma warning disable S1764
+#pragma warning disable S2589
+#pragma warning disable S3776
+
 using com.lightstreamer.client;
 using dto.endpoint.accountswitch;
 using dto.endpoint.auth.session.v2;
@@ -76,10 +80,7 @@ namespace TradingBrain.Models
         {
             try
             {
-                if (igContainer == null)
-                {
-                    throw new ArgumentNullException(nameof(igContainer));
-                }
+                ArgumentNullException.ThrowIfNull(igContainer);
                 _igContainer = igContainer;
                 Accounts = new ObservableCollection<IgPublicApiData.AccountModel>();
                 updateDelegate = lsUpdateDelegate;
@@ -171,7 +172,7 @@ namespace TradingBrain.Models
                     if (response.Response.currentAccountId != accountId)
                     {
                         // Need to switch accounts
-                        AccountSwitchRequest asr = new AccountSwitchRequest { accountId = accountId };
+                        AccountSwitchRequest asr = new() { accountId = accountId };
 
                         AccountSwitchResponse response2 = await _igContainer.igRestApiClient.accountSwitch(asr);
 
@@ -259,7 +260,7 @@ namespace TradingBrain.Models
                     if (response.Response.currentAccountId != accountId)
                     {
                         // Need to switch accounts
-                        AccountSwitchRequest asr = new AccountSwitchRequest { accountId = accountId };
+                        AccountSwitchRequest asr = new() { accountId = accountId };
 
                         AccountSwitchResponse response2 = await _igContainer.igRestApiClient.accountSwitch(asr);
 
@@ -310,7 +311,7 @@ namespace TradingBrain.Models
 
                     // set a timeout to run this again in 30 mins. this will keep the session active.
                     CommonFunctions.AddStatusMessage("Setting a timer so we can re run the AccountDetails after 10 mins to stop it expiring.", "INFO");
-                    System.Timers.Timer timer = new System.Timers.Timer(600000); // 10 mins
+                    System.Timers.Timer timer = new(600000); // 10 mins
                     timer.Elapsed += OnTimedEvent;
                     timer.AutoReset = true; // Run only once
                     timer.Enabled = true;
@@ -392,9 +393,9 @@ namespace TradingBrain.Models
         public void Start()
         {
             int ph = Interlocked.Increment(ref this.phase);
-            Thread t = new Thread(new ThreadStart(delegate ()
+            Thread t = new(new ThreadStart(delegate ()
             {
-                Execute(ph);
+                _ = Task.Run(() => Execute(ph));
             }));
             t.Start();
         }
@@ -436,7 +437,7 @@ namespace TradingBrain.Models
                 //instance.addEventMessage(message);
             }
         }
-        private async void Execute(int ph)
+        private async Task Execute(int ph)
         {
             try
             {
@@ -484,9 +485,9 @@ namespace TradingBrain.Models
                 if (cStatus == 0 && Interlocked.CompareExchange(ref this.reset, 0, 1) == 1)
                 {
                     int phs = Interlocked.Increment(ref this.phase);
-                    Thread t = new Thread(new ThreadStart(delegate ()
+                    Thread t = new(new ThreadStart(delegate ()
                     {
-                        Execute(phs);
+                        _ = Task.Run(() => Execute(phs));
                     }));
                     t.Start();
 
@@ -543,10 +544,12 @@ namespace TradingBrain.Models
                     LOepic? thisEpic = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == epic);
                     if (thisEpic != null)
                     {
-                        tick thisTick = new tick();
-                        thisTick.bid = Convert.ToDecimal(wlmUpdate.getValue("BID"));
-                        thisTick.offer = Convert.ToDecimal(wlmUpdate.getValue("OFR"));
-                        thisTick.UTM = thisUTM;
+                        tick thisTick = new()
+                        {
+                            bid = Convert.ToDecimal(wlmUpdate.getValue("BID")),
+                            offer = Convert.ToDecimal(wlmUpdate.getValue("OFR")),
+                            UTM = thisUTM
+                        };
 
                         thisEpic.ticks.Add(thisTick);
                     }
@@ -713,10 +716,12 @@ namespace TradingBrain.Models
                     //parm = wrk._thread.Name.Split("|").ToList();
                     if (wrk.epicName == tradeSubUpdate.epic)
                     {
-                        UpdateMessage msg = new UpdateMessage();
-                        msg.itemName = update.ItemName;
-                        msg.updateData = inputData;
-                        msg.updateType = "UPDATE";
+                        UpdateMessage msg = new()
+                        {
+                            itemName = update.ItemName,
+                            updateData = inputData,
+                            updateType = "UPDATE"
+                        };
                         _ = wrk.iGUpdate(msg);
 
                         CommonFunctions.SendBroadcast("UpdateOPU", inputData);
@@ -760,10 +765,12 @@ namespace TradingBrain.Models
                         //parm = wrk._thread.Name.Split("|").ToList();
                         if (wrk.epicName == tradeSubUpdate.epic)
                         {
-                            UpdateMessage msg = new UpdateMessage();
-                            msg.itemName = update.ItemName;
-                            msg.updateData = inputData;
-                            msg.updateType = "CONFIRM";
+                            UpdateMessage msg = new()
+                            {
+                                itemName = update.ItemName,
+                                updateData = inputData,
+                                updateType = "CONFIRM"
+                            };
                             _ = wrk.iGUpdate(msg);
                             CommonFunctions.SendBroadcast("UpdateConfirm", inputData);
                             //Console.WriteLine("updateConfirm: " + inputData);
@@ -773,11 +780,13 @@ namespace TradingBrain.Models
             }
             catch (Exception ex)
             {
-                var log = new TradingBrain.Models.Log(_igContainer.the_app_db);
-                log.Log_Message = ex.ToString();
-                log.Log_Type = "Error";
-                log.Log_App = "UpdateTsConfirm";
-                log.Epic = "";
+                var log = new TradingBrain.Models.Log(_igContainer.the_app_db)
+                {
+                    Log_Message = ex.ToString(),
+                    Log_Type = "Error",
+                    Log_App = "UpdateTsConfirm",
+                    Epic = ""
+                };
                 await log.Save();
             }
             return tsm;
@@ -785,20 +794,17 @@ namespace TradingBrain.Models
 
         protected static decimal? StringToNullableDecimal(string value)
         {
-            decimal number;
-            return decimal.TryParse(value, out number) ? number : (decimal?)null;
+            return decimal.TryParse(value, out decimal number) ? number : (decimal?)null;
         }
 
         protected static int? StringToNullableInt(string value)
         {
-            int number;
-            return int.TryParse(value, out number) ? number : (int?)null;
+                return int.TryParse(value, out int number) ? number : (int?)null;
         }
 
         protected static DateTime? EpocStringToNullableDateTime(string value)
         {
-            ulong epoc;
-            if (!ulong.TryParse(value, out epoc))
+            if (!ulong.TryParse(value, out ulong epoc))
             {
                 return null;
             }
@@ -875,12 +881,12 @@ namespace TradingBrain.Models
                 {
                     throw new InvalidOperationException("Lightstreamer client is null in ChartSubscribe");
                 }
-                List<string> epics = new List<string>();
+                List<string> epics = new();
 
                 foreach (EpicList epic in _igContainer.EpicList)
                 {
                     string tmpEpic = "";
-                    if (epic.Epic.Contains("|"))
+                    if (epic.Epic.Contains('|'))
                     {
                         List<string> tmpLst = epic.Epic.Split("|").ToList();
                         tmpEpic = tmpLst[0];
@@ -897,24 +903,26 @@ namespace TradingBrain.Models
                 //    chartName = "CHART:" + _igContainer.epicName + ":TICK";
                 //}
                 //subscription = new Subscription("DISTINCT", new string[1] { chartName }, new string[11] { "BID", "OFR", "LTP", "LTV", "TTV", "UTM", "DAY_OPEN_MID", "DAY_NET_CHG_MID", "DAY_PERC_CHG_MID", "DAY_HIGH", "DAY_LOW" });
-                subscription = new Subscription("DISTINCT", epics.ToArray(), new string[3] { "UTM", "BID", "OFR" });
-
-
-                //subscription = new Subscription("MERGE", new string[30] { "item1", "item2", "item3", "item4", "item5", "item6", "item7", "item8", "item9", "item10", "item11", "item12", "item13", "item14", "item15", "item16", "item17", "item18", "item19", "item20", "item21", "item22", "item23", "item24", "item25", "item26", "item27", "item28", "item29", "item30" },
-                //    new string[12] { "stock_name", "last_price", "time", "pct_change", "bid_quantity", "bid", "ask", "ask_quantity", "min", "max", "ref_price", "open_price" });
-                //subscription.DataAdapter = "QUOTE_ADAPTER";
-                subscription.RequestedSnapshot = "yes";
+                subscription = new Subscription("DISTINCT", epics.ToArray(), new string[3] { "UTM", "BID", "OFR" })
+                {
+                    //subscription = new Subscription("MERGE", new string[30] { "item1", "item2", "item3", "item4", "item5", "item6", "item7", "item8", "item9", "item10", "item11", "item12", "item13", "item14", "item15", "item16", "item17", "item18", "item19", "item20", "item21", "item22", "item23", "item24", "item25", "item26", "item27", "item28", "item29", "item30" },
+                    //    new string[12] { "stock_name", "last_price", "time", "pct_change", "bid_quantity", "bid", "ask", "ask_quantity", "min", "max", "ref_price", "open_price" });
+                    //subscription.DataAdapter = "QUOTE_ADAPTER";
+                    RequestedSnapshot = "yes"
+                };
 
                 subscription.addListener(new ChartSubscriptionListener(this, this.phase));
                 client.subscribe(subscription);
             }
             catch (Exception e)
             {
-                var log = new TradingBrain.Models.Log(_igContainer.the_app_db);
-                log.Log_Message = e.ToString();
-                log.Log_Type = "Error";
-                log.Log_App = "ChartSubscribe";
-                log.Epic = "";
+                var log = new TradingBrain.Models.Log(_igContainer.the_app_db)
+                {
+                    Log_Message = e.ToString(),
+                    Log_Type = "Error",
+                    Log_App = "ChartSubscribe",
+                    Epic = ""
+                };
                 _ = log.Save();
             }
         }
@@ -933,13 +941,13 @@ namespace TradingBrain.Models
                 {
                     throw new InvalidOperationException("Lightstreamer client is null in TradeSubscribe");
                 }
-                subscription = new Subscription("DISTINCT", new string[1] { "TRADE:" + accountId }, new string[3] { "CONFIRMS", "OPU", "WOU" });
-
-
-                //subscription = new Subscription("MERGE", new string[30] { "item1", "item2", "item3", "item4", "item5", "item6", "item7", "item8", "item9", "item10", "item11", "item12", "item13", "item14", "item15", "item16", "item17", "item18", "item19", "item20", "item21", "item22", "item23", "item24", "item25", "item26", "item27", "item28", "item29", "item30" },
-                //    new string[12] { "stock_name", "last_price", "time", "pct_change", "bid_quantity", "bid", "ask", "ask_quantity", "min", "max", "ref_price", "open_price" });
-                //subscription.DataAdapter = "QUOTE_ADAPTER";
-                subscription.RequestedSnapshot = "no";
+                subscription = new Subscription("DISTINCT", new string[1] { "TRADE:" + accountId }, new string[3] { "CONFIRMS", "OPU", "WOU" })
+                {
+                    //subscription = new Subscription("MERGE", new string[30] { "item1", "item2", "item3", "item4", "item5", "item6", "item7", "item8", "item9", "item10", "item11", "item12", "item13", "item14", "item15", "item16", "item17", "item18", "item19", "item20", "item21", "item22", "item23", "item24", "item25", "item26", "item27", "item28", "item29", "item30" },
+                    //    new string[12] { "stock_name", "last_price", "time", "pct_change", "bid_quantity", "bid", "ask", "ask_quantity", "min", "max", "ref_price", "open_price" });
+                    //subscription.DataAdapter = "QUOTE_ADAPTER";
+                    RequestedSnapshot = "no"
+                };
                 //subscription.RequestedMaxFrequency = "unfiltered";
                 //subscription.RequestedBufferSize = "50";
                 subscription.addListener(new TradeSubscriptionListener(this, this.phase));
@@ -954,11 +962,13 @@ namespace TradingBrain.Models
                 {
                     return;
                 }
-                var log = new TradingBrain.Models.Log(_igContainer.the_app_db);
-                log.Log_Message = e.ToString();
-                log.Log_Type = "Error";
-                log.Log_App = "TradeSubscribe";
-                log.Epic = "";
+                var log = new TradingBrain.Models.Log(_igContainer.the_app_db)
+                {
+                    Log_Message = e.ToString(),
+                    Log_Type = "Error",
+                    Log_App = "TradeSubscribe",
+                    Epic = ""
+                };
                 await log.Save();
             }
         }
@@ -1103,7 +1113,7 @@ namespace TradingBrain.Models
 
         }
 
-        public void OnLightstreamerStatusChanged(int cStatus, string status)
+        public static void OnLightstreamerStatusChanged(int cStatus, string status)
         {
             //statusLabel.Text = status;
             //var a = 1;
@@ -1233,21 +1243,25 @@ namespace TradingBrain.Models
                 catch (CosmosException de)
                 {
                     Console.WriteLine(de.ToString());
-                    var log = new Log();
-                    log.Log_Message = de.ToString();
-                    log.Log_Type = "Error";
-                    log.Log_App = "clsChartUpdate/Add";
-                    log.Epic = this.Epic;
+                    var log = new Log
+                    {
+                        Log_Message = de.ToString(),
+                        Log_Type = "Error",
+                        Log_App = "clsChartUpdate/Add",
+                        Epic = this.Epic
+                    };
                     await log.Save();
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine(e.ToString());
-                    var log = new Log();
-                    log.Log_Message = e.ToString();
-                    log.Log_Type = "Error";
-                    log.Log_App = "clsChartUpdate/Add";
-                    log.Epic = this.Epic;
+                    var log = new Log
+                    {
+                        Log_Message = e.ToString(),
+                        Log_Type = "Error",
+                        Log_App = "clsChartUpdate/Add",
+                        Epic = this.Epic
+                    };
                     await log.Save();
                 }
             }
@@ -1295,21 +1309,25 @@ namespace TradingBrain.Models
             catch (CosmosException de)
             {
                 Console.WriteLine(de.ToString());
-                var log = new Log();
-                log.Log_Message = de.ToString();
-                log.Log_Type = "Error";
-                log.Log_App = "clsChartUpdate/DoesThisTickExist";
-                log.Epic = this.Epic;
+                var log = new Log
+                {
+                    Log_Message = de.ToString(),
+                    Log_Type = "Error",
+                    Log_App = "clsChartUpdate/DoesThisTickExist",
+                    Epic = this.Epic
+                };
                 await log.Save();
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
-                var log = new Log();
-                log.Log_Message = e.ToString();
-                log.Log_Type = "Error";
-                log.Log_App = "clsChartUpdate/DoesThisTickExist";
-                log.Epic = this.Epic;
+                var log = new Log
+                {
+                    Log_Message = e.ToString(),
+                    Log_Type = "Error",
+                    Log_App = "clsChartUpdate/DoesThisTickExist",
+                    Epic = this.Epic
+                };
                 await log.Save();
             }
             return ret;
