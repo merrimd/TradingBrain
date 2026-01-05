@@ -1,4 +1,4 @@
-﻿#pragma warning disable S125
+#pragma warning disable S125
 #pragma warning disable S1764
 #pragma warning disable S2589
 #pragma warning disable S3776
