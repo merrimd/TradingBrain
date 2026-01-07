@@ -8,6 +8,7 @@
 using Azure.Core.GeoJson;
 using Azure.Storage;
 using com.lightstreamer.client;
+using DotNetty.Handlers.Tls;
 using dto.endpoint.accountactivity.transaction;
 using dto.endpoint.application.operation;
 using dto.endpoint.auth.session.v2;
@@ -145,6 +146,7 @@ namespace TradingBrain.Models
         public string newSIMSDealReference { get; set; } = "";
         public string newGRIDLDealReference { get; set; } = "";
         public string newGRIDSDealReference { get; set; } = "";
+
         public modQuote lastCandle = new();
         public List<modQuote> candleList = [];
 
@@ -152,6 +154,8 @@ namespace TradingBrain.Models
         public IGContainer? _igContainer2 = new();
         const int MAX_WAIT_FOR_CLOSE_TIME = 60;
         public int closeAttemptCount = 0;
+
+        public int testCount { get; set; } = 0;
 
         public TradingBrainSettings setInitialModelVar()
         {
@@ -2977,10 +2981,21 @@ namespace TradingBrain.Models
 
                                     CommonFunctions.AddStatusMessage($"Spread = {thisCandle.spread},   Long Start GridSize = {thisInput.var0} Long current gridsize = {Math.Round(model.modelVar.currentGridSize, 2)}", "DEBUG", logName);
 
-                                    //CommonFunctions.AddStatusMessage($"Before grid size:{this.model.modelVar.currentGridSize}");
-
+                                    ///////////////////////////////////////////////////////
+                                    // Run the model to determine if we are to buy or sell
+                                    ////////////////////////////////////////////////////////
                                     model.RunProTrendCodeGRID(model.candles);
-                                    //CommonFunctions.AddStatusMessage($"After grid size:{this.model.modelVar.currentGridSize}");
+                                    //if (this.testCount < 50)
+                                    //{
+                                    //    model.buyLong = true;
+                                    //    this.testCount += 1;
+                                    //    model.modelVar.quantity = 1;
+                                    //}
+                                    //else
+                                    //{
+                                    //    clsCommonFunctions.AddStatusMessage("Test loop finished");
+                                    //    model.buyLong = false;
+                                    //}
 
                                     CommonFunctions.AddStatusMessage($"values after  run  - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
 
@@ -3039,13 +3054,6 @@ namespace TradingBrain.Models
                                             dealReference = await PlaceDeal("long", model.modelVar.quantity, 0, this._igContainer.creds.igAccountId)
                                         };
                                         requestedTrades.Add(reqTrade);
-                                        //if (reqTrade.dealReference != "")
-                                        //{
-                                        //    //dealSent = true;
-                                        //    thisDealRef = reqTrade.dealReference;
-                                        //    //dealType = "PlaceDeal";
-                                        //}
-
                                     }
                                     else
                                     {
@@ -3071,12 +3079,6 @@ namespace TradingBrain.Models
                                             dealReference = await PlaceDeal("short", model.modelVar.quantity, 0, this._igContainer2.creds.igAccountId)
                                         };
                                         requestedTrades.Add(reqTrade);
-                                        //if (reqTrade.dealReference != "")
-                                        //{
-                                        //    //dealSent = true;
-                                        //    thisDealRef = reqTrade.dealReference;
-                                        //    //dealType = "PlaceDeal";
-                                        //}
 
                                     }
                                     else
@@ -4858,6 +4860,14 @@ namespace TradingBrain.Models
                                     }
                                     CommonFunctions.AddStatusMessage($"Processing OPEN trade update for DealRef: {tsm.DealReference}, saved deal ref = {osDealRef}", "INFO");
                                     // Check the deal id with the deal reference from the Place Deal call to ensure we are dealing with the correct trade
+                                    if (requestedTrades.FirstOrDefault(x => x.dealReference == tsm.DealReference) != null)
+                                    {
+                                        osDealRef = tsm.DealReference;
+                                    }
+                                    else
+                                    {
+                                        CommonFunctions.AddStatusMessage($"No matching requested trade found for DealRef: {tsm.DealReference}", "WARNING");
+                                    }
                                     if (tsm.DealReference == osDealRef || this.strategy == "GRID" && osDealRef == "")
                                     {
                                         CommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
@@ -5001,6 +5011,7 @@ namespace TradingBrain.Models
                                         IGModels.clsCommonFunctions.SaveTradeAudit(this.the_app_db, thisModelTrade, (double)thisTrade.level, tsm.TradeType);
                                         await tradeSubUpdate.Add(this.the_app_db);
 
+                                        requestedTrades.RemoveAll(x => x.dealReference == tsm.DealReference);
 
                                         if (strategy == "GRID")
                                         {
