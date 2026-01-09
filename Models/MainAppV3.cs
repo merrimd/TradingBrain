@@ -2952,11 +2952,15 @@ namespace TradingBrain.Models
                                 if (closeAttemptCount > 0) CommonFunctions.AddStatusMessage($"Current closeAttemptCount = {closeAttemptCount}", "DEBUG", logName);
 
                                 model.candles.currentCandle.grid_long_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.var4).Average(s => s.Close));
-                                model.candles.currentCandle.grid_short_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.svar4).Average(s => s.Close));
-
+                                if (thisInput.svar4 > 0)
+                                {
+                                    model.candles.currentCandle.grid_short_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.svar4).Average(s => s.Close));
+                                }
                                 model.candles.currentCandle.grid_prev_long_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.var4).Average(s => s.Close));
-                                model.candles.currentCandle.grid_prev_short_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.svar4).Average(s => s.Close));
-
+                                if (thisInput.svar4 > 0)
+                                {
+                                    model.candles.currentCandle.grid_prev_short_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.svar4).Average(s => s.Close));
+                                }
                                 //CommonFunctions.AddStatusMessage($"Current : SMA Long = {model.candles.currentCandle.grid_long_sma}, Short = {model.candles.currentCandle.grid_short_sma}", "DEBUG", logName);
                                 //CommonFunctions.AddStatusMessage($"Prev : SMA Long = {model.candles.currentCandle.grid_prev_long_sma}, Short = {model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
 
