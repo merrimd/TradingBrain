@@ -3010,7 +3010,7 @@ namespace TradingBrain.Models
                                                 {
                                                     clsEmail obj = new clsEmail();
                                                     List<recip> recips = new List<recip>();
-                                                    recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
+                                                    recips.Add(new recip("Mike Ward", "n525fd@gmail.com"));
                                                     recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
                                                     string subject = "MAX DROP FLAG SET - " + this.epicName;
                                                     string text = "The MAX DROP FLAG has been set on the " + this.epicName + " epic</br></br>";
