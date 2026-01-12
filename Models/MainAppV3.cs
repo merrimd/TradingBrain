@@ -2812,6 +2812,7 @@ namespace TradingBrain.Models
                         model.thisModel.inputs_RSI = await this.tb.runDetails.inputs_RSI.DeepCopyAsync();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
                         model.thisModel.matchProTrend = false;
+                        model.modelVar.maxDropFlag = this.tb.lastRunVars.maxDropFlag;
                         model.modelVar.counterVar = model.thisModel.counterVar;
                         model.startTime = dtNow;
                         model.modelRunID = modelID;
@@ -2984,6 +2985,48 @@ namespace TradingBrain.Models
                                     }
 
                                     CommonFunctions.AddStatusMessage($"Spread = {thisCandle.spread},   Long Start GridSize = {thisInput.var0} Long current gridsize = {Math.Round(model.modelVar.currentGridSize, 2)}", "DEBUG", logName);
+
+
+                                    // Check to make sure a) var6 has a value other than 0 and b) that the close price now is greater than (1-var6) * close from  3600 candles ago
+
+                                    if (thisInput.var6 > 0 && modelVar.maxDropFlag == 0)
+                                    {
+                                        modQuote? candle3600Ago = candleList.OrderByDescending(c => c.Date).Skip(3600).FirstOrDefault();
+                                        if (candle3600Ago != null)
+                                        {
+                                            double thresholdPrice = (double)candle3600Ago.Close * (1 - thisInput.var6);
+                                            CommonFunctions.AddStatusMessage($"MaxDropFlag - Close price 3600 seconds ago = {Math.Round(candle3600Ago.Close, 2)}, threshold price = {Math.Round(thresholdPrice, 2)}, current price = {thisCandle.Close}", "DEBUG", logName);
+                                            if ((double)thisCandle.Close < thresholdPrice)
+                                            {
+                                                CommonFunctions.AddStatusMessage("MaxDropFlag matched", "DEBUG", logName);
+                                                tb.lastRunVars.maxDropFlag = 1;
+                                                modelVar.maxDropFlag = 1;
+                                                _ = await tb.SaveDocument(this.the_app_db);
+                                                CommonFunctions.SendBroadcast("MaxDropFlagSet", this.epicName);
+                                                currentStatus.status = "MaxDropFlagSet";
+                                            }
+                                            else
+                                            {
+                                                CommonFunctions.AddStatusMessage("MaxDropFlag NOT matched", "DEBUG", logName);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            CommonFunctions.AddStatusMessage("MaxDropFlag - could not find candle from 3600 seconds ago", "DEBUG", logName);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (thisInput.var6 == 0)
+                                        {
+                                            CommonFunctions.AddStatusMessage("MaxDropFlag skipped as var6 = 0", "DEBUG", logName);
+                                        }
+                                        else
+                                        {
+                                            CommonFunctions.AddStatusMessage("MaxDropFlag CURRENTLY SET", "DEBUG", logName);
+                                        }
+                                    }
+
 
                                     ///////////////////////////////////////////////////////
                                     // Run the model to determine if we are to buy or sell
@@ -9936,6 +9979,21 @@ namespace TradingBrain.Models
                             }
                             break;
 
+                        case "ClearMaxDrop":
+                            //clsCommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus));
+                            CommonFunctions.AddStatusMessage("ClearMaxDrop request received", "INFO", logName);
+                            paused = false;
+                            pausedAfterNGL = false;
+
+                            this.tb.lastRunVars.maxDropFlag = 0;
+                            _ = await this.tb.SaveDocument(the_app_db);
+
+                            if (currentStatus != null)
+                            {
+                                currentStatus.status = "running";
+                                Task taskE = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
+                            }
+                            break;
                         case "ChangeQuantity":
                             //clsCommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus));
                             CommonFunctions.AddStatusMessage("ChangeQuantity request received", "INFO", logName);
