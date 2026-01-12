@@ -3005,7 +3005,12 @@ namespace TradingBrain.Models
                                                 _ = await tb.SaveDocument(this.the_app_db);
                                                 CommonFunctions.SendBroadcast("MaxDropFlagSet", this.epicName);
                                                 currentStatus.status = "MaxDropFlagSet";
-                                                string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
+
+                                                string region = Environment.GetEnvironmentVariable("Region").ToUpper();
+                                                if (region == "")
+                                                {
+                                                    region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
+                                                }
                                                 if (region == "LIVE")
                                                 {
                                                     clsEmail obj = new clsEmail();
