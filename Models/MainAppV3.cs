@@ -3004,6 +3004,18 @@ namespace TradingBrain.Models
                                                 _ = await tb.SaveDocument(this.the_app_db);
                                                 CommonFunctions.SendBroadcast("MaxDropFlagSet", this.epicName);
                                                 currentStatus.status = "MaxDropFlagSet";
+                                                string region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
+                                                if (region == "LIVE")
+                                                {
+                                                    clsEmail obj = new clsEmail();
+                                                    List<recip> recips = new List<recip>();
+                                                    recips.Add(new recip("Mike Ward", "n278mp@gmail.com"));
+                                                    recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
+                                                    string subject = "MAX DROP FLAG SET - " + this.epicName;
+                                                    string text = "The MAX DROP FLAG has been set on the " + this.epicName + " epic</br></br>";
+                                                    text += "This will mean that no more trades will be purchased until this flag has been cleared in the IGMonitor website.";
+                                                    obj.sendEmail(recips, subject, text);
+                                                }
                                             }
                                             else
                                             {
