@@ -3012,7 +3012,7 @@ namespace TradingBrain.Models
                                                     region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
                                                 }
                                                 CommonFunctions.AddStatusMessage("MaxDropFlag region = " + region, "DEBUG", logName);
-                                                if (region == "LIVE" || 1==1)
+                                                if (region == "LIVE" )
                                                 {
                                                     CommonFunctions.AddStatusMessage("Sending email ", "DEBUG", logName);
                                                     clsEmail obj = new clsEmail();
