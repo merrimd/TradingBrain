@@ -2813,6 +2813,7 @@ namespace TradingBrain.Models
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
                         model.thisModel.matchProTrend = false;
                         model.modelVar.maxDropFlag = this.tb.lastRunVars.maxDropFlag;
+                        if (model.modelVar.maxDropFlag == 1) { currentStatus.status = "MaxDropFlagSet"; }
                         model.modelVar.counterVar = model.thisModel.counterVar;
                         model.startTime = dtNow;
                         model.modelRunID = modelID;
