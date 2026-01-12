@@ -3014,7 +3014,8 @@ namespace TradingBrain.Models
                                                     recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
                                                     string subject = "MAX DROP FLAG SET - " + this.epicName;
                                                     string text = "The MAX DROP FLAG has been set on the " + this.epicName + " epic</br></br>";
-                                                    text += "This will mean that no more trades will be purchased until this flag has been cleared in the IGMonitor website.";
+                                                    text += "This will mean that no more trades will be purchased until this flag has been cleared in the IGMonitor website.</br></br>\"";
+                                                    text += "<a href='https://igmonitor.azurewebsites.net/?strategy=GRID'>IGMonitor Website</a></br></br>";
                                                     obj.sendEmail(recips, subject, text);
                                                 }
                                             }
