@@ -3006,13 +3006,15 @@ namespace TradingBrain.Models
                                                 CommonFunctions.SendBroadcast("MaxDropFlagSet", this.epicName);
                                                 currentStatus.status = "MaxDropFlagSet";
 
-                                                string region = Environment.GetEnvironmentVariable("Region").ToUpper();
+                                                string region = Environment.GetEnvironmentVariable("Region") ?? "".ToUpper();
                                                 if (region == "")
                                                 {
                                                     region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
                                                 }
-                                                if (region == "LIVE")
+                                                CommonFunctions.AddStatusMessage("MaxDropFlag region = " + region, "DEBUG", logName);
+                                                if (region == "LIVE" || 1==1)
                                                 {
+                                                    CommonFunctions.AddStatusMessage("Sending email ", "DEBUG", logName);
                                                     clsEmail obj = new clsEmail();
                                                     List<recip> recips = new List<recip>();
                                                     recips.Add(new recip("Mike Ward", "n525fd@gmail.com"));
@@ -3022,6 +3024,7 @@ namespace TradingBrain.Models
                                                     text += "This will mean that no more trades will be purchased until this flag has been cleared in the IGMonitor website.</br></br>\"";
                                                     text += "<a href='https://igmonitor.azurewebsites.net/?strategy=GRID'>IGMonitor Website</a></br></br>";
                                                     obj.sendEmail(recips, subject, text);
+                                                    CommonFunctions.AddStatusMessage("Email sent to  " + recips.ToList().ToString(), "DEBUG", logName);
                                                 }
                                             }
                                             else
