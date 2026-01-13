@@ -3006,13 +3006,13 @@ namespace TradingBrain.Models
                                                 CommonFunctions.SendBroadcast("MaxDropFlagSet", this.epicName);
                                                 currentStatus.status = "MaxDropFlagSet";
 
-                                                string region = Environment.GetEnvironmentVariable("Region") ?? "".ToUpper();
+                                                string region = Environment.GetEnvironmentVariable("Region") ?? "";
                                                 if (region == "")
                                                 {
-                                                    region = IGModels.clsCommonFunctions.Get_AppSetting("region").ToUpper();
+                                                    region = IGModels.clsCommonFunctions.Get_AppSetting("region");
                                                 }
                                                 CommonFunctions.AddStatusMessage("MaxDropFlag region = " + region, "DEBUG", logName);
-                                                if (region == "LIVE" )
+                                                if (region.ToUpper() == "LIVE" )
                                                 {
                                                     CommonFunctions.AddStatusMessage("Sending email ", "DEBUG", logName);
                                                     clsEmail obj = new clsEmail();
