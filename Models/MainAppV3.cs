@@ -2966,6 +2966,7 @@ namespace TradingBrain.Models
                                 //CommonFunctions.AddStatusMessage($"Current : SMA Long = {model.candles.currentCandle.grid_long_sma}, Short = {model.candles.currentCandle.grid_short_sma}", "DEBUG", logName);
                                 //CommonFunctions.AddStatusMessage($"Prev : SMA Long = {model.candles.currentCandle.grid_prev_long_sma}, Short = {model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
 
+
                                 if (model.doShorts) CommonFunctions.AddStatusMessage($"current short sma = {model.candles.currentCandle.grid_short_sma}, prev sma = {model.candles.currentCandle.grid_prev_short_sma} : is current > prev - {model.candles.currentCandle.grid_short_sma > model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
                                 CommonFunctions.AddStatusMessage($"current long sma = {Math.Round(model.candles.currentCandle.grid_long_sma, 2)}, prev sma = {Math.Round(model.candles.currentCandle.grid_prev_long_sma, 2)} : is current < prev - {model.candles.currentCandle.grid_long_sma < model.candles.currentCandle.grid_prev_long_sma}", "DEBUG", logName);
 
