@@ -401,3 +401,5 @@ FodyWeavers.xsd
 /Deps/IGModels.deps.json
 /Deps/IGModels.dll
 /Deps/DotNetClient_N2.dll
+/Deps/IGModels.pdb
+/Deps/IGModels.dll
