@@ -2973,7 +2973,6 @@ namespace TradingBrain.Models
                                 if (closeAttemptCount == 0)
                                 {
 
-
                                     if (model.thisModel.gridLTrades.Count > 0)
                                     {
                                         CommonFunctions.AddStatusMessage($"Long bollid = {this.gridLID}", "DEBUG");
