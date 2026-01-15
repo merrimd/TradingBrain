@@ -277,6 +277,7 @@ stages:
               
               # Set variables for next steps
               echo "##vso[task.setvariable variable=FULL_IMAGE_NAME]$REGISTRY/$IMAGE_NAME"
+              echo "##vso[task.setvariable variable=IMAGE_TAG_V1]$REGISTRY/$IMAGE_NAME:v1"
               echo "##vso[task.setvariable variable=IMAGE_TAG_BRANCH]$REGISTRY/$IMAGE_NAME:$BRANCH_NAME"
               echo "##vso[task.setvariable variable=IMAGE_TAG_SHA]$REGISTRY/$IMAGE_NAME:$BRANCH_NAME-$SHORT_SHA"
               echo "##vso[task.setvariable variable=IMAGE_TAG_LATEST]$REGISTRY/$IMAGE_NAME:latest"
@@ -285,6 +286,7 @@ stages:
           - script: |
               # Build the container image
               docker build \
+                -t "$(IMAGE_TAG_V1)" \
                 -t "$(IMAGE_TAG_LATEST)" \
                 -t "$(IMAGE_TAG_BRANCH)" \
                 -t "$(IMAGE_TAG_SHA)" \
@@ -292,12 +294,20 @@ stages:
                 -f Dockerfile \
                 .
               
-              echo "Built images:"
-              docker images | grep "$(IMAGE_NAME)"
+              echo "✅ Docker build completed successfully"
+              echo ""
+              echo "Built images with tags:"
+              echo "  - $(IMAGE_TAG_V1)"
+              echo "  - $(IMAGE_TAG_LATEST)"
+              echo "  - $(IMAGE_TAG_BRANCH)"
+              echo "  - $(IMAGE_TAG_SHA)"
             displayName: 'Build container image'
 
           - script: |
               # Push all tags
+              echo "Pushing: $(IMAGE_TAG_V1)"
+              docker push "$(IMAGE_TAG_V1)"
+              
               echo "Pushing: $(IMAGE_TAG_LATEST)"
               docker push "$(IMAGE_TAG_LATEST)"
               
@@ -307,7 +317,7 @@ stages:
               echo "Pushing: $(IMAGE_TAG_SHA)"
               docker push "$(IMAGE_TAG_SHA)"
               
-              echo "All tags pushed successfully"
+              echo "✅ All tags pushed successfully"
             displayName: 'Push container image to GHCR'
 
           # Scan the built container image
@@ -318,8 +328,8 @@ stages:
               sudo apt-get update
               sudo apt-get install trivy -y
               
-              # Scan the container image
-              trivy image $(REGISTRY)/$(IMAGE_NAME):latest --format sarif --output container-scan-results.sarif --severity CRITICAL,HIGH
+              # Scan the container image with v1 tag
+              trivy image $(IMAGE_TAG_V1) --format sarif --output container-scan-results.sarif --severity CRITICAL,HIGH
             displayName: 'Scan container image with Trivy'
             continueOnError: true
 
