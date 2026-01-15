@@ -1,0 +1,340 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - README.md
+      - docs/*
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+parameters:
+  - name: manualTrigger
+    displayName: 'Manual Deployment'
+    type: boolean
+    default: false
+
+variables:
+  - name: REGISTRY
+    value: 'ghcr.io'
+  - name: IMAGE_NAME
+    value: '$(Build.Repository.Name)'
+  - name: AZURE_CONTAINER_APP_NAME
+    value: 'tradingbrain-grid-test'
+  - name: AZURE_RESOURCE_GROUP
+    value: 'IGContainerGrp'
+  - name: AZURE_CONTAINER_APP_ENVIRONMENT
+    value: 'managedEnvironment-IGContainerGrp-93fe'
+  - name: dotnetVersion
+    value: '8.0.x'
+
+stages:
+  # ============================================================================
+  # Stage 1: Code Quality and Security Scanning
+  # ============================================================================
+  - stage: CodeQuality
+    displayName: 'Code Quality & Security Scanning'
+    jobs:
+      - job: SecurityScanning
+        displayName: 'Security & Quality Checks'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            displayName: 'Checkout code with full history'
+
+          - task: UseDotNet@2
+            displayName: 'Setup .NET SDK'
+            inputs:
+              version: $(dotnetVersion)
+              includePreviewVersions: false
+
+          # Static code analysis
+          - script: |
+              dotnet format --verify-no-changes --verbosity diagnostic
+            displayName: 'Run code linting'
+            continueOnError: true
+
+          # Dependency vulnerability scanning
+          - script: |
+              dotnet list package --vulnerable --include-transitive
+            displayName: 'Run dependency vulnerability scan'
+            continueOnError: true
+
+          # For CodeQL in Azure DevOps, you would typically use:
+          # Microsoft Security Code Analysis extension or GitHub Advanced Security for Azure DevOps
+          # Alternative: SonarCloud or SonarQube
+          - task: DotNetCoreCLI@2
+            displayName: 'Build for code analysis'
+            inputs:
+              command: 'build'
+              arguments: '--configuration Release'
+
+          # Trivy vulnerability scanner
+          - script: |
+              # Install Trivy
+              wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+              echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+              sudo apt-get update
+              sudo apt-get install trivy -y
+              
+              # Run Trivy scan
+              trivy fs . --format sarif --output trivy-results.sarif --severity CRITICAL,HIGH
+            displayName: 'Run Trivy vulnerability scanner'
+            continueOnError: true
+
+          # For SARIF upload, you can use the SARIF SAST Scans Tab extension
+          - task: PublishBuildArtifacts@1
+            displayName: 'Upload Trivy results'
+            condition: always()
+            inputs:
+              PathtoPublish: 'trivy-results.sarif'
+              ArtifactName: 'CodeAnalysisLogs'
+
+  # ============================================================================
+  # Stage 2: Build and Test
+  # ============================================================================
+  - stage: BuildAndTest
+    displayName: 'Build and Test'
+    dependsOn: CodeQuality
+    condition: succeeded()
+    jobs:
+      - job: Build
+        displayName: 'Build and Test Application'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          - checkout: self
+            displayName: 'Checkout code'
+
+          - task: UseDotNet@2
+            displayName: 'Setup .NET SDK'
+            inputs:
+              version: $(dotnetVersion)
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore dependencies'
+            inputs:
+              command: 'restore'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Build application'
+            inputs:
+              command: 'build'
+              arguments: '--configuration Release --no-restore'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Run unit tests'
+            inputs:
+              command: 'test'
+              arguments: '--configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --logger trx'
+              publishTestResults: true
+
+          - task: PublishTestResults@2
+            displayName: 'Publish test results'
+            condition: always()
+            inputs:
+              testResultsFormat: 'VSTest'
+              testResultsFiles: '**/*.trx'
+              mergeTestResults: true
+              failTaskOnFailedTests: false
+
+          - task: PublishCodeCoverageResults@2
+            displayName: 'Publish code coverage'
+            condition: always()
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: '**/coverage.cobertura.xml'
+              failIfCoverageEmpty: false
+
+  # ============================================================================
+  # Stage 3: Build Container Image
+  # ============================================================================
+  - stage: BuildContainer
+    displayName: 'Build Container Image'
+    dependsOn: BuildAndTest
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: ContainerBuild
+        displayName: 'Build and Push Container'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          - checkout: self
+            displayName: 'Checkout code'
+
+          - task: Docker@2
+            displayName: 'Docker Login'
+            inputs:
+              command: 'login'
+              containerRegistry: 'GitHubContainerRegistry'  # Service connection name
+
+          - script: |
+              # Generate image tags
+              BRANCH_NAME=$(echo "$(Build.SourceBranch)" | sed 's/refs\/heads\///')
+              SHORT_SHA=$(echo "$(Build.SourceVersion)" | cut -c1-7)
+              
+              echo "##vso[task.setvariable variable=IMAGE_TAG_BRANCH]$(REGISTRY)/$(IMAGE_NAME):$BRANCH_NAME"
+              echo "##vso[task.setvariable variable=IMAGE_TAG_SHA]$(REGISTRY)/$(IMAGE_NAME):$BRANCH_NAME-$SHORT_SHA"
+              echo "##vso[task.setvariable variable=IMAGE_TAG_LATEST]$(REGISTRY)/$(IMAGE_NAME):latest"
+            displayName: 'Generate image tags'
+
+          - task: Docker@2
+            displayName: 'Build and push container image'
+            inputs:
+              command: 'buildAndPush'
+              repository: '$(IMAGE_NAME)'
+              dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+              containerRegistry: 'GitHubContainerRegistry'
+              tags: |
+                $(Build.SourceBranchName)
+                $(Build.SourceBranchName)-$(Build.SourceVersion)
+                latest
+              arguments: '--build-arg BUILD_NUMBER=$(Build.BuildNumber)'
+
+          # Scan the built container image
+          - script: |
+              # Install Trivy if not already installed
+              wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+              echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+              sudo apt-get update
+              sudo apt-get install trivy -y
+              
+              # Scan the container image
+              trivy image $(REGISTRY)/$(IMAGE_NAME):latest --format sarif --output container-scan-results.sarif --severity CRITICAL,HIGH
+            displayName: 'Scan container image with Trivy'
+            continueOnError: true
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Upload container scan results'
+            condition: always()
+            inputs:
+              PathtoPublish: 'container-scan-results.sarif'
+              ArtifactName: 'ContainerSecurityScans'
+
+          # Store image information for deployment stage
+          - script: |
+              echo "$(IMAGE_TAG_LATEST)" > $(Build.ArtifactStagingDirectory)/image-tag.txt
+            displayName: 'Save image tag'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish image metadata'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)/image-tag.txt'
+              artifactName: 'image-metadata'
+
+  # ============================================================================
+  # Stage 4: Manual Approval & Deploy to Azure
+  # ============================================================================
+  - stage: Deploy
+    displayName: 'Deploy to Production'
+    dependsOn: BuildContainer
+    condition: succeeded()
+    jobs:
+      - deployment: DeployToAzure
+        displayName: 'Deploy to Azure Container Apps'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'production'  # This enables manual approval in Azure DevOps
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  displayName: 'Checkout code'
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: 'Download image metadata'
+                  inputs:
+                    artifactName: 'image-metadata'
+                    targetPath: '$(Pipeline.Workspace)'
+
+                - script: |
+                    IMAGE_TAG=$(cat $(Pipeline.Workspace)/image-tag.txt)
+                    echo "##vso[task.setvariable variable=DEPLOY_IMAGE_TAG]$IMAGE_TAG"
+                  displayName: 'Load image tag'
+
+                - task: AzureCLI@2
+                  displayName: 'Azure Login and Deploy'
+                  inputs:
+                    azureSubscription: 'AzureServiceConnection'  # Service connection name
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Deploy to Azure Container Apps
+                      az containerapp update \
+                        --name $(AZURE_CONTAINER_APP_NAME) \
+                        --resource-group $(AZURE_RESOURCE_GROUP) \
+                        --image $(DEPLOY_IMAGE_TAG) \
+                        --set-env-vars BUILD_NUMBER=$(Build.BuildNumber)
+
+                - task: AzureCLI@2
+                  displayName: 'Verify deployment'
+                  inputs:
+                    azureSubscription: 'AzureServiceConnection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      REVISION=$(az containerapp show \
+                        --name $(AZURE_CONTAINER_APP_NAME) \
+                        --resource-group $(AZURE_RESOURCE_GROUP) \
+                        --query "properties.latestRevisionName" \
+                        --output tsv)
+                      
+                      echo "Latest revision: $REVISION"
+                      echo "##vso[task.setvariable variable=LATEST_REVISION]$REVISION"
+
+                - script: |
+                    APP_URL="https://$(AZURE_CONTAINER_APP_NAME).azurecontainerapps.io"
+                    echo "Testing deployment at $APP_URL"
+                    
+                    HTTP_CODE=$(curl -f -s -o /dev/null -w "%{http_code}" $APP_URL/health)
+                    
+                    if [ $HTTP_CODE -eq 200 ]; then
+                      echo "✅ Health check passed (HTTP $HTTP_CODE)"
+                    else
+                      echo "❌ Health check failed (HTTP $HTTP_CODE)"
+                      exit 1
+                    fi
+                  displayName: 'Run smoke tests'
+
+  # ============================================================================
+  # Stage 5: Post-Deployment Notification
+  # ============================================================================
+  - stage: Notify
+    displayName: 'Deployment Notification'
+    dependsOn: Deploy
+    condition: always()
+    jobs:
+      - job: NotifyStatus
+        displayName: 'Send Deployment Status'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          - script: |
+              DEPLOY_STATUS="${{ stageDependencies.Deploy.DeployToAzure.result }}"
+              
+              if [ "$DEPLOY_STATUS" == "Succeeded" ]; then
+                echo "✅ Deployment successful"
+                echo "##vso[task.complete result=Succeeded;]Deployment completed successfully"
+              else
+                echo "❌ Deployment failed"
+                echo "##vso[task.complete result=Failed;]Deployment failed"
+                exit 1
+              fi
+            displayName: 'Deployment notification'
+
+          # Optional: Add notification tasks here
+          # - task: SendEmail@1
+          # - task: SlackNotification@1
+          # - task: MicrosoftTeamsNotification@1
