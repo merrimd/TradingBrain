@@ -319,17 +319,18 @@ stages:
         displayName: 'Send Deployment Status'
         pool:
           vmImage: 'ubuntu-latest'
+        variables:
+          deployStatus: $[ stageDependencies.Deploy.DeployToAzure.result ]
         
         steps:
           - script: |
-              DEPLOY_STATUS="${{ stageDependencies.Deploy.DeployToAzure.result }}"
-              
-              if [ "$DEPLOY_STATUS" == "Succeeded" ]; then
+              if [ "$(deployStatus)" == "Succeeded" ]; then
                 echo "✅ Deployment successful"
-                echo "##vso[task.complete result=Succeeded;]Deployment completed successfully"
+                echo "Build: $(Build.BuildNumber)"
+                echo "Environment: production"
               else
-                echo "❌ Deployment failed"
-                echo "##vso[task.complete result=Failed;]Deployment failed"
+                echo "❌ Deployment failed or was skipped"
+                echo "Status: $(deployStatus)"
                 exit 1
               fi
             displayName: 'Deployment notification'
