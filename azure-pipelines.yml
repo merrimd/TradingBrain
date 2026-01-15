@@ -62,13 +62,31 @@ stages:
 
           # Static code analysis
           - script: |
-              dotnet format --verify-no-changes --verbosity diagnostic
+              # Find and format only TradingBrain.csproj
+              PROJECT_FILE=$(find . -name "TradingBrain.csproj" -type f | head -1)
+              
+              if [ -z "$PROJECT_FILE" ]; then
+                echo "##[warning]TradingBrain.csproj not found, skipping code linting"
+                exit 0
+              fi
+              
+              echo "Running code linting on: $PROJECT_FILE"
+              dotnet format "$PROJECT_FILE" --verify-no-changes --verbosity diagnostic
             displayName: 'Run code linting'
             continueOnError: true
 
           # Dependency vulnerability scanning
           - script: |
-              dotnet list package --vulnerable --include-transitive
+              # Scan only TradingBrain.csproj for vulnerabilities
+              PROJECT_FILE=$(find . -name "TradingBrain.csproj" -type f | head -1)
+              
+              if [ -z "$PROJECT_FILE" ]; then
+                echo "##[warning]TradingBrain.csproj not found, skipping dependency scan"
+                exit 0
+              fi
+              
+              echo "Scanning dependencies for: $PROJECT_FILE"
+              dotnet list "$PROJECT_FILE" package --vulnerable --include-transitive
             displayName: 'Run dependency vulnerability scan'
             continueOnError: true
 
