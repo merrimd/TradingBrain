@@ -215,8 +215,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=sha,prefix=v1-
-            type=raw,value=v1-latest
+            type=sha,prefix=v2-
+            type=raw,value=v2-latest
 
       - name: Build and push container image
         id: build
@@ -234,7 +234,7 @@ jobs:
       - name: Get image tag
         id: image-tag
         run: |
-          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep "v1-" | grep -v "latest" | head -n 1 | cut -d':' -f2)
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep "v2-" | grep -v "latest" | head -n 1 | cut -d':' -f2)
           echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "Image tag: $IMAGE_TAG"
 
