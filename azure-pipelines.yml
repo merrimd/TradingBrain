@@ -8,11 +8,11 @@ trigger:
   #    - docs/*
   none
 pr:
-  branches:
-    include:
-      - main
-      - develop
-
+  #branches:
+  #  include:
+  #    - main
+  #    - develop
+  none
 parameters:
   - name: manualTrigger
     displayName: 'Manual Deployment'
