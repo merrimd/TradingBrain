@@ -55,10 +55,10 @@ jobs:
             exit 1
           fi
 
-      - name: Run code linting
-        run: |
-          dotnet format TradingBrain.csproj --verify-no-changes --verbosity diagnostic
-        continue-on-error: true
+      #- name: Run code linting
+      #  run: |
+      #    dotnet format TradingBrain.csproj --verify-no-changes --verbosity diagnostic
+      #  continue-on-error: true
 
       - name: Run dependency scan
         run: |

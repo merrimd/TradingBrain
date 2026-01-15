@@ -8,6 +8,7 @@
 using Azure.Core.GeoJson;
 using Azure.Storage;
 using com.lightstreamer.client;
+using DotNetty.Handlers.Tls;
 using dto.endpoint.accountactivity.transaction;
 using dto.endpoint.application.operation;
 using dto.endpoint.auth.session.v2;
@@ -145,6 +146,7 @@ namespace TradingBrain.Models
         public string newSIMSDealReference { get; set; } = "";
         public string newGRIDLDealReference { get; set; } = "";
         public string newGRIDSDealReference { get; set; } = "";
+
         public modQuote lastCandle = new();
         public List<modQuote> candleList = [];
 
@@ -152,6 +154,8 @@ namespace TradingBrain.Models
         public IGContainer? _igContainer2 = new();
         const int MAX_WAIT_FOR_CLOSE_TIME = 60;
         public int closeAttemptCount = 0;
+
+        public int testCount { get; set; } = 0;
 
         public TradingBrainSettings setInitialModelVar()
         {
@@ -2808,6 +2812,8 @@ namespace TradingBrain.Models
                         model.thisModel.inputs_RSI = await this.tb.runDetails.inputs_RSI.DeepCopyAsync();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
                         model.thisModel.matchProTrend = false;
+                        model.modelVar.maxDropFlag = this.tb.lastRunVars.maxDropFlag;
+                        if (model.modelVar.maxDropFlag == 1) { currentStatus.status = "MaxDropFlagSet"; }
                         model.modelVar.counterVar = model.thisModel.counterVar;
                         model.startTime = dtNow;
                         model.modelRunID = modelID;
@@ -2948,13 +2954,18 @@ namespace TradingBrain.Models
                                 if (closeAttemptCount > 0) CommonFunctions.AddStatusMessage($"Current closeAttemptCount = {closeAttemptCount}", "DEBUG", logName);
 
                                 model.candles.currentCandle.grid_long_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.var4).Average(s => s.Close));
-                                model.candles.currentCandle.grid_short_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.svar4).Average(s => s.Close));
-
+                                if (thisInput.svar4 > 0)
+                                {
+                                    model.candles.currentCandle.grid_short_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.svar4).Average(s => s.Close));
+                                }
                                 model.candles.currentCandle.grid_prev_long_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.var4).Average(s => s.Close));
-                                model.candles.currentCandle.grid_prev_short_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.svar4).Average(s => s.Close));
-
+                                if (thisInput.svar4 > 0)
+                                {
+                                    model.candles.currentCandle.grid_prev_short_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.svar4).Average(s => s.Close));
+                                }
                                 //CommonFunctions.AddStatusMessage($"Current : SMA Long = {model.candles.currentCandle.grid_long_sma}, Short = {model.candles.currentCandle.grid_short_sma}", "DEBUG", logName);
                                 //CommonFunctions.AddStatusMessage($"Prev : SMA Long = {model.candles.currentCandle.grid_prev_long_sma}, Short = {model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
+
 
                                 if (model.doShorts) CommonFunctions.AddStatusMessage($"current short sma = {model.candles.currentCandle.grid_short_sma}, prev sma = {model.candles.currentCandle.grid_prev_short_sma} : is current > prev - {model.candles.currentCandle.grid_short_sma > model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
                                 CommonFunctions.AddStatusMessage($"current long sma = {Math.Round(model.candles.currentCandle.grid_long_sma, 2)}, prev sma = {Math.Round(model.candles.currentCandle.grid_prev_long_sma, 2)} : is current < prev - {model.candles.currentCandle.grid_long_sma < model.candles.currentCandle.grid_prev_long_sma}", "DEBUG", logName);
@@ -2977,10 +2988,84 @@ namespace TradingBrain.Models
 
                                     CommonFunctions.AddStatusMessage($"Spread = {thisCandle.spread},   Long Start GridSize = {thisInput.var0} Long current gridsize = {Math.Round(model.modelVar.currentGridSize, 2)}", "DEBUG", logName);
 
-                                    //CommonFunctions.AddStatusMessage($"Before grid size:{this.model.modelVar.currentGridSize}");
 
+                                    // Check to make sure a) var6 has a value other than 0 and b) that the close price now is greater than (1-var6) * close from  3600 candles ago
+
+                                    if (thisInput.var6 > 0 && modelVar.maxDropFlag == 0)
+                                    {
+                                        modQuote? candle3600Ago = candleList.OrderByDescending(c => c.Date).Skip(3600).FirstOrDefault();
+                                        if (candle3600Ago != null)
+                                        {
+                                            double thresholdPrice = (double)candle3600Ago.Close * (1 - thisInput.var6);
+                                            CommonFunctions.AddStatusMessage($"MaxDropFlag - Close price 3600 seconds ago = {Math.Round(candle3600Ago.Close, 2)}, threshold price = {Math.Round(thresholdPrice, 2)}, current price = {thisCandle.Close}", "DEBUG", logName);
+                                            if ((double)thisCandle.Close < thresholdPrice)
+                                            {
+                                                CommonFunctions.AddStatusMessage("MaxDropFlag matched", "DEBUG", logName);
+                                                tb.lastRunVars.maxDropFlag = 1;
+                                                modelVar.maxDropFlag = 1;
+                                                _ = await tb.SaveDocument(this.the_app_db);
+                                                CommonFunctions.SendBroadcast("MaxDropFlagSet", this.epicName);
+                                                currentStatus.status = "MaxDropFlagSet";
+
+                                                string region = Environment.GetEnvironmentVariable("Region") ?? "";
+                                                if (region == "")
+                                                {
+                                                    region = IGModels.clsCommonFunctions.Get_AppSetting("region");
+                                                }
+                                                CommonFunctions.AddStatusMessage("MaxDropFlag region = " + region, "DEBUG", logName);
+                                                if (region.ToUpper() == "LIVE" )
+                                                {
+                                                    CommonFunctions.AddStatusMessage("Sending email ", "DEBUG", logName);
+                                                    clsEmail obj = new clsEmail();
+                                                    List<recip> recips = new List<recip>();
+                                                    recips.Add(new recip("Mike Ward", "n525fd@gmail.com"));
+                                                    recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
+                                                    string subject = "MAX DROP FLAG SET - " + this.epicName;
+                                                    string text = "The MAX DROP FLAG has been set on the " + this.epicName + " epic</br></br>";
+                                                    text += "This will mean that no more trades will be purchased until this flag has been cleared in the IGMonitor website.</br></br>";
+                                                    text += "<a href='https://igmonitor.azurewebsites.net/?strategy=GRID'>IGMonitor Website</a></br></br>";
+                                                    obj.sendEmail(recips, subject, text);
+                                                    CommonFunctions.AddStatusMessage("Email sent to  " + recips.ToList().ToString(), "DEBUG", logName);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                CommonFunctions.AddStatusMessage("MaxDropFlag NOT matched", "DEBUG", logName);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            CommonFunctions.AddStatusMessage("MaxDropFlag - could not find candle from 3600 seconds ago", "DEBUG", logName);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (thisInput.var6 == 0)
+                                        {
+                                            CommonFunctions.AddStatusMessage("MaxDropFlag skipped as var6 = 0", "DEBUG", logName);
+                                        }
+                                        else
+                                        {
+                                            CommonFunctions.AddStatusMessage("MaxDropFlag CURRENTLY SET", "DEBUG", logName);
+                                        }
+                                    }
+
+
+                                    ///////////////////////////////////////////////////////
+                                    // Run the model to determine if we are to buy or sell
+                                    ////////////////////////////////////////////////////////
                                     model.RunProTrendCodeGRID(model.candles);
-                                    //CommonFunctions.AddStatusMessage($"After grid size:{this.model.modelVar.currentGridSize}");
+                                    //if (this.testCount < 50)
+                                    //{
+                                    //    model.buyLong = true;
+                                    //    this.testCount += 1;
+                                    //    model.modelVar.quantity = 1;
+                                    //}
+                                    //else
+                                    //{
+                                    //    clsCommonFunctions.AddStatusMessage("Test loop finished");
+                                    //    model.buyLong = false;
+                                    //}
 
                                     CommonFunctions.AddStatusMessage($"values after  run  - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
 
@@ -3039,13 +3124,6 @@ namespace TradingBrain.Models
                                             dealReference = await PlaceDeal("long", model.modelVar.quantity, 0, this._igContainer.creds.igAccountId)
                                         };
                                         requestedTrades.Add(reqTrade);
-                                        //if (reqTrade.dealReference != "")
-                                        //{
-                                        //    //dealSent = true;
-                                        //    thisDealRef = reqTrade.dealReference;
-                                        //    //dealType = "PlaceDeal";
-                                        //}
-
                                     }
                                     else
                                     {
@@ -3071,12 +3149,6 @@ namespace TradingBrain.Models
                                             dealReference = await PlaceDeal("short", model.modelVar.quantity, 0, this._igContainer2.creds.igAccountId)
                                         };
                                         requestedTrades.Add(reqTrade);
-                                        //if (reqTrade.dealReference != "")
-                                        //{
-                                        //    //dealSent = true;
-                                        //    thisDealRef = reqTrade.dealReference;
-                                        //    //dealType = "PlaceDeal";
-                                        //}
 
                                     }
                                     else
@@ -4858,6 +4930,14 @@ namespace TradingBrain.Models
                                     }
                                     CommonFunctions.AddStatusMessage($"Processing OPEN trade update for DealRef: {tsm.DealReference}, saved deal ref = {osDealRef}", "INFO");
                                     // Check the deal id with the deal reference from the Place Deal call to ensure we are dealing with the correct trade
+                                    if (requestedTrades.FirstOrDefault(x => x.dealReference == tsm.DealReference) != null)
+                                    {
+                                        osDealRef = tsm.DealReference;
+                                    }
+                                    else
+                                    {
+                                        CommonFunctions.AddStatusMessage($"No matching requested trade found for DealRef: {tsm.DealReference}", "WARNING");
+                                    }
                                     if (tsm.DealReference == osDealRef || this.strategy == "GRID" && osDealRef == "")
                                     {
                                         CommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
@@ -5001,6 +5081,7 @@ namespace TradingBrain.Models
                                         IGModels.clsCommonFunctions.SaveTradeAudit(this.the_app_db, thisModelTrade, (double)thisTrade.level, tsm.TradeType);
                                         await tradeSubUpdate.Add(this.the_app_db);
 
+                                        requestedTrades.RemoveAll(x => x.dealReference == tsm.DealReference);
 
                                         if (strategy == "GRID")
                                         {
@@ -9921,6 +10002,21 @@ namespace TradingBrain.Models
                             }
                             break;
 
+                        case "ClearMaxDrop":
+                            //clsCommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus));
+                            CommonFunctions.AddStatusMessage("ClearMaxDrop request received", "INFO", logName);
+                            paused = false;
+                            pausedAfterNGL = false;
+
+                            this.tb.lastRunVars.maxDropFlag = 0;
+                            _ = await this.tb.SaveDocument(the_app_db);
+
+                            if (currentStatus != null)
+                            {
+                                currentStatus.status = "running";
+                                Task taskE = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
+                            }
+                            break;
                         case "ChangeQuantity":
                             //clsCommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus));
                             CommonFunctions.AddStatusMessage("ChangeQuantity request received", "INFO", logName);

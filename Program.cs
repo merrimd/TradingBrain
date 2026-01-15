@@ -277,6 +277,7 @@ namespace TradingBrain.Models
             t.Start();
 
 
+
             if (strategy == "GRID")
             {
 
