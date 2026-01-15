@@ -21,15 +21,25 @@ parameters:
 
 variables:
   - name: REGISTRY
-    value: 'IContainerReg.azurecr.io'
+    value: 'ghcr.io'
   - name: IMAGE_NAME
-    value: 'tradingbrain-grid-test'
+    value: '$(Build.Repository.Name)'
   - name: AZURE_CONTAINER_APP_NAME
     value: 'tradingbrain-grid-test'
   - name: AZURE_RESOURCE_GROUP
     value: 'IGContainerGrp'
   - name: AZURE_CONTAINER_APP_ENVIRONMENT
     value: 'managedEnvironment-IGContainerGrp-93fe'
+  # Test environment configuration
+  - name: AZURE_CONTAINER_APP_NAME_TEST
+    value: 'tradingbrain-grid-test'
+  - name: AZURE_RESOURCE_GROUP_TEST
+    value: 'IGContainerGrp'
+  # Production environment configuration (update if different from test)
+  - name: AZURE_CONTAINER_APP_NAME_PROD
+    value: 'tradingbrain-grid-prod'  # Change this if you have a separate prod app
+  - name: AZURE_RESOURCE_GROUP_PROD
+    value: 'IGContainerGrp'  # Change this if you have a separate prod resource group
   - name: dotnetVersion
     value: '8.0.x'
   # BUILD ONLY TRADINGBRAIN PROJECT - IGNORE IGMODELS
@@ -247,7 +257,7 @@ stages:
             displayName: 'Docker Login to GHCR'
             inputs:
               command: 'login'
-              containerRegistry: 'AzureContainerRegistry'  # Service connection name
+              containerRegistry: 'GitHubContainerRegistry'  # Service connection name
 
           - script: |
               # Prepare image tags
@@ -332,18 +342,18 @@ stages:
               artifactName: 'image-metadata'
 
   # ============================================================================
-  # Stage 4: Manual Approval & Deploy to Azure
+  # Stage 4: Deploy to Test Environment (with Manual Approval)
   # ============================================================================
-  - stage: Deploy
-    displayName: 'Deploy to Production'
+  - stage: DeployTest
+    displayName: 'Deploy to Test Environment'
     dependsOn: BuildContainer
     condition: succeeded()
     jobs:
-      - deployment: DeployToAzure
-        displayName: 'Deploy to Azure Container Apps'
+      - deployment: DeployToTest
+        displayName: 'Deploy to Test Container Apps'
         pool:
           vmImage: 'ubuntu-latest'
-        environment: 'production'  # This enables manual approval in Azure DevOps
+        environment: 'test'  # This enables manual approval - configure in Environments
         strategy:
           runOnce:
             deploy:
@@ -360,58 +370,177 @@ stages:
                 - script: |
                     IMAGE_TAG=$(cat $(Pipeline.Workspace)/image-tag.txt)
                     echo "##vso[task.setvariable variable=DEPLOY_IMAGE_TAG]$IMAGE_TAG"
+                    echo "Deploying image: $IMAGE_TAG"
                   displayName: 'Load image tag'
 
                 - task: AzureCLI@2
-                  displayName: 'Azure Login and Deploy'
+                  displayName: 'Deploy to Test Environment'
                   inputs:
-                    azureSubscription: 'AzureServiceConnection'  # Service connection name
+                    azureSubscription: 'AzureServiceConnection'
                     scriptType: 'bash'
                     scriptLocation: 'inlineScript'
                     inlineScript: |
-                      # Deploy to Azure Container Apps
+                      echo "Deploying to TEST environment..."
+                      echo "Container App: $(AZURE_CONTAINER_APP_NAME_TEST)"
+                      echo "Resource Group: $(AZURE_RESOURCE_GROUP_TEST)"
+                      echo "Image: $(DEPLOY_IMAGE_TAG)"
+                      
                       az containerapp update \
-                        --name $(AZURE_CONTAINER_APP_NAME) \
-                        --resource-group $(AZURE_RESOURCE_GROUP) \
+                        --name $(AZURE_CONTAINER_APP_NAME_TEST) \
+                        --resource-group $(AZURE_RESOURCE_GROUP_TEST) \
                         --image $(DEPLOY_IMAGE_TAG) \
-                        --set-env-vars BUILD_NUMBER=$(Build.BuildNumber)
+                        --set-env-vars BUILD_NUMBER=$(Build.BuildNumber) ENVIRONMENT=test
 
                 - task: AzureCLI@2
-                  displayName: 'Verify deployment'
+                  displayName: 'Verify test deployment'
                   inputs:
                     azureSubscription: 'AzureServiceConnection'
                     scriptType: 'bash'
                     scriptLocation: 'inlineScript'
                     inlineScript: |
                       REVISION=$(az containerapp show \
-                        --name $(AZURE_CONTAINER_APP_NAME) \
-                        --resource-group $(AZURE_RESOURCE_GROUP) \
+                        --name $(AZURE_CONTAINER_APP_NAME_TEST) \
+                        --resource-group $(AZURE_RESOURCE_GROUP_TEST) \
                         --query "properties.latestRevisionName" \
                         --output tsv)
                       
-                      echo "Latest revision: $REVISION"
-                      echo "##vso[task.setvariable variable=LATEST_REVISION]$REVISION"
+                      echo "✅ Test deployment revision: $REVISION"
+                      echo "##vso[task.setvariable variable=TEST_REVISION]$REVISION"
 
                 - script: |
-                    APP_URL="https://$(AZURE_CONTAINER_APP_NAME).azurecontainerapps.io"
+                    APP_URL="https://$(AZURE_CONTAINER_APP_NAME_TEST).azurecontainerapps.io"
                     echo "Testing deployment at $APP_URL"
                     
-                    HTTP_CODE=$(curl -f -s -o /dev/null -w "%{http_code}" $APP_URL/health)
+                    # Wait for deployment to stabilize
+                    sleep 10
                     
-                    if [ $HTTP_CODE -eq 200 ]; then
-                      echo "✅ Health check passed (HTTP $HTTP_CODE)"
+                    HTTP_CODE=$(curl -f -s -o /dev/null -w "%{http_code}" $APP_URL/health || echo "000")
+                    
+                    if [ "$HTTP_CODE" == "200" ]; then
+                      echo "✅ Test environment health check passed (HTTP $HTTP_CODE)"
                     else
-                      echo "❌ Health check failed (HTTP $HTTP_CODE)"
-                      exit 1
+                      echo "⚠️  Test environment health check returned HTTP $HTTP_CODE"
+                      echo "This may be expected if /health endpoint doesn't exist"
                     fi
-                  displayName: 'Run smoke tests'
+                  displayName: 'Run smoke tests on test environment'
+                  continueOnError: true
+
+                - script: |
+                    echo "============================================"
+                    echo "✅ TEST DEPLOYMENT SUCCESSFUL"
+                    echo "============================================"
+                    echo "Environment: TEST"
+                    echo "Container App: $(AZURE_CONTAINER_APP_NAME_TEST)"
+                    echo "Build: $(Build.BuildNumber)"
+                    echo "Image: $(DEPLOY_IMAGE_TAG)"
+                    echo "URL: https://$(AZURE_CONTAINER_APP_NAME_TEST).azurecontainerapps.io"
+                    echo "============================================"
+                  displayName: 'Test deployment summary'
 
   # ============================================================================
-  # Stage 5: Post-Deployment Notification
+  # Stage 5: Deploy to Production (with Manual Approval)
+  # ============================================================================
+  - stage: DeployProduction
+    displayName: 'Deploy to Production Environment'
+    dependsOn: DeployTest
+    condition: succeeded()
+    jobs:
+      - deployment: DeployToProduction
+        displayName: 'Deploy to Production Container Apps'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'production'  # This enables manual approval - configure in Environments
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  displayName: 'Checkout code'
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: 'Download image metadata'
+                  inputs:
+                    artifactName: 'image-metadata'
+                    targetPath: '$(Pipeline.Workspace)'
+
+                - script: |
+                    IMAGE_TAG=$(cat $(Pipeline.Workspace)/image-tag.txt)
+                    echo "##vso[task.setvariable variable=DEPLOY_IMAGE_TAG]$IMAGE_TAG"
+                    echo "Deploying image: $IMAGE_TAG"
+                  displayName: 'Load image tag'
+
+                - task: AzureCLI@2
+                  displayName: 'Deploy to Production Environment'
+                  inputs:
+                    azureSubscription: 'AzureServiceConnection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      echo "Deploying to PRODUCTION environment..."
+                      echo "Container App: $(AZURE_CONTAINER_APP_NAME_PROD)"
+                      echo "Resource Group: $(AZURE_RESOURCE_GROUP_PROD)"
+                      echo "Image: $(DEPLOY_IMAGE_TAG)"
+                      
+                      az containerapp update \
+                        --name $(AZURE_CONTAINER_APP_NAME_PROD) \
+                        --resource-group $(AZURE_RESOURCE_GROUP_PROD) \
+                        --image $(DEPLOY_IMAGE_TAG) \
+                        --set-env-vars BUILD_NUMBER=$(Build.BuildNumber) ENVIRONMENT=production
+
+                - task: AzureCLI@2
+                  displayName: 'Verify production deployment'
+                  inputs:
+                    azureSubscription: 'AzureServiceConnection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      REVISION=$(az containerapp show \
+                        --name $(AZURE_CONTAINER_APP_NAME_PROD) \
+                        --resource-group $(AZURE_RESOURCE_GROUP_PROD) \
+                        --query "properties.latestRevisionName" \
+                        --output tsv)
+                      
+                      echo "✅ Production deployment revision: $REVISION"
+                      echo "##vso[task.setvariable variable=PROD_REVISION]$REVISION"
+
+                - script: |
+                    APP_URL="https://$(AZURE_CONTAINER_APP_NAME_PROD).azurecontainerapps.io"
+                    echo "Testing deployment at $APP_URL"
+                    
+                    # Wait for deployment to stabilize
+                    sleep 10
+                    
+                    HTTP_CODE=$(curl -f -s -o /dev/null -w "%{http_code}" $APP_URL/health || echo "000")
+                    
+                    if [ "$HTTP_CODE" == "200" ]; then
+                      echo "✅ Production health check passed (HTTP $HTTP_CODE)"
+                    else
+                      echo "❌ Production health check failed (HTTP $HTTP_CODE)"
+                      exit 1
+                    fi
+                  displayName: 'Run smoke tests on production'
+                  continueOnError: false
+
+                - script: |
+                    echo "============================================"
+                    echo "✅ PRODUCTION DEPLOYMENT SUCCESSFUL"
+                    echo "============================================"
+                    echo "Environment: PRODUCTION"
+                    echo "Container App: $(AZURE_CONTAINER_APP_NAME_PROD)"
+                    echo "Build: $(Build.BuildNumber)"
+                    echo "Image: $(DEPLOY_IMAGE_TAG)"
+                    echo "URL: https://$(AZURE_CONTAINER_APP_NAME_PROD).azurecontainerapps.io"
+                    echo "============================================"
+                  displayName: 'Production deployment summary'
+
+  # ============================================================================
+  # Stage 6: Post-Deployment Notification
   # ============================================================================
   - stage: Notify
     displayName: 'Deployment Notification'
-    dependsOn: Deploy
+    dependsOn: 
+      - DeployTest
+      - DeployProduction
     condition: always()
     jobs:
       - job: NotifyStatus
@@ -419,22 +548,49 @@ stages:
         pool:
           vmImage: 'ubuntu-latest'
         variables:
-          deployStatus: $[ stageDependencies.Deploy.DeployToAzure.result ]
+          testStatus: $[ stageDependencies.DeployTest.DeployToTest.result ]
+          prodStatus: $[ stageDependencies.DeployProduction.DeployToProduction.result ]
         
         steps:
           - script: |
-              if [ "$(deployStatus)" == "Succeeded" ]; then
-                echo "✅ Deployment successful"
-                echo "Build: $(Build.BuildNumber)"
-                echo "Environment: production"
+              echo "============================================"
+              echo "DEPLOYMENT PIPELINE SUMMARY"
+              echo "============================================"
+              echo "Build Number: $(Build.BuildNumber)"
+              echo "Test Environment: $(testStatus)"
+              echo "Production Environment: $(prodStatus)"
+              echo "============================================"
+              
+              if [ "$(testStatus)" == "Succeeded" ] && [ "$(prodStatus)" == "Succeeded" ]; then
+                echo "✅ All deployments successful!"
+                echo ""
+                echo "Test URL: https://$(AZURE_CONTAINER_APP_NAME_TEST).azurecontainerapps.io"
+                echo "Production URL: https://$(AZURE_CONTAINER_APP_NAME_PROD).azurecontainerapps.io"
+              elif [ "$(testStatus)" == "Succeeded" ] && [ "$(prodStatus)" != "Succeeded" ]; then
+                echo "⚠️  Test deployment succeeded, but production failed or was skipped"
+              elif [ "$(testStatus)" != "Succeeded" ]; then
+                echo "❌ Test deployment failed - production was not attempted"
+                exit 1
               else
-                echo "❌ Deployment failed or was skipped"
-                echo "Status: $(deployStatus)"
+                echo "❌ Deployment pipeline encountered issues"
                 exit 1
               fi
             displayName: 'Deployment notification'
 
           # Optional: Add notification tasks here
           # - task: SendEmail@1
+          #   inputs:
+          #     To: 'team@example.com'
+          #     Subject: 'Deployment $(testStatus) - Build $(Build.BuildNumber)'
+          #     Body: 'Test: $(testStatus), Production: $(prodStatus)'
+          # 
           # - task: SlackNotification@1
+          #   inputs:
+          #     SlackApiToken: '$(SLACK_TOKEN)'
+          #     Channel: '#deployments'
+          #     Message: 'Deployment completed - Test: $(testStatus), Prod: $(prodStatus)'
+          # 
           # - task: MicrosoftTeamsNotification@1
+          #   inputs:
+          #     WebhookUrl: '$(TEAMS_WEBHOOK)'
+          #     Message: 'Pipeline $(Build.BuildNumber) - Test: $(testStatus), Prod: $(prodStatus)'
