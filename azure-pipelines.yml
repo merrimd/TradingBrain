@@ -1,12 +1,12 @@
 trigger:
-  branches:
-    include:
-      - main
-  paths:
-    exclude:
-      - README.md
-      - docs/*
-
+  #branches:
+  #  include:
+  #    - main
+  #paths:
+  #  exclude:
+  #    - README.md
+  #    - docs/*
+  none
 pr:
   branches:
     include:
