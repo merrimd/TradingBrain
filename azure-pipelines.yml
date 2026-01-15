@@ -244,33 +244,61 @@ stages:
             displayName: 'Checkout code'
 
           - task: Docker@2
-            displayName: 'Docker Login'
+            displayName: 'Docker Login to GHCR'
             inputs:
               command: 'login'
               containerRegistry: 'GitHubContainerRegistry'  # Service connection name
 
           - script: |
-              # Generate image tags
-              BRANCH_NAME=$(echo "$(Build.SourceBranch)" | sed 's/refs\/heads\///')
+              # Prepare image tags
+              REGISTRY="$(REGISTRY)"
+              IMAGE_NAME="$(IMAGE_NAME)"
+              
+              # Make image name lowercase (GHCR requirement)
+              IMAGE_NAME=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+              
+              BRANCH_NAME=$(echo "$(Build.SourceBranchName)" | tr '[:upper:]' '[:lower:]')
               SHORT_SHA=$(echo "$(Build.SourceVersion)" | cut -c1-7)
               
-              echo "##vso[task.setvariable variable=IMAGE_TAG_BRANCH]$(REGISTRY)/$(IMAGE_NAME):$BRANCH_NAME"
-              echo "##vso[task.setvariable variable=IMAGE_TAG_SHA]$(REGISTRY)/$(IMAGE_NAME):$BRANCH_NAME-$SHORT_SHA"
-              echo "##vso[task.setvariable variable=IMAGE_TAG_LATEST]$(REGISTRY)/$(IMAGE_NAME):latest"
+              echo "Registry: $REGISTRY"
+              echo "Image: $IMAGE_NAME"
+              echo "Branch: $BRANCH_NAME"
+              echo "SHA: $SHORT_SHA"
+              
+              # Set variables for next steps
+              echo "##vso[task.setvariable variable=FULL_IMAGE_NAME]$REGISTRY/$IMAGE_NAME"
+              echo "##vso[task.setvariable variable=IMAGE_TAG_BRANCH]$REGISTRY/$IMAGE_NAME:$BRANCH_NAME"
+              echo "##vso[task.setvariable variable=IMAGE_TAG_SHA]$REGISTRY/$IMAGE_NAME:$BRANCH_NAME-$SHORT_SHA"
+              echo "##vso[task.setvariable variable=IMAGE_TAG_LATEST]$REGISTRY/$IMAGE_NAME:latest"
             displayName: 'Generate image tags'
 
-          - task: Docker@2
-            displayName: 'Build and push container image'
-            inputs:
-              command: 'buildAndPush'
-              repository: '$(IMAGE_NAME)'
-              dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
-              containerRegistry: 'GitHubContainerRegistry'
-              tags: |
-                $(Build.SourceBranchName)
-                $(Build.SourceBranchName)-$(Build.SourceVersion)
-                latest
-              arguments: '--build-arg BUILD_NUMBER=$(Build.BuildNumber)'
+          - script: |
+              # Build the container image
+              docker build \
+                -t "$(IMAGE_TAG_LATEST)" \
+                -t "$(IMAGE_TAG_BRANCH)" \
+                -t "$(IMAGE_TAG_SHA)" \
+                --build-arg BUILD_NUMBER=$(Build.BuildNumber) \
+                -f Dockerfile \
+                .
+              
+              echo "Built images:"
+              docker images | grep "$(IMAGE_NAME)"
+            displayName: 'Build container image'
+
+          - script: |
+              # Push all tags
+              echo "Pushing: $(IMAGE_TAG_LATEST)"
+              docker push "$(IMAGE_TAG_LATEST)"
+              
+              echo "Pushing: $(IMAGE_TAG_BRANCH)"
+              docker push "$(IMAGE_TAG_BRANCH)"
+              
+              echo "Pushing: $(IMAGE_TAG_SHA)"
+              docker push "$(IMAGE_TAG_SHA)"
+              
+              echo "All tags pushed successfully"
+            displayName: 'Push container image to GHCR'
 
           # Scan the built container image
           - script: |
