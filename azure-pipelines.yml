@@ -21,9 +21,9 @@ parameters:
 
 variables:
   - name: REGISTRY
-    value: 'ghcr.io'
+    value: 'IContainerReg.azurecr.io'
   - name: IMAGE_NAME
-    value: '$(Build.Repository.Name)'
+    value: 'tradingbrain-grid-test'
   - name: AZURE_CONTAINER_APP_NAME
     value: 'tradingbrain-grid-test'
   - name: AZURE_RESOURCE_GROUP
@@ -247,7 +247,7 @@ stages:
             displayName: 'Docker Login to GHCR'
             inputs:
               command: 'login'
-              containerRegistry: 'GitHubContainerRegistry'  # Service connection name
+              containerRegistry: 'AzureContainerRegistry'  # Service connection name
 
           - script: |
               # Prepare image tags
