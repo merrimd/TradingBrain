@@ -4457,12 +4457,14 @@ namespace TradingBrain.Models
                                                         this.model.thisModel.gridLTrades.Remove(matchTrade);
 
                                                         CommonFunctions.AddStatusMessage($"closedGridLTrades  = {this.model.thisModel.closedGridLTrades.Count} : gridLTrades = {this.model.thisModel.gridLTrades.Count} ", "DEBUG");
-
+                                                        CommonFunctions.SendBroadcast("SellingLongGrid", matchTrade.BOLLI_ID);
                                                         if (this.model.thisModel.gridLTrades.Count == 0)
                                                         {
                                                             CommonFunctions.AddStatusMessage($"closeAttemptCount going from {this.closeAttemptCount} to 0", "DEBUG");
                                                             this.closeAttemptCount = 0;
-                                                            CommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(this.model.thisModel.closedGridLTrades));
+                                                            //CommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(this.model.thisModel.closedGridLTrades));
+                                                            CommonFunctions.SendBroadcast("SoldLongGrid", matchTrade.BOLLI_ID);
+
                                                             //this.model.thisModel.closingGridLTrade = false;
                                                             this.model.thisModel.closedGridLTrades.Clear();
                                                             this.model.thisModel.currentGRIDLTrade = null;
@@ -4480,12 +4482,14 @@ namespace TradingBrain.Models
                                                         this.model.thisModel.gridSTrades.Remove(matchTrade);
 
                                                         CommonFunctions.AddStatusMessage($"closedGridSTrades  = {this.model.thisModel.closedGridSTrades.Count} : gridSTrades = {this.model.thisModel.gridSTrades.Count} ", "DEBUG");
-
+                                                        CommonFunctions.SendBroadcast("BuyingShortGrid", matchTrade.BOLLI_ID);
                                                         if (this.model.thisModel.gridSTrades.Count == 0)
                                                         {
                                                             CommonFunctions.AddStatusMessage($"closeAttemptCount going from {this.closeAttemptCount} to 0", "DEBUG");
                                                             this.closeAttemptCount = 0;
-                                                            CommonFunctions.SendBroadcast("BuyShort", JsonConvert.SerializeObject(this.model.thisModel.closedGridSTrades));
+                                                            //CommonFunctions.SendBroadcast("BuyShort", JsonConvert.SerializeObject(this.model.thisModel.closedGridSTrades));
+
+                                                            CommonFunctions.SendBroadcast("BuyShortGrid", matchTrade.BOLLI_ID);
                                                             //this.model.thisModel.closingGridSTrade = false;
                                                             this.model.thisModel.closedGridSTrades.Clear();
                                                             this.model.thisModel.currentGRIDSTrade = null;
@@ -5031,7 +5035,11 @@ namespace TradingBrain.Models
                                                 this.model.modelLogs.logs[0].quantity = thisModelTrade.quantity;
                                                 this.model.modelLogs.logs[0].tradePrice = thisModelTrade.buyPrice;
                                             }
-                                            CommonFunctions.SendBroadcast("BuyLong", JsonConvert.SerializeObject(thisModelTrade));
+
+                                            if (this.strategy != "GRID")
+                                            {
+                                                            CommonFunctions.SendBroadcast("SellShort", JsonConvert.SerializeObject(thisModelTrade));
+                                            }
                                         }
                                         else
                                         {
@@ -5050,7 +5058,10 @@ namespace TradingBrain.Models
                                                 this.model.modelLogs.logs[0].quantity = thisModelTrade.quantity;
                                                 this.model.modelLogs.logs[0].tradePrice = thisModelTrade.sellPrice;
                                             }
-                                            CommonFunctions.SendBroadcast("SellShort", JsonConvert.SerializeObject(thisModelTrade));
+                                            if (this.strategy != "GRID")
+                                            {
+                                                     CommonFunctions.SendBroadcast("SellShort", JsonConvert.SerializeObject(thisModelTrade));
+                                            }
                                         }
                                         this.model.onMarket = true;
 
@@ -5091,6 +5102,9 @@ namespace TradingBrain.Models
                                                 this.model.thisModel.gridLTrades.Add(await thisModelTrade.DeepCopyAsync());
                                                 CommonFunctions.AddStatusMessage($"Current long trade set in model - DealID: {this.model.thisModel.currentGRIDLTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDLTrade.tbDealReference}", "INFO", logName);
                                                 CommonFunctions.AddStatusMessage($"Current long trade set in local - DealID: {this.currentGRIDLTrade.dealId}, DealRef: {this.currentGRIDLTrade.dealReference}", "INFO", logName);
+
+                                                CommonFunctions.SendBroadcast("BuyLongGrid", thisModelTrade.BOLLI_ID);
+     
                                             }
                                             else
                                             {
@@ -5099,6 +5113,9 @@ namespace TradingBrain.Models
                                                 this.model.thisModel.gridSTrades.Add(await thisModelTrade.DeepCopyAsync());
                                                 CommonFunctions.AddStatusMessage($"Current short trade set in model - DealID: {this.model.thisModel.currentGRIDSTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDSTrade.tbDealReference}", "INFO", logName);
                                                 CommonFunctions.AddStatusMessage($"Current short trade set in local - DealID: {this.currentGRIDSTrade.dealId}, DealRef: {this.currentGRIDSTrade.dealReference}", "INFO", logName);
+
+                                                CommonFunctions.SendBroadcast("SellShortGrid", thisModelTrade.BOLLI_ID);
+     
                                             }
                                             this.tb.lastRunVars = await this.model.modelVar.DeepCopyAsync();
                                             _ = this.tb.SaveDocument(this.the_app_db);
