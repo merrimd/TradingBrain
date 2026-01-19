@@ -321,12 +321,18 @@ namespace TradingBrain.Models
             config.AddTarget(azureBlobTarget);
             config.AddRule(LogLevel.Debug, LogLevel.Fatal, azureBlobTarget);
 
-            var logconsole = new NLog.Targets.ConsoleTarget("logconsole")
-            {
-                Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${message}|${exception:format=toString}"
-            };
+            string envRegion = Environment.GetEnvironmentVariable("Region") ?? "";
 
-            config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
+            if (envRegion == "") //Must be being run in an environment where we want console logging
+            {
+                var logconsole = new NLog.Targets.ConsoleTarget("logconsole")
+                {
+                    Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${message}|${exception:format=toString}"
+                };
+
+                config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
+            }
+
 
             NLog.LogManager.Configuration = config;
             //MappedDiagnosticsLogicalContext.Set("jobId", "default");
