@@ -332,9 +332,13 @@ namespace TradingBrain.Models
 
                 config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
             }
+            else
+            {
+                Console.WriteLine("Not logging to console as running in environment: " + envRegion);
+            }
 
 
-            NLog.LogManager.Configuration = config;
+                NLog.LogManager.Configuration = config;
             //MappedDiagnosticsLogicalContext.Set("jobId", "default");
 
             ScopeContext.PushProperty("app", "TRADINGBRAIN/");
