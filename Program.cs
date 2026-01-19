@@ -16,8 +16,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MimeKit.Encodings;
 using NLog;
+using NLog.Common;
 using NLog.Extensions.AzureBlobStorage;
 using NLog.Targets;
+using NLog.Targets.Wrappers;
 using Org.BouncyCastle.Pqc.Crypto.Lms;
 using Org.BouncyCastle.Tsp;
 using System;
@@ -42,8 +44,7 @@ using static IGModels.ModellingModels.GetModelClass;
 using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 using static TradingBrain.Models.TBStreamingClient;
 using Container = Microsoft.Azure.Cosmos.Container;
-
-
+ 
 namespace TradingBrain.Models
 {
     partial class ProgramV2
@@ -131,9 +132,115 @@ namespace TradingBrain.Models
             return ret;
 
         }
+
+        public class MonitoredBufferingWrapper : BufferingTargetWrapper
+        {
+            private System.Threading.Timer? _flushTimer;
+            private readonly int _flushIntervalMs = 30000;
+            private readonly object _syncLock = new object();
+            private volatile bool _isDisposed = false;
+
+            public MonitoredBufferingWrapper()
+            {
+                this.BufferSize = 10000;
+                this.FlushTimeout = 30000;
+                this.SlidingTimeout = false;
+            }
+
+            protected override void InitializeTarget()
+            {
+                base.InitializeTarget();
+                StartPeriodicFlushTimer();
+            }
+
+            protected override void CloseTarget()
+            {
+                StopPeriodicFlushTimer();
+                base.CloseTarget();
+            }
+
+            private void StartPeriodicFlushTimer()
+            {
+                lock (_syncLock)
+                {
+                    if (_flushTimer == null && !_isDisposed)
+                    {
+                        _flushTimer = new System.Threading.Timer(
+                            callback: PeriodicFlush,
+                            state: null,
+                            dueTime: _flushIntervalMs,
+                            period: _flushIntervalMs);
+                        
+                        Console.WriteLine($"[NLog] Periodic flush timer started: {_flushIntervalMs}ms interval");
+                    }
+                }
+            }
+
+            private void StopPeriodicFlushTimer()
+            {
+                lock (_syncLock)
+                {
+                    if (_flushTimer != null)
+                    {
+                        _flushTimer.Dispose();
+                        _flushTimer = null;
+                        Console.WriteLine("[NLog] Periodic flush timer stopped");
+                    }
+                }
+            }
+
+            private void PeriodicFlush(object? state)
+            {
+                if (!_isDisposed)
+                {
+                    try
+                    {
+                        Console.WriteLine($"[NLog] Periodic flush triggered at {DateTime.Now}");
+                        Flush(ex =>
+                        {
+                            if (ex != null)
+                            {
+                                Console.WriteLine($"[NLog] Flush error: {ex}");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"[NLog] Flush completed successfully");
+                            }
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[NLog] PeriodicFlush exception: {ex}");
+                    }
+                }
+            }
+
+            protected override void FlushAsync(AsyncContinuation asyncContinuation)
+            {
+                Console.WriteLine($"[NLog] Buffer flush called at {DateTime.Now}");
+                base.FlushAsync(asyncContinuation);
+            }
+        }
         //public System.Timers.Timer ti = new System.Timers.Timer();
         static async Task Main(string[] args)
         {
+            // Register shutdown handlers
+            var shutdownEvent = new ManualResetEventSlim(false);
+
+            AppDomain.CurrentDomain.ProcessExit += async (sender, e) =>
+            {
+                CommonFunctions.AddStatusMessage("Application shutting down via SIGTERM...", "INFO");
+                await GracefulShutdown();
+                shutdownEvent.Set();
+            };
+
+            Console.CancelKeyPress += async (sender, e) =>
+            {
+                e.Cancel = true;
+                CommonFunctions.AddStatusMessage("Application shutting down via Ctrl+C...", "INFO");
+                await GracefulShutdown();
+                shutdownEvent.Set();
+            };
 
             object v = ConfigurationManager.GetSection("appSettings");
             NameValueCollection igWebApiConnectionConfig = (NameValueCollection)v;
@@ -195,42 +302,33 @@ namespace TradingBrain.Models
             BlobStorageTarget azureBlobTarget = new()
             {
                 Name = "azureBlob",
-
-                // Your Azure Blob connection string
                 ConnectionString = blobConnectionString,
-
-                // Container and blob path
                 Container = "tb-logs-" + region,
                 BlobName = blobName,
-
-                // How log messages are rendered
                 Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${message}|${exception:format=toString}",
+                BatchSize = 100000,
+                TaskDelayMilliseconds = 30000
 
-                BatchSize = 20,
             };
+
+            // Create buffering wrapper with custom implementation
+            //var bufferedTarget = new MonitoredBufferingWrapper
+            //{
+            //    Name = "bufferedAzureBlob",
+            //    WrappedTarget = azureBlobTarget
+            //};
 
             config.AddTarget(azureBlobTarget);
             config.AddRule(LogLevel.Debug, LogLevel.Fatal, azureBlobTarget);
 
-
-
-
-
-
-            //var filename = "DEBUG-" + DateTime.UtcNow.Year + "-" + DateTime.UtcNow.Month + "-" + DateTime.UtcNow.Day + "-" + DateTime.UtcNow.Hour + ".txt";
-
-            //var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "c:/tblogs/App.${mdlc:item=jobId}.${shortdate}.txt", MaxArchiveDays = 31, KeepFileOpen = false, Layout = "${longdate} [${mdlc:item=jobId}] |${level:uppercase=true}|${message}|${exception:format=toString}" };
-            //config.AddRule(LogLevel.Debug, LogLevel.Fatal, logfile);
-
-            var logconsole = new NLog.Targets.ConsoleTarget("logconsole");
-            //logconsole.Layout = "${longdate} [${threadid}] |${level:uppercase=true}|${mdlc:item=jobId}|${message}|${exception:format=toString}";
-            logconsole.Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${message}|${exception:format=toString}";
+            var logconsole = new NLog.Targets.ConsoleTarget("logconsole")
+            {
+                Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${message}|${exception:format=toString}"
+            };
 
             config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
 
-
             NLog.LogManager.Configuration = config;
-
             //MappedDiagnosticsLogicalContext.Set("jobId", "default");
 
             ScopeContext.PushProperty("app", "TRADINGBRAIN/");
@@ -674,6 +772,75 @@ namespace TradingBrain.Models
             //var a = 1;
 
 
+        }
+
+        private static async Task GracefulShutdown()
+        {
+            try
+            {
+                CommonFunctions.AddStatusMessage("Starting graceful shutdown...", "INFO");
+
+                // Stop all worker apps
+                foreach (var worker in workerList)
+                {
+                    try
+                    {
+                    // Add any cleanup code for each worker
+                        CommonFunctions.AddStatusMessage($"Stopping worker for {worker.epicName}...", "INFO");
+                    }
+                    catch (Exception ex)
+                    {
+                        CommonFunctions.AddStatusMessage($"Error stopping worker {worker.epicName}: {ex.Message}", "WARN");
+                    }
+                }
+
+                // Close database connections
+                if (the_db != null)
+                {
+                    try
+                    {
+                        CommonFunctions.AddStatusMessage("Closing primary database connection...", "INFO");
+                    the_db.Client?.Dispose();
+                }
+                    catch (Exception ex)
+                    {
+                        CommonFunctions.AddStatusMessage($"Error closing primary database: {ex.Message}", "WARN");
+                    }
+                }
+
+                if (the_app_db != null)
+                {
+                    try
+                    {
+                        CommonFunctions.AddStatusMessage("Closing application database connection...", "INFO");
+                    the_app_db.Client?.Dispose();
+                }
+                    catch (Exception ex)
+                    {
+                        CommonFunctions.AddStatusMessage($"Error closing application database: {ex.Message}", "WARN");
+                    }
+                }
+
+                // Flush and shutdown logs - wait for all buffered logs to be written
+                CommonFunctions.AddStatusMessage("Flushing remaining logs...", "INFO");
+
+                // Flush all targets with a timeout
+                LogManager.Flush(TimeSpan.FromSeconds(5));
+                
+                CommonFunctions.AddStatusMessage("Logs flushed successfully", "INFO");
+                LogManager.Shutdown();
+
+                CommonFunctions.AddStatusMessage("Graceful shutdown completed successfully", "INFO");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Critical error during shutdown: {ex}");
+                try
+                {
+                    LogManager.Shutdown();
+                }
+                catch { }
+            }
         }
     }
 
