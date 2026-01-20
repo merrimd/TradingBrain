@@ -4457,13 +4457,13 @@ namespace TradingBrain.Models
                                                         this.model.thisModel.gridLTrades.Remove(matchTrade);
 
                                                         CommonFunctions.AddStatusMessage($"closedGridLTrades  = {this.model.thisModel.closedGridLTrades.Count} : gridLTrades = {this.model.thisModel.gridLTrades.Count} ", "DEBUG");
-                                                        CommonFunctions.SendBroadcast("SellingLongGrid", matchTrade.BOLLI_ID);
+                                                        CommonFunctions.SendBroadcast("SellingLongGrid", matchTrade.BOLLI_ID + "|" + matchTrade.epic);
                                                         if (this.model.thisModel.gridLTrades.Count == 0)
                                                         {
                                                             CommonFunctions.AddStatusMessage($"closeAttemptCount going from {this.closeAttemptCount} to 0", "DEBUG");
                                                             this.closeAttemptCount = 0;
                                                             //CommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(this.model.thisModel.closedGridLTrades));
-                                                            CommonFunctions.SendBroadcast("SoldLongGrid", matchTrade.BOLLI_ID);
+                                                            CommonFunctions.SendBroadcast("SoldLongGrid", matchTrade.BOLLI_ID + "|" + matchTrade.epic);
 
                                                             //this.model.thisModel.closingGridLTrade = false;
                                                             this.model.thisModel.closedGridLTrades.Clear();
@@ -4482,14 +4482,14 @@ namespace TradingBrain.Models
                                                         this.model.thisModel.gridSTrades.Remove(matchTrade);
 
                                                         CommonFunctions.AddStatusMessage($"closedGridSTrades  = {this.model.thisModel.closedGridSTrades.Count} : gridSTrades = {this.model.thisModel.gridSTrades.Count} ", "DEBUG");
-                                                        CommonFunctions.SendBroadcast("BuyingShortGrid", matchTrade.BOLLI_ID);
+                                                        CommonFunctions.SendBroadcast("BuyingShortGrid", matchTrade.BOLLI_ID + "|" + matchTrade.epic);
                                                         if (this.model.thisModel.gridSTrades.Count == 0)
                                                         {
                                                             CommonFunctions.AddStatusMessage($"closeAttemptCount going from {this.closeAttemptCount} to 0", "DEBUG");
                                                             this.closeAttemptCount = 0;
                                                             //CommonFunctions.SendBroadcast("BuyShort", JsonConvert.SerializeObject(this.model.thisModel.closedGridSTrades));
 
-                                                            CommonFunctions.SendBroadcast("BuyShortGrid", matchTrade.BOLLI_ID);
+                                                            CommonFunctions.SendBroadcast("BuyShortGrid", matchTrade.BOLLI_ID + "|" + matchTrade.epic);
                                                             //this.model.thisModel.closingGridSTrade = false;
                                                             this.model.thisModel.closedGridSTrades.Clear();
                                                             this.model.thisModel.currentGRIDSTrade = null;
@@ -5103,7 +5103,7 @@ namespace TradingBrain.Models
                                                 CommonFunctions.AddStatusMessage($"Current long trade set in model - DealID: {this.model.thisModel.currentGRIDLTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDLTrade.tbDealReference}", "INFO", logName);
                                                 CommonFunctions.AddStatusMessage($"Current long trade set in local - DealID: {this.currentGRIDLTrade.dealId}, DealRef: {this.currentGRIDLTrade.dealReference}", "INFO", logName);
 
-                                                CommonFunctions.SendBroadcast("BuyLongGrid", thisModelTrade.BOLLI_ID);
+                                                CommonFunctions.SendBroadcast("BuyLongGrid", thisModelTrade.BOLLI_ID + "|" + thisModelTrade.epic);
      
                                             }
                                             else
@@ -5114,7 +5114,7 @@ namespace TradingBrain.Models
                                                 CommonFunctions.AddStatusMessage($"Current short trade set in model - DealID: {this.model.thisModel.currentGRIDSTrade.tbDealId}, DealRef: {this.model.thisModel.currentGRIDSTrade.tbDealReference}", "INFO", logName);
                                                 CommonFunctions.AddStatusMessage($"Current short trade set in local - DealID: {this.currentGRIDSTrade.dealId}, DealRef: {this.currentGRIDSTrade.dealReference}", "INFO", logName);
 
-                                                CommonFunctions.SendBroadcast("SellShortGrid", thisModelTrade.BOLLI_ID);
+                                                CommonFunctions.SendBroadcast("SellShortGrid", thisModelTrade.BOLLI_ID + "|" + thisModelTrade.epic);
      
                                             }
                                             this.tb.lastRunVars = await this.model.modelVar.DeepCopyAsync();
@@ -10207,7 +10207,7 @@ namespace TradingBrain.Models
                                     currentStatus.quantity = newVars.baseQuantity;
                                     currentStatus.baseQuantity = newVars.baseQuantity;
                                     currentStatus.minQuantity = newVars.baseQuantity;
-                                    if (this.strategy == "BOLLI")
+                                    if (this.strategy == "GRID")
                                     {
                                         tb.lastRunVars.quantity = newVars.baseQuantity;
                                         model.modelVar.quantity = newVars.baseQuantity;
@@ -10231,7 +10231,7 @@ namespace TradingBrain.Models
                                 model.modelVar.currentGain = newVars.currentGain;
                                 currentStatus.currentGain = newVars.currentGain;
 
-                                if (this.strategy == "BOLLI" && (newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0))
+                                if (this.strategy == "GRID" && (newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0))
                                 {
                                     // Get the input settings from the last run optimzerundata
 
