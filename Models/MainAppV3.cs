@@ -2284,7 +2284,7 @@ namespace TradingBrain.Models
                                     if (the_app_db != null)
                                     {
                                         //Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0])));
-                                        if (DateTime.UtcNow.Second == 0)
+                                        if (DateTime.UtcNow.Second % 15 == 0)
                                         {
                                             Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
                                         }
