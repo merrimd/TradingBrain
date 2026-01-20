@@ -2284,7 +2284,10 @@ namespace TradingBrain.Models
                                     if (the_app_db != null)
                                     {
                                         //Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0])));
-                                        Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
+                                        if (DateTime.UtcNow.Second == 0)
+                                        {
+                                            Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
+                                        }
                                         //save log to the database
                                         //Container logContainer = the_app_db.GetContainer("ModelLogs");
                                         //await log.SaveDocument(logContainer);
@@ -3893,6 +3896,7 @@ namespace TradingBrain.Models
 
                 {
                     message obj = JsonConvert.DeserializeObject<message>(message) ?? new message();
+                    //Console.WriteLine("message reveived " + DateTime.UtcNow.ToString() + " - " + obj.messageType);
                     switch (obj.messageType)
                     {
                         case "Ping":
@@ -3906,8 +3910,12 @@ namespace TradingBrain.Models
                             break;
 
                         case "Status":
-                            //AddStatusMessage($"status sent - {currentStatus.epicName}-{currentStatus.strategy}", "INFO");
-                            CommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus), the_app_db);
+                            if (obj.messageValue.Contains(currentStatus.epicName))
+                            {
+                                //AddStatusMessage($"status recd - {currentStatus.epicName}-{currentStatus.strategy} - {obj.messageValue}", "INFO");
+                                CommonFunctions.SendMessage(obj.messageValue, "Status", JsonConvert.SerializeObject(currentStatus), the_app_db);
+                                //AddStatusMessage($"status sent - {currentStatus.epicName}-{currentStatus.strategy} - {obj.messageValue}", "INFO");
+                            }
                             break;
 
                         case "Pause":
