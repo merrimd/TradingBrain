@@ -491,16 +491,7 @@ namespace TradingBrain.Models
                 ti.Elapsed += new System.Timers.ElapsedEventHandler(RunMainAppCode);
                 if (epcs[0].strategy == "GRID")
                 {
-
-
                     ti.Interval = GetIntervalSecond();
-
-                    //var now = DateTime.UtcNow;
-                    ////var next = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second , 100).AddSeconds(1);// now.AddSeconds(1).AddMilliseconds(-50);
-                    //var next = now.AddSeconds(1);
-                    ////var delay = (next - now).TotalMilliseconds - now.Millisecond;
-                    //ti.Interval = (next - now).TotalMilliseconds;
-
                 }
                 else
                     ti.Interval = GetInterval(epcs[0].strategy);
@@ -509,7 +500,6 @@ namespace TradingBrain.Models
             ti.Start();
 
             await WaitForChanges();
-
 
         }
 
