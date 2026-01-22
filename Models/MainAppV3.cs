@@ -1862,6 +1862,21 @@ namespace TradingBrain.Models
                             LOepic? thisEpic = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == epicName) ?? throw new InvalidOperationException("Epic not found in PriceEpicList");
                             DateTime tickStart = _startTime.AddSeconds(-1);
                             DateTime tickeEnd = _startTime.AddSeconds(1).AddMilliseconds(-1);
+                            if (thisEpic.ticks == null)
+                            {
+                                AddStatusMessage("thisEpic.ticks is null - creating new list", "WARNING", logName);
+
+                                thisEpic.ticks = new List<tick>();
+                                string msg = thisEpic.Equals(null) ? "thisEpic is null" : "thisEpic.ticks was null";
+
+                                Log log = new(the_app_db)
+                                {
+                                    Log_Message = this.epicName + " - " + msg,
+                                    Log_Type = "Error",
+                                    Log_App = "RunCode"
+                                };
+                                await log.Save();
+                            }
                             List<tick> ticks = thisEpic.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
                             modQuote thisCandle = new();
 
