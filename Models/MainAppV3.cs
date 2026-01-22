@@ -1872,6 +1872,7 @@ namespace TradingBrain.Models
                                 Log log = new(the_app_db)
                                 {
                                     Log_Message = this.epicName + " - " + msg,
+                                    Epic = this.epicName,
                                     Log_Type = "Error",
                                     Log_App = "RunCode"
                                 };
@@ -2329,6 +2330,7 @@ namespace TradingBrain.Models
                         {
                             Log_Message = ex.ToString(),
                             Log_Type = "Error",
+                            Epic = this.epicName,
                             Log_App = "RunCode"
                         };
                         await log.Save();
