@@ -2804,7 +2804,7 @@ namespace TradingBrain.Models
                                                 this.model.sellLong = false;
                                                 this.model.buyLong = false;
 
-                                                this.model.longOnmarket = false;
+
 
                                                 if (this.model.modelLogs.logs.Count >= 1)
                                                 {
@@ -2905,10 +2905,13 @@ namespace TradingBrain.Models
 
                                                         //this.model.thisModel.closingGridLTrade = false;
                                                         this.model.thisModel.closedGridLTrades.Clear();
-
-                                                        this.model.thisModel.currentGRIDLTrade = null;
-                                                        this.currentGRIDLTrade = null;
-                                                        this.model.onMarket = false;
+                                                        if (!closingPartial)
+                                                        {
+                                                            this.model.thisModel.currentGRIDLTrade = null;
+                                                            this.currentGRIDLTrade = null;
+                                                            this.model.onMarket = false;
+                                                            this.model.longOnmarket = false;
+                                                        }
                                                         this.model.sellLongPartial = false;
                                                         // Save the tb settings to include the strategyprofit values.
 
@@ -4520,7 +4523,7 @@ namespace TradingBrain.Models
 
                 if (lstPrices.Count > 0)
                 {
-                    ret = Math.Round(lstPrices.Average(x => x.typicalPrice), 2);
+                    ret = Math.Round(lstPrices.Average(x => x.bid), 2);
                 }
                 //epic = await container.ReadItemAsync<IG_Epic>(id, new PartitionKey(id), null, default);
 
