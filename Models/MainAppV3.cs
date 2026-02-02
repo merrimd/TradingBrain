@@ -2866,13 +2866,14 @@ namespace TradingBrain.Models
                                             // update the strategy profit and max strategy profit after each sell.
                                             this.model.modelVar.strategyProfit += dbTrade.tradeValue;
                                             this.model.modelVar.deltaProfit += dbTrade.tradeValue;
+
                                             if (dbTrade.tradeValue > 0)
                                             {
                                                 this.model.modelVar.maxStrategyProfit = Math.Max(this.model.modelVar.maxStrategyProfit, this.model.modelVar.deltaProfit);
                                             }
                                             //if (this.model.modelVar.strategyProfit > this.model.modelVar.maxStrategyProfit) { this.model.modelVar.maxStrategyProfit = this.model.modelVar.strategyProfit; }
                                             this.tb.lastRunVars = await this.model.modelVar.DeepCopyAsync();
-                                            _ = this.tb.SaveDocument(this.the_app_db);
+         
 
                                             await tradeSubUpdate.Add(this.the_app_db);
 
@@ -2890,6 +2891,7 @@ namespace TradingBrain.Models
                                                         this.model.thisModel.gridLTradesToClose.Remove(matchTrade);
                                                         closingPartial = true; 
                                                     }
+                                                    this.model.modelVar.carriedForwardLoss = Math.Max(this.model.modelVar.carriedForwardLoss - (double)matchTrade.tradeValue, 0);
 
                                                     CommonFunctions.AddStatusMessage($"closedGridLTrades  = {this.model.thisModel.closedGridLTrades.Count} : gridLTrades = {this.model.thisModel.gridLTrades.Count} : gridLTradesToClose = {this.model.thisModel.gridLTradesToClose.Count}  ", "DEBUG");
                                                     CommonFunctions.SendBroadcast("SellingLongGrid", matchTrade.BOLLI_ID + "|" + matchTrade.epic);
@@ -2904,14 +2906,23 @@ namespace TradingBrain.Models
                                                         // calc strategyprofit
 
                                                         //this.model.thisModel.closingGridLTrade = false;
-                                                        this.model.thisModel.closedGridLTrades.Clear();
+                                                        
                                                         if (!closingPartial)
                                                         {
+                                                            decimal thisEventValue = this.model.thisModel.closedGridLTrades.Sum(x => x.tradeValue);
+                                                            if (thisEventValue < 0)
+                                                            {
+                                                                this.model.modelVar.deltaProfit = thisEventValue;
+                                                                this.model.modelVar.maxStrategyProfit = 0;
+                                                                clsCommonFunctions.AddStatusMessage($"Resetting maxStrategyProfit to 0 due to loss of {thisEventValue} - deltaProfit set to {thisEventValue}", "INFO");
+                                                            }
                                                             this.model.thisModel.currentGRIDLTrade = null;
                                                             this.currentGRIDLTrade = null;
                                                             this.model.onMarket = false;
                                                             this.model.longOnmarket = false;
                                                         }
+
+                                                        this.model.thisModel.closedGridLTrades.Clear();
                                                         this.model.sellLongPartial = false;
                                                         // Save the tb settings to include the strategyprofit values.
 
@@ -2949,7 +2960,12 @@ namespace TradingBrain.Models
                                                     //}
 
                                                 }
+
+                                        
                                             }
+
+                                            // Save the trading brain settings to take into account all that has happened
+                                            _ = this.tb.SaveDocument(this.the_app_db);
 
                                             // keep on market until the last grid trade is removed
                                             if (tsm.Direction == "BUY")
