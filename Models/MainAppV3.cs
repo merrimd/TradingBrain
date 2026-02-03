@@ -4098,7 +4098,22 @@ namespace TradingBrain.Models
                                 model.modelVar.currentGain = newVars.currentGain;
                                 currentStatus.currentGain = newVars.currentGain;
 
-                                if (this.strategy == "GRID" && (newVars.var0 > 0 || newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0))
+                                CommonFunctions.AddStatusMessage("New strategyProfit to use = " + newVars.strategyProfit, "INFO", logName);
+                                tb.lastRunVars.strategyProfit = newVars.strategyProfit;
+                                model.modelVar.strategyProfit = newVars.strategyProfit;
+                                currentStatus.strategyProfit = newVars.strategyProfit;
+
+                                CommonFunctions.AddStatusMessage("New maxStrategyProfit to use = " + newVars.maxStrategyProfit, "INFO", logName);
+                                tb.lastRunVars.maxStrategyProfit = newVars.maxStrategyProfit;
+                                model.modelVar.maxStrategyProfit = newVars.maxStrategyProfit;
+                                currentStatus.maxStrategyProfit = newVars.maxStrategyProfit;
+
+                                CommonFunctions.AddStatusMessage("New deltaProfit to use = " + newVars.deltaProfit, "INFO", logName);
+                                tb.lastRunVars.deltaProfit = newVars.deltaProfit;
+                                model.modelVar.deltaProfit = newVars.deltaProfit;
+                                currentStatus.deltaProfit = newVars.deltaProfit;
+
+                                if (this.strategy == "GRID" && (newVars.var0 > 0 || newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0 || newVars.var7 > 0 || newVars.var8 > 0))
                                 {
                                     // Get the input settings from the last run optimzerundata
 
@@ -4139,7 +4154,16 @@ namespace TradingBrain.Models
                                         CommonFunctions.AddStatusMessage("New var6 to use = " + newVars.var6, "INFO", logName);
                                         tb.runDetails.inputs_RSI[0].var6 = newVars.var6;
                                     }
-
+                                    if (newVars.var7 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var7 to use = " + newVars.var7, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var7 = newVars.var7;
+                                    }
+                                    if (newVars.var8 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var8 to use = " + newVars.var8, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var8 = newVars.var8;
+                                    }
                                     Container optContainer = the_app_db.GetContainer("OptimizeRunData");
                                     optData.inputs_RSI = await tb.runDetails.inputs_RSI.DeepCopyAsync();
                                     await optData.SaveDocument(the_app_db, optContainer);
