@@ -2414,6 +2414,7 @@ namespace TradingBrain.Models
                                     currentStatus.maxStrategyProfit = modelVar.maxStrategyProfit;
                                     currentStatus.deltaProfit = modelVar.deltaProfit;
 
+
                                     //send log to the website
                                     model.modelLogs.logs[0].epicName = this.epicName;
                                     if (the_app_db != null)
