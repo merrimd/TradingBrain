@@ -2872,7 +2872,7 @@ namespace TradingBrain.Models
                                                 this.model.modelVar.maxStrategyProfit = Math.Max(this.model.modelVar.maxStrategyProfit, this.model.modelVar.deltaProfit);
                                             }
                                             //if (this.model.modelVar.strategyProfit > this.model.modelVar.maxStrategyProfit) { this.model.modelVar.maxStrategyProfit = this.model.modelVar.strategyProfit; }
-                                            this.tb.lastRunVars = await this.model.modelVar.DeepCopyAsync();
+                                            //this.tb.lastRunVars = await this.model.modelVar.DeepCopyAsync();
          
 
                                             await tradeSubUpdate.Add(this.the_app_db);
@@ -2963,7 +2963,7 @@ namespace TradingBrain.Models
 
                                         
                                             }
-
+                                            this.tb.lastRunVars = await this.model.modelVar.DeepCopyAsync();
                                             // Save the trading brain settings to take into account all that has happened
                                             _ = this.tb.SaveDocument(this.the_app_db);
 
