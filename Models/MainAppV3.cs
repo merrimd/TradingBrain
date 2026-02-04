@@ -2073,7 +2073,7 @@ namespace TradingBrain.Models
 
                                 //thisCandle.atr= this.candleList.GetAtr((int)thisInput.var3).LastOrDefault().Atr ?? 0;
                                 //clsCommonFunctions.AddStatusMessage($"ATR= {thisCandle.atr}");
-
+                                model.candles.epic = this.epicName;
                                 model.candles.currentGRIDCandle = thisCandle;
                                 CommonFunctions.AddStatusMessage($"{thisCandle.Date} - close price = {Math.Round(thisCandle.Close, 2)}", "DEBUG", logName);
                                 if (closeAttemptCount > 0) CommonFunctions.AddStatusMessage($"Current closeAttemptCount = {closeAttemptCount}", "DEBUG", logName);
@@ -2891,9 +2891,10 @@ namespace TradingBrain.Models
                                                     bool closingPartial = false;
                                                     this.model.thisModel.closedGridLTrades.Add(matchTrade);
                                                     this.model.thisModel.gridLTrades.Remove(matchTrade);
-                                                    if (this.model.thisModel.gridLTradesToClose.Count > 0) { 
+                                                    if (this.model.thisModel.gridLTradesToClose.Count > 0)
+                                                    {
                                                         this.model.thisModel.gridLTradesToClose.Remove(matchTrade);
-                                                        closingPartial = true; 
+                                                        closingPartial = true;
                                                     }
                                                     this.model.modelVar.carriedForwardLoss = Math.Max(this.model.modelVar.carriedForwardLoss - (double)matchTrade.tradeValue, 0);
 
@@ -2907,18 +2908,18 @@ namespace TradingBrain.Models
                                                         //CommonFunctions.SendBroadcast("SellLong", JsonConvert.SerializeObject(this.model.thisModel.closedGridLTrades));
                                                         CommonFunctions.SendBroadcast("SoldLongGrid", matchTrade.BOLLI_ID + "|" + matchTrade.epic);
 
-                                                        // calc strategyprofit
-
-                                                        //this.model.thisModel.closingGridLTrade = false;
-                                                        
                                                         if (!closingPartial)
                                                         {
                                                             decimal thisEventValue = this.model.thisModel.closedGridLTrades.Sum(x => x.tradeValue);
-                                                            if (thisEventValue < 0)
+                                                            clsCommonFunctions.AddStatusMessage($"Grid Longs fully closed with event value of {thisEventValue} ", "INFO");
+                                                            this.model.modelVar.deltaProfit = 0;
+                                                            clsCommonFunctions.AddStatusMessage($"Resetting deltaProfit to 0", "INFO");
+
+                                                            if (thisEventValue > 0)
                                                             {
-                                                                this.model.modelVar.deltaProfit = thisEventValue;
-                                                                this.model.modelVar.maxStrategyProfit = 0;
-                                                                clsCommonFunctions.AddStatusMessage($"Resetting maxStrategyProfit to 0 due to loss of {thisEventValue} - deltaProfit set to {thisEventValue}", "INFO");
+                                                                decimal prevMaxStrategyProfit = this.model.modelVar.maxStrategyProfit;
+                                                                this.model.modelVar.maxStrategyProfit = Math.Max(this.model.modelVar.maxStrategyProfit, this.model.modelVar.strategyProfit);
+                                                                clsCommonFunctions.AddStatusMessage($"Setting maxStrategyProfit from {prevMaxStrategyProfit} to {this.model.modelVar.maxStrategyProfit} ", "INFO");
                                                             }
                                                             this.model.thisModel.currentGRIDLTrade = null;
                                                             this.currentGRIDLTrade = null;
