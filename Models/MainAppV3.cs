@@ -150,7 +150,7 @@ namespace TradingBrain.Models
 
         public modQuote lastCandle = new();
         public List<modQuote> candleList = [];
-
+        public modQuote lastVixCandle = new();
         public IGContainer _igContainer = new();
         public IGContainer? _igContainer2 = new();
         const int MAX_WAIT_FOR_CLOSE_TIME = 60;
@@ -383,21 +383,16 @@ namespace TradingBrain.Models
                 currentStatus.resolution = this.resolution;
                 Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
 
-                //AddStatusMessage($"Security token = {_igContainer.context.xSecurityToken}", "INFO");
-
                 //Getting indCandles for GRID
                 if (strategy == "GRID")
                 {
                     AddStatusMessage($"Getting SMA candles ", "INFO");
                     this.candleList = RSI_LoadPrices.GetPriceDataSMAGRID(the_db, epicName, "SECOND", strategy, 5001).Result;
                     AddStatusMessage($"Number of SMA candles retrieved = {this.candleList.Count}", "INFO");
+                    this.lastVixCandle = RSI_LoadPrices.GetLastVIXCandle(the_db).Result;
                 }
 
-
                 bool ret = GetPositions().Result;
-
-                // set up timer here perhaps
-
 
             }
             catch (Exception ex)
@@ -1974,6 +1969,9 @@ namespace TradingBrain.Models
                                 await log.Save();
                             }
                             List<tick> ticks = thisEpic.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
+
+
+
                             modQuote thisCandle = new();
 
                             //clsCommonFunctions.AddStatusMessage($"Ticks - {thisEpic.ticks.Count}");
@@ -2047,6 +2045,93 @@ namespace TradingBrain.Models
                                 foreach (tick item in ticks) thisEpic.ticks.Remove(item);
                             }
 
+
+                            ///////////////////////////////////
+                            // Now get the VIX list of ticks //
+                            ///////////////////////////////////
+
+                            CommonFunctions.AddStatusMessage("Getting current VIX candle data");
+
+                            bool gotCandleVix = false;
+
+                            //Get the last tick from the list of ticks
+                            LOepic? thisEpicVix = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == "CC.D.VIX.USS.IP") ?? throw new InvalidOperationException("VIX Epic not found in PriceEpicList");
+                            //DateTime tickStartVix = _startTime.AddSeconds(-1);
+                            //DateTime tickeEndVix = _startTime.AddSeconds(1).AddMilliseconds(-1);
+                            if (thisEpicVix.ticks == null)
+                            {
+                                AddStatusMessage("VIX thisEpic.ticks is null - creating new list", "WARNING", logName);
+
+                                thisEpicVix.ticks = new List<tick>();
+                                string msg = thisEpicVix.Equals(null) ? "thisEpic VIX is null" : "thisEpicVix.ticks was null";
+
+                                Log log = new(the_app_db)
+                                {
+                                    Log_Message = this.epicName + " - " + msg,
+                                    Epic = this.epicName,
+                                    Log_Type = "Error",
+                                    Log_App = "RunCode"
+                                };
+                                await log.Save();
+                            }
+                            List<tick> ticksVix = thisEpicVix.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
+                            if (ticksVix != null && ticksVix.Count > 0)
+                            {
+                                tbPrice thisPrice = new();
+
+                                dto.endpoint.prices.v2.Price lowPrice = new();
+                                dto.endpoint.prices.v2.Price highPrice = new();
+                                dto.endpoint.prices.v2.Price openPrice = new();
+                                dto.endpoint.prices.v2.Price closePrice = new();
+
+                                highPrice.bid = ticksVix.Max(x => x.bid);
+                                highPrice.ask = ticksVix.Max(x => x.offer);
+                                lowPrice.bid = ticksVix.Min(x => x.bid);
+                                lowPrice.ask = ticksVix.Min(x => x.offer);
+
+                                tick? thisOpenTick = ticksVix.OrderBy(x => x.UTM).FirstOrDefault();
+                                if (thisOpenTick != null)
+                                {
+                                    openPrice.bid = thisOpenTick.bid;
+                                    openPrice.ask = thisOpenTick.offer;
+                                }
+
+                                tick? thisCloseTick = ticksVix.OrderByDescending(x => x.UTM).FirstOrDefault();
+                                if (thisCloseTick != null)
+                                {
+                                    closePrice.bid = thisCloseTick.bid;
+                                    closePrice.ask = thisCloseTick.offer;
+                                }
+                                thisPrice.typicalPrice ??= new dto.endpoint.prices.v2.Price();
+                                thisPrice.startDate = tickStart;
+                                thisPrice.endDate = tickeEnd;
+                                thisPrice.openPrice = openPrice;
+                                thisPrice.closePrice = closePrice;
+                                thisPrice.highPrice = highPrice;
+                                thisPrice.lowPrice = lowPrice;
+                                thisPrice.typicalPrice.bid = (highPrice.bid + lowPrice.bid + closePrice.bid) / 3;
+                                thisPrice.typicalPrice.ask = (highPrice.ask + lowPrice.ask + closePrice.ask) / 3;
+
+                                List<double> closePrices = ticksVix.Select(x => (double)(x.bid + x.offer) / 2).ToList();
+                                StandardDeviation sd = new(closePrices);
+                                thisPrice.stdDev = sd.Value;
+
+                                modQuote thisCandleVix = new modQuote();
+                                thisCandleVix.Date = tickStart;
+                                thisCandleVix.Close = ((thisPrice.closePrice.bid ?? 0) + (thisPrice.closePrice.ask ?? 0)) / 2;
+                                thisCandleVix.Open = ((thisPrice.openPrice.bid ?? 0) + (thisPrice.openPrice.ask ?? 0)) / 2;
+                                thisCandleVix.High = ((thisPrice.highPrice.bid ?? 0) + (thisPrice.highPrice.ask ?? 0)) / 2;
+                                thisCandleVix.Low = ((thisPrice.lowPrice.bid ?? 0) + (thisPrice.lowPrice.ask ?? 0)) / 2;
+                                thisCandleVix.Typical = ((thisPrice.typicalPrice.bid ?? 0) + (thisPrice.typicalPrice.ask ?? 0)) / 2;
+                                thisCandleVix.stdDev = sd.Value;
+                                thisCandleVix.spread = (double)((thisPrice.closePrice.ask ?? 0) - (thisPrice.closePrice.bid ?? 0));
+
+                                this.lastVixCandle = thisCandleVix;
+
+                                foreach (tick item in ticksVix) thisEpicVix.ticks.Remove(item);
+
+                            }
+
                             if (gotCandle && model.candles.currentCandle != null)
                             {
                                 //this.candleList.Add(thisCandle.DeepCopy());
@@ -2095,7 +2180,11 @@ namespace TradingBrain.Models
                                 }
                                 model.candles.currentCandle.grid_minute_sma = gridMinuteSMA;
 
+                                model.candles.currentCandle.grid_VIX_value = this.lastVixCandle.Close;
+
+                                CommonFunctions.AddStatusMessage($"Last VIX value = {Math.Round(this.lastVixCandle.Close, 2)}", "DEBUG", logName);
                                 CommonFunctions.AddStatusMessage($"Minute sma = {model.candles.currentCandle.grid_minute_sma}");
+
                                 //CommonFunctions.AddStatusMessage($"Current : SMA Long = {model.candles.currentCandle.grid_long_sma}, Short = {model.candles.currentCandle.grid_short_sma}", "DEBUG", logName);
                                 //CommonFunctions.AddStatusMessage($"Prev : SMA Long = {model.candles.currentCandle.grid_prev_long_sma}, Short = {model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
 

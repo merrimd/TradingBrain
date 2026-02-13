@@ -280,6 +280,13 @@ namespace TradingBrain.Models
                 epcs.Add(new TbEpics(DEFAULT_EPIC));
                 epicList.Add(DEFAULT_EPIC);
             }
+
+            // Add the VIX epic to the list of epics if it's not already there as we need it for the volatility calculation in some strategies
+            if (!epicList.Contains("CC.D.VIX.USS.IP"))
+            {
+                //epcs.Add(new TbEpics("CC.D.VIX.USS.IP|GRID|SECOND"));
+                epicList.Add("CC.D.VIX.USS.IP");
+            }
             //string[] epics = { epcs[0].epic };
 
             string strategy = epcs[0].strategy;

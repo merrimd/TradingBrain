@@ -458,6 +458,7 @@ namespace TradingBrain.Models
                     //ony subscribe to charts on primary connection
                     this.ChartSubscribe();
                 }
+                
                 await this.TradeSubscribe(this._igContainer.igAccountId);
                 //this._igContainer.igAccountId = CurrentAccountId;
                 // this.subscribeChart()
