@@ -4207,7 +4207,7 @@ namespace TradingBrain.Models
                                 model.modelVar.deltaProfit = newVars.deltaProfit;
                                 currentStatus.deltaProfit = newVars.deltaProfit;
 
-                                if (this.strategy == "GRID" && (newVars.var0 > 0 || newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0 || newVars.var7 > 0 || newVars.var8 > 0))
+                                if (this.strategy == "GRID" && (newVars.var0 > 0 || newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0 || newVars.var7 > 0 || newVars.var8 > 0 || newVars.var9 > 0 || newVars.var10 > 0))
                                 {
                                     // Get the input settings from the last run optimzerundata
 
@@ -4257,6 +4257,16 @@ namespace TradingBrain.Models
                                     {
                                         CommonFunctions.AddStatusMessage("New var8 to use = " + newVars.var8, "INFO", logName);
                                         tb.runDetails.inputs_RSI[0].var8 = newVars.var8;
+                                    }
+                                    if (newVars.var9 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var9 to use = " + newVars.var9, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var9 = newVars.var9;
+                                    }
+                                    if (newVars.var10 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var10 to use = " + newVars.var10, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var10 = newVars.var10;
                                     }
                                     Container optContainer = the_app_db.GetContainer("OptimizeRunData");
                                     optData.inputs_RSI = await tb.runDetails.inputs_RSI.DeepCopyAsync();
