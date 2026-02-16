@@ -1004,6 +1004,16 @@ namespace TradingBrain.Models
                 if (modelVar == null) { throw new InvalidOperationException("ModelVars is null in RunCodeV5"); }
                 if (currentStatus == null) { throw new InvalidOperationException("CurrentStatus is null in RunCodeV5"); }
 
+                this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy);
+
+                if (this.tb == null || this.tb.runDetails == null || this.tb.runDetails.inputs == null || this.tb.lastRunVars == null)
+                {
+                    throw new InvalidOperationException("Trading Brain settings not found");
+                }
+                
+                //Get paused value from DB
+                paused = this.tb.lastRunVars.paused;
+
 
                 if (!paused || paused && model.onMarket || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
                 {
@@ -1031,12 +1041,7 @@ namespace TradingBrain.Models
                         //watch.Start();
 
 
-                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy);
 
-                        if (this.tb == null || this.tb.runDetails == null || this.tb.runDetails.inputs == null || this.tb.lastRunVars == null)
-                        {
-                            throw new InvalidOperationException("Trading Brain settings not found");
-                        }
                         CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
 
@@ -1854,6 +1859,17 @@ namespace TradingBrain.Models
             if (modelVar == null) { throw new InvalidOperationException("ModelVars is null in RunCode_GRID"); }
             if (currentStatus == null) { throw new InvalidOperationException("CurrentStatus is null in RunCode_GRID"); }
 
+            this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+
+            if (this.tb == null || this.tb.runDetails == null || this.tb.runDetails.inputs == null || this.tb.lastRunVars == null)
+            {
+                throw new InvalidOperationException("Trading Brain settings not found");
+            }
+
+
+            paused = this.tb.lastRunVars.paused;
+
+            
             if (!paused || paused && model.onMarket || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
             {
                 // Check if the market is currently open. If it is not then skip till next time.
@@ -1876,12 +1892,7 @@ namespace TradingBrain.Models
 
                     try
                     {
-                        this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
 
-                        if (this.tb == null || this.tb.runDetails == null || this.tb.runDetails.inputs == null || this.tb.lastRunVars == null)
-                        {
-                            throw new InvalidOperationException("Trading Brain settings not found");
-                        }
 
                         CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
@@ -2292,6 +2303,11 @@ namespace TradingBrain.Models
                                     if (model.pauseTB)
                                     {
                                         this.paused = true;
+                                        model.modelVar.paused = true;
+                                        this.tb.lastRunVars.paused = true;
+                                        model.buyLong = false; //make sure we don't buy any more trades.
+                                        _= await this.tb.SaveDocument(the_app_db);
+
                                         CommonFunctions.AddStatusMessage("Trading Brain paused by model", "INFO", logName);
                                     }
 
@@ -3976,6 +3992,10 @@ namespace TradingBrain.Models
                             CommonFunctions.AddStatusMessage("Pause request received", "INFO", logName);
 
                             paused = true;
+                            model.modelVar.paused = paused;
+                            tb.lastRunVars.paused = paused;
+                            await tb.SaveDocument(the_app_db);
+
                             pausedAfterNGL = false;
                             if (currentStatus != null && model != null)
                             {
@@ -3996,6 +4016,10 @@ namespace TradingBrain.Models
                             // Pause TB once CFL = 0
                             paused = true;
                             pausedAfterNGL = true;
+                            model.modelVar.paused = paused;
+                            tb.lastRunVars.paused = paused;
+                            await tb.SaveDocument(the_app_db);
+
                             if (currentStatus != null)
                             {
                                 currentStatus.status = "deferred pause (after nightingale success)";
@@ -4032,7 +4056,9 @@ namespace TradingBrain.Models
 
                                     }
                                 }
-
+                                model.modelVar.paused = paused;
+                                tb.lastRunVars.paused = paused;
+                                await tb.SaveDocument(the_app_db);
                                 currentStatus.status = "paused";
                                 Task taskD = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
                             }
@@ -4048,6 +4074,10 @@ namespace TradingBrain.Models
                                 currentStatus.status = "running";
                                 Task taskE = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
                             }
+                            model.pauseTB = false;
+                            model.modelVar.paused = paused;
+                            tb.lastRunVars.paused = paused;
+                            await tb.SaveDocument(the_app_db);
                             break;
 
                         case "ClearMaxDrop":
@@ -4055,7 +4085,9 @@ namespace TradingBrain.Models
                             CommonFunctions.AddStatusMessage("ClearMaxDrop request received", "INFO", logName);
                             paused = false;
                             pausedAfterNGL = false;
-
+                            model.modelVar.paused = paused;
+                            tb.lastRunVars.paused = paused;
+ 
                             this.tb.lastRunVars.maxDropFlag = 0;
                             _ = await this.tb.SaveDocument(the_app_db);
 
@@ -4207,7 +4239,7 @@ namespace TradingBrain.Models
                                 model.modelVar.deltaProfit = newVars.deltaProfit;
                                 currentStatus.deltaProfit = newVars.deltaProfit;
 
-                                if (this.strategy == "GRID" && (newVars.var0 > 0 || newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0 || newVars.var7 > 0 || newVars.var8 > 0 || newVars.var9 > 0 || newVars.var10 > 0))
+                                if (this.strategy == "GRID" && (newVars.var0 > 0 || newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0 || newVars.var7 > 0 || newVars.var8 > 0 || newVars.var9 > 0 || newVars.var10 > 0 || newVars.var11 > 0 || newVars.var12 > 0 || newVars.var13 > 0))
                                 {
                                     // Get the input settings from the last run optimzerundata
 
@@ -4267,6 +4299,21 @@ namespace TradingBrain.Models
                                     {
                                         CommonFunctions.AddStatusMessage("New var10 to use = " + newVars.var10, "INFO", logName);
                                         tb.runDetails.inputs_RSI[0].var10 = newVars.var10;
+                                    }
+                                    if (newVars.var11 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var11 to use = " + newVars.var11, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var11 = newVars.var11;
+                                    }
+                                    if (newVars.var12 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var12 to use = " + newVars.var12, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var12 = newVars.var12;
+                                    }
+                                    if (newVars.var13 > 0)
+                                    {
+                                        CommonFunctions.AddStatusMessage("New var13 to use = " + newVars.var13, "INFO", logName);
+                                        tb.runDetails.inputs_RSI[0].var13 = newVars.var13;
                                     }
                                     Container optContainer = the_app_db.GetContainer("OptimizeRunData");
                                     optData.inputs_RSI = await tb.runDetails.inputs_RSI.DeepCopyAsync();
