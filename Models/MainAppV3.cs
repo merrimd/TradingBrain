@@ -812,13 +812,11 @@ namespace TradingBrain.Models
                     expiry = "DFB"
                 };
 
-                if (model != null)
+
+                if (direction == "long" && model != null)
                 {
-                    if (direction == "long")
-                    {
-                        pos.direction = "SELL";
-                        trades = await model.thisModel.gridLTradesToClose.DeepCopyAsync();
-                    }
+                    pos.direction = "SELL";
+                    trades = await model.thisModel.gridLTradesToClose.DeepCopyAsync();
                 }
 
                 foreach (tradeItem trade in trades)
@@ -1010,7 +1008,7 @@ namespace TradingBrain.Models
                 {
                     throw new InvalidOperationException("Trading Brain settings not found");
                 }
-                
+
                 //Get paused value from DB
                 paused = this.tb.lastRunVars.paused;
 
@@ -1866,10 +1864,8 @@ namespace TradingBrain.Models
                 throw new InvalidOperationException("Trading Brain settings not found");
             }
 
-
             paused = this.tb.lastRunVars.paused;
 
-            
             if (!paused || paused && model.onMarket || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
             {
                 // Check if the market is currently open. If it is not then skip till next time.
@@ -1979,7 +1975,7 @@ namespace TradingBrain.Models
                                 };
                                 await log.Save();
                             }
-                            List<tick> ticks = thisEpic.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
+                            List<tick> ticks = thisEpic.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
 
 
 
@@ -2055,7 +2051,17 @@ namespace TradingBrain.Models
                                 gotCandle = true;
                                 foreach (tick item in ticks) thisEpic.ticks.Remove(item);
                             }
-
+                            else
+                            {
+                                if (ticks != null)
+                                {
+                                    AddStatusMessage($"No ticks found for this period {tickStart} to {tickeEnd}", "WARNING", logName);
+                                }
+                                else
+                                {
+                                    AddStatusMessage($"Ticks list is null for epic {epicName}", "WARNING", logName);
+                                }
+                            }
 
                             ///////////////////////////////////
                             // Now get the VIX list of ticks //
@@ -2085,7 +2091,7 @@ namespace TradingBrain.Models
                                 };
                                 await log.Save();
                             }
-                            List<tick> ticksVix = thisEpicVix.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
+                            List<tick> ticksVix = thisEpicVix.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
                             if (ticksVix != null && ticksVix.Count > 0)
                             {
                                 tbPrice thisPrice = new();
