@@ -1866,7 +1866,27 @@ namespace TradingBrain.Models
 
             paused = this.tb.lastRunVars.paused;
 
-            if (!paused || paused && model.onMarket || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
+            // Check if it is monday morning and tb has still not unpaused yet (due to auto closing). If so, unpause and carry on.
+            modelVar.mondayOpenTimeUTC = this.tb.lastRunVars.mondayOpenTimeUTC;
+
+            TimeSpan tod = new TimeSpan(DateTime.UtcNow.Hour, DateTime.UtcNow.Minute, DateTime.UtcNow.Second);
+            if (DateTime.UtcNow.DayOfWeek == DayOfWeek.Monday
+                && paused
+                && this.tb.lastRunVars.fridayAutoClose
+                && tod == new TimeSpan(modelVar.mondayOpenTimeUTC.Hour, modelVar.mondayOpenTimeUTC.Minute, modelVar.mondayOpenTimeUTC.Second))
+            {
+ 
+                CommonFunctions.AddStatusMessage($"Unpausing trading brain because it's Monday and the time is past the set open time of {modelVar.mondayOpenTimeUTC}", "INFO", logName);
+                this.paused = false;
+                model.modelVar.paused = false;
+                this.tb.lastRunVars.paused = false;
+
+                _ = await this.tb.SaveDocument(the_app_db);
+                currentStatus.status = "running";
+ 
+            }
+
+            if (!paused ||  paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
             {
                 // Check if the market is currently open. If it is not then skip till next time.
                 marketOpen = await IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates, this.epicName);
@@ -1927,7 +1947,7 @@ namespace TradingBrain.Models
                         model.modelVar.fridayAutoClose = this.tb.lastRunVars.fridayAutoClose;
                         model.modelVar.fridayCloseMinValue = this.tb.lastRunVars.fridayCloseMinValue;
                         model.modelVar.fridayCloseTimeUTC = this.tb.lastRunVars.fridayCloseTimeUTC;
-
+                        model.modelVar.mondayOpenTimeUTC = this.tb.lastRunVars.mondayOpenTimeUTC;
                         if (model.modelVar.maxDropFlag == 1) { currentStatus.status = "MaxDropFlagSet"; }
                         model.modelVar.counterVar = model.thisModel.counterVar;
                         model.startTime = dtNow;
@@ -1949,7 +1969,8 @@ namespace TradingBrain.Models
                         currentStatus.fridayAutoClose = tb.lastRunVars.fridayAutoClose;
                         currentStatus.fridayCloseMinValue = tb.lastRunVars.fridayCloseMinValue;
                         currentStatus.fridayCloseTimeUTC = tb.lastRunVars.fridayCloseTimeUTC;
-                        
+                        currentStatus.mondayOpenTimeUTC = tb.lastRunVars.mondayOpenTimeUTC;
+
                         modelInstanceInputs_RSI? thisInput = tb.runDetails.inputs_RSI.FirstOrDefault(t => t.spread == 0);
                         if (thisInput == null)
                         {
@@ -2522,6 +2543,7 @@ namespace TradingBrain.Models
                             currentStatus.fridayCloseTimeUTC = modelVar.fridayCloseTimeUTC;
                             currentStatus.fridayCloseMinValue= modelVar.fridayCloseMinValue;
                             currentStatus.fridayAutoClose = modelVar.fridayAutoClose;
+                            currentStatus.mondayOpenTimeUTC = modelVar.mondayOpenTimeUTC;
                             if (paused || modelVar.paused)
                             {
                                 currentStatus.status = "Paused";
@@ -3984,22 +4006,24 @@ namespace TradingBrain.Models
                             CommonFunctions.AddStatusMessage("Pause request received", "INFO", logName);
 
                             paused = true;
-                            model.modelVar.paused = paused;
-                            tb.lastRunVars.paused = paused;
-                            await tb.SaveDocument(the_app_db);
-
+                            model.modelVar.paused = true;
+                            this.tb.lastRunVars.paused = true;
                             pausedAfterNGL = false;
+
                             if (currentStatus != null && model != null)
                             {
-                                if (model.onMarket)
-                                {
-                                    currentStatus.status = "deferred pause (after current trade)";
-                                }
-                                else
-                                {
+                                //if (model.onMarket)
+                                //{
+                                //    currentStatus.status = "deferred pause (after current trade)";
+                                //    pausedAfterNGL = true;
+                                //}
+                                //else
+                                //{
                                     currentStatus.status = "paused";
-                                }
+                                //}
                             }
+                            _= await tb.SaveDocument(the_app_db);
+
                             Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
                             break;
 
@@ -4008,8 +4032,8 @@ namespace TradingBrain.Models
                             // Pause TB once CFL = 0
                             paused = true;
                             pausedAfterNGL = true;
-                            model.modelVar.paused = paused;
-                            tb.lastRunVars.paused = paused;
+                            model.modelVar.paused = true;
+                            tb.lastRunVars.paused = true;
                             await tb.SaveDocument(the_app_db);
 
                             if (currentStatus != null)
@@ -4245,6 +4269,11 @@ namespace TradingBrain.Models
                                 tb.lastRunVars.fridayCloseMinValue = newVars.fridayCloseMinValue;
                                 model.modelVar.fridayCloseMinValue = newVars.fridayCloseMinValue;
                                 currentStatus.fridayCloseMinValue = newVars.fridayCloseMinValue;
+
+                                CommonFunctions.AddStatusMessage("New mondayOpenTimeUTC to use = " + newVars.mondayOpenTimeUTC, "INFO", logName);
+                                tb.lastRunVars.mondayOpenTimeUTC = newVars.mondayOpenTimeUTC;
+                                model.modelVar.mondayOpenTimeUTC = newVars.mondayOpenTimeUTC;
+                                currentStatus.mondayOpenTimeUTC = newVars.mondayOpenTimeUTC;
 
                                 if (this.strategy == "GRID" && (newVars.var0 > 0 || newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0 || newVars.var7 > 0 || newVars.var8 > 0 || newVars.var9 > 0 || newVars.var10 > 0 || newVars.var11 > 0 || newVars.var12 > 0 || newVars.var13 > 0))
                                 {
