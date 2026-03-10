@@ -1924,6 +1924,10 @@ namespace TradingBrain.Models
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
                         model.thisModel.matchProTrend = false;
                         model.modelVar.maxDropFlag = this.tb.lastRunVars.maxDropFlag;
+                        model.modelVar.fridayAutoClose = this.tb.lastRunVars.fridayAutoClose;
+                        model.modelVar.fridayCloseMinValue = this.tb.lastRunVars.fridayCloseMinValue;
+                        model.modelVar.fridayCloseTimeUTC = this.tb.lastRunVars.fridayCloseTimeUTC;
+
                         if (model.modelVar.maxDropFlag == 1) { currentStatus.status = "MaxDropFlagSet"; }
                         model.modelVar.counterVar = model.thisModel.counterVar;
                         model.startTime = dtNow;
@@ -1942,7 +1946,10 @@ namespace TradingBrain.Models
                         currentStatus.inputs = tb.runDetails.inputs;
                         currentStatus.countervar = Math.Max(this.tb.runDetails.counterVar, 1000);
                         currentStatus.quantity = tb.lastRunVars.minQuantity;
-
+                        currentStatus.fridayAutoClose = tb.lastRunVars.fridayAutoClose;
+                        currentStatus.fridayCloseMinValue = tb.lastRunVars.fridayCloseMinValue;
+                        currentStatus.fridayCloseTimeUTC = tb.lastRunVars.fridayCloseTimeUTC;
+                        
                         modelInstanceInputs_RSI? thisInput = tb.runDetails.inputs_RSI.FirstOrDefault(t => t.spread == 0);
                         if (thisInput == null)
                         {
@@ -1956,7 +1963,7 @@ namespace TradingBrain.Models
                             bool gotCandle = false;
 
                             //Get the last tick from the list of ticks
-                            LOepic? thisEpic = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == epicName) ?? throw new InvalidOperationException("Epic not found in PriceEpicList");
+                            LOepic thisEpic = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == epicName) ?? throw new InvalidOperationException("Epic not found in PriceEpicList");
                             DateTime tickStart = _startTime.AddSeconds(-1);
                             DateTime tickeEnd = _startTime.AddSeconds(1).AddMilliseconds(-1);
                             if (thisEpic.ticks == null)
@@ -1975,7 +1982,7 @@ namespace TradingBrain.Models
                                 };
                                 await log.Save();
                             }
-                            List<tick> ticks = thisEpic.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
+                            List<tick> ticks = [.. thisEpic!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickeEnd)];
 
 
 
@@ -2091,7 +2098,7 @@ namespace TradingBrain.Models
                                 };
                                 await log.Save();
                             }
-                            List<tick> ticksVix = thisEpicVix.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
+                            List<tick> ticksVix = thisEpicVix!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
                             if (ticksVix != null && ticksVix.Count > 0)
                             {
                                 tbPrice thisPrice = new();
@@ -2251,7 +2258,7 @@ namespace TradingBrain.Models
                                                     region = IGModels.clsCommonFunctions.Get_AppSetting("region");
                                                 }
                                                 CommonFunctions.AddStatusMessage("MaxDropFlag region = " + region, "DEBUG", logName);
-                                                if (region.ToUpper() == "LIVE" )
+                                                if (region.ToUpper() == "LIVE")
                                                 {
                                                     CommonFunctions.AddStatusMessage("Sending email ", "DEBUG", logName);
                                                     clsEmail obj = new clsEmail();
@@ -2312,7 +2319,7 @@ namespace TradingBrain.Models
                                         model.modelVar.paused = true;
                                         this.tb.lastRunVars.paused = true;
                                         model.buyLong = false; //make sure we don't buy any more trades.
-                                        _= await this.tb.SaveDocument(the_app_db);
+                                        _ = await this.tb.SaveDocument(the_app_db);
 
                                         CommonFunctions.AddStatusMessage("Trading Brain paused by model", "INFO", logName);
                                     }
@@ -2470,85 +2477,64 @@ namespace TradingBrain.Models
                                         _ = await CloseDealEpic("short", model.thisModel.gridSTrades.Sum(x => x.quantity), this.epicName, this._igContainer2.creds.igAccountId);
                                     }
                                 }
-
-                                if (model.modelLogs.logs.Count > 0)
-                                {
-                                    ModelLog log = model.modelLogs.logs[0];
-                                    log.modelRunID = modelID;
-                                    log.runDate = _startTime;
-                                    log.id = System.Guid.NewGuid().ToString();
-                                    if (model.onMarket)
-                                    {
-                                        currentStatus.onMarket = true;
-                                        if (model.longOnmarket)
-                                        {
-                                            currentStatus.tradeType = "Long";
-                                        }
-                                        if (model.shortOnMarket)
-                                        {
-                                            currentStatus.tradeType = "Short";
-                                        }
-                                        //currentStatus.target = model.thisModel.currentGRIDLTrade.targetPrice;
-                                        //currentStatus.count = model.thisModel.currentGRIDLTrade.count;
-
-                                    }
-                                    else
-                                    {
-                                        currentStatus.onMarket = false;
-                                        currentStatus.tradeType = "";
-                                    }
-
-                                    //if (model.candles.currentCandle.bolli_avg > model.candles.currentCandle.bolli_avgPrev && model.onMarket)
-                                    //{
-                                    //    currentStatus.lTT = 1;
-                                    //}
-                                    //else
-                                    //{
-                                    //    currentStatus.lTT = 0;
-                                    //}
-
-                                    currentStatus.carriedForwardLoss = modelVar.carriedForwardLoss;
-                                    currentStatus.accountId = this.igAccountId;
-                                    currentStatus.startingQuantity = modelVar.startingQuantity;
-                                    currentStatus.minQuantity = modelVar.minQuantity;
-                                    currentStatus.maxQuantity = modelVar.maxQuantity;
-                                    currentStatus.gainMultiplier = modelVar.gainMultiplier;
-                                    currentStatus.maxQuantityMultiplier = modelVar.maxQuantityMultiplier;
-                                    currentStatus.currentGain = modelVar.currentGain;
-                                    currentStatus.baseQuantity = modelVar.baseQuantity;
-                                    currentStatus.suppQuantityMultiplier = modelVar.suppQuantityMultiplier;
-                                    currentStatus.suppStopPercentage = modelVar.suppStopPercentage;
-                                    currentStatus.doSuppTrades = model.doSuppTrades;
-                                    currentStatus.doShorts = model.doShorts;
-                                    currentStatus.doLongs = model.doLongs;
-                                    currentStatus.strategyProfit = modelVar.strategyProfit;
-                                    currentStatus.maxStrategyProfit = modelVar.maxStrategyProfit;
-                                    currentStatus.deltaProfit = modelVar.deltaProfit;
-
-
-                                    //send log to the website
-                                    model.modelLogs.logs[0].epicName = this.epicName;
-                                    if (the_app_db != null)
-                                    {
-                                        //Task taskA = Task.Run(() => CommonFunctions.SendBroadcast("Log", JsonConvert.SerializeObject(model.modelLogs.logs[0])));
-                                        if (DateTime.UtcNow.Second % 15 == 0 || DateTime.UtcNow.Second == 0)
-                                        {
-                                            Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
-                                        }
-                                        //save log to the database
-                                        //Container logContainer = the_app_db.GetContainer("ModelLogs");
-                                        //await log.SaveDocument(logContainer);
-                                        model.modelLogs.logs = [];
-                                    }
-                                }
-                                //}
                             }
                             else
                             {
                                 CommonFunctions.AddStatusMessage($"No candle formed for second starting at {_startTime} - current candle list at {this.candleList.Count}", "DEBUG", logName);
                             }
 
-                            //_startTime = _startTime.AddSeconds(1);
+                            // Send current status to the dashboard
+                            if (model.onMarket)
+                            {
+                                currentStatus.onMarket = true;
+                                if (model.longOnmarket)
+                                {
+                                    currentStatus.tradeType = "Long";
+                                }
+                                if (model.shortOnMarket)
+                                {
+                                    currentStatus.tradeType = "Short";
+                                }
+                            }
+                            else
+                            {
+                                currentStatus.onMarket = false;
+                                currentStatus.tradeType = "";
+                            }
+
+                            currentStatus.carriedForwardLoss = modelVar.carriedForwardLoss;
+                            currentStatus.accountId = this.igAccountId;
+                            currentStatus.startingQuantity = modelVar.startingQuantity;
+                            currentStatus.minQuantity = modelVar.minQuantity;
+                            currentStatus.maxQuantity = modelVar.maxQuantity;
+                            currentStatus.gainMultiplier = modelVar.gainMultiplier;
+                            currentStatus.maxQuantityMultiplier = modelVar.maxQuantityMultiplier;
+                            currentStatus.currentGain = modelVar.currentGain;
+                            currentStatus.baseQuantity = modelVar.baseQuantity;
+                            currentStatus.suppQuantityMultiplier = modelVar.suppQuantityMultiplier;
+                            currentStatus.suppStopPercentage = modelVar.suppStopPercentage;
+                            currentStatus.doSuppTrades = model.doSuppTrades;
+                            currentStatus.doShorts = model.doShorts;
+                            currentStatus.doLongs = model.doLongs;
+                            currentStatus.strategyProfit = modelVar.strategyProfit;
+                            currentStatus.maxStrategyProfit = modelVar.maxStrategyProfit;
+                            currentStatus.deltaProfit = modelVar.deltaProfit;
+                            currentStatus.fridayCloseTimeUTC = modelVar.fridayCloseTimeUTC;
+                            currentStatus.fridayCloseMinValue= modelVar.fridayCloseMinValue;
+                            currentStatus.fridayAutoClose = modelVar.fridayAutoClose;
+                            if (paused || modelVar.paused)
+                            {
+                                currentStatus.status = "Paused";
+                            }
+                            else
+                            {
+                                currentStatus.status = "Running";
+                            }
+
+                            if (DateTime.UtcNow.Second % 15 == 0 || DateTime.UtcNow.Second == 0)
+                            {
+                                Task taskB = Task.Run(() => CommonFunctions.SendBroadcast("Status", JsonConvert.SerializeObject(currentStatus)));
+                            }
 
 
                         }
@@ -4244,6 +4230,21 @@ namespace TradingBrain.Models
                                 tb.lastRunVars.deltaProfit = newVars.deltaProfit;
                                 model.modelVar.deltaProfit = newVars.deltaProfit;
                                 currentStatus.deltaProfit = newVars.deltaProfit;
+
+                                CommonFunctions.AddStatusMessage("New fridayAutoClose to use = " + newVars.fridayAutoClose, "INFO", logName);
+                                tb.lastRunVars.fridayAutoClose = newVars.fridayAutoClose;
+                                model.modelVar.fridayAutoClose = newVars.fridayAutoClose;
+                                currentStatus.fridayAutoClose = newVars.fridayAutoClose;
+
+                                CommonFunctions.AddStatusMessage("New fridayCloseTimeUTC to use = " + newVars.fridayCloseTimeUTC, "INFO", logName);
+                                tb.lastRunVars.fridayCloseTimeUTC = newVars.fridayCloseTimeUTC;
+                                model.modelVar.fridayCloseTimeUTC = newVars.fridayCloseTimeUTC;
+                                currentStatus.fridayCloseTimeUTC = newVars.fridayCloseTimeUTC;
+
+                                CommonFunctions.AddStatusMessage("New fridayCloseMinValue to use = " + newVars.fridayCloseMinValue, "INFO", logName);
+                                tb.lastRunVars.fridayCloseMinValue = newVars.fridayCloseMinValue;
+                                model.modelVar.fridayCloseMinValue = newVars.fridayCloseMinValue;
+                                currentStatus.fridayCloseMinValue = newVars.fridayCloseMinValue;
 
                                 if (this.strategy == "GRID" && (newVars.var0 > 0 || newVars.var1 > 0 || newVars.var2 > 0 || newVars.var3 > 0 || newVars.var4 > 0 || newVars.var5 > 0 || newVars.var6 > 0 || newVars.var7 > 0 || newVars.var8 > 0 || newVars.var9 > 0 || newVars.var10 > 0 || newVars.var11 > 0 || newVars.var12 > 0 || newVars.var13 > 0))
                                 {
