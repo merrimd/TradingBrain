@@ -150,7 +150,9 @@ namespace TradingBrain.Models
 
         public modQuote lastCandle = new();
         public List<modQuote> candleList = [];
+        public List<modQuote> minuteCandleList = [];
         public modQuote lastVixCandle = new();
+        public modQuote lastMinuteCandle = new();
         public IGContainer _igContainer = new();
         public IGContainer? _igContainer2 = new();
         const int MAX_WAIT_FOR_CLOSE_TIME = 60;
@@ -1982,11 +1984,18 @@ namespace TradingBrain.Models
                             CommonFunctions.AddStatusMessage("Getting current candle data");
 
                             bool gotCandle = false;
+                            bool minuteCandleFlag = _startTime.Second == 0;
+                            if (minuteCandleFlag)
+                            {
+                                CommonFunctions.AddStatusMessage("Also getting minute candle data because we are at the start of a new minute", "INFO", logName);
+                            }
 
                             //Get the last tick from the list of ticks
                             LOepic thisEpic = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == epicName) ?? throw new InvalidOperationException("Epic not found in PriceEpicList");
+
+
                             DateTime tickStart = _startTime.AddSeconds(-1);
-                            DateTime tickeEnd = _startTime.AddSeconds(1).AddMilliseconds(-1);
+                            DateTime tickEnd = _startTime.AddSeconds(1).AddMilliseconds(-1);
                             if (thisEpic.ticks == null)
                             {
                                 AddStatusMessage("thisEpic.ticks is null - creating new list", "WARNING", logName);
@@ -2003,93 +2012,80 @@ namespace TradingBrain.Models
                                 };
                                 await log.Save();
                             }
-                            List<tick> ticks = [.. thisEpic!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickeEnd)];
 
-
-
+                            // Get the current second candle
                             modQuote thisCandle = new();
+                            List<tick> ticks = [.. thisEpic!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickEnd)];
 
-                            //clsCommonFunctions.AddStatusMessage($"Ticks - {thisEpic.ticks.Count}");
-                            //clsCommonFunctions.AddStatusMessage($"Ticks in period {tickStart} to {tickeEnd} - Last Tick = {thisEpic.ticks.Last().UTM}");
-                            if (ticks != null && ticks.Count > 0)
+                            thisCandle = await CreateCandleFromTicks(ticks, tickStart, tickEnd,"Second");
+
+                            if (thisCandle.Date != default)
                             {
-                                tbPrice thisPrice = new();
-
-                                dto.endpoint.prices.v2.Price lowPrice = new();
-                                dto.endpoint.prices.v2.Price highPrice = new();
-                                dto.endpoint.prices.v2.Price openPrice = new();
-                                dto.endpoint.prices.v2.Price closePrice = new();
-
-                                highPrice.bid = ticks.Max(x => x.bid);
-                                highPrice.ask = ticks.Max(x => x.offer);
-                                lowPrice.bid = ticks.Min(x => x.bid);
-                                lowPrice.ask = ticks.Min(x => x.offer);
-
-                                tick? thisOpenTick = ticks.OrderBy(x => x.UTM).FirstOrDefault();
-                                if (thisOpenTick != null)
-                                {
-                                    openPrice.bid = thisOpenTick.bid;
-                                    openPrice.ask = thisOpenTick.offer;
-                                }
-
-                                tick? thisCloseTick = ticks.OrderByDescending(x => x.UTM).FirstOrDefault();
-                                if (thisCloseTick != null)
-                                {
-                                    closePrice.bid = thisCloseTick.bid;
-                                    closePrice.ask = thisCloseTick.offer;
-                                }
-                                thisPrice.typicalPrice ??= new dto.endpoint.prices.v2.Price();
-                                thisPrice.startDate = tickStart;
-                                thisPrice.endDate = tickeEnd;
-                                thisPrice.openPrice = openPrice;
-                                thisPrice.closePrice = closePrice;
-                                thisPrice.highPrice = highPrice;
-                                thisPrice.lowPrice = lowPrice;
-                                thisPrice.typicalPrice.bid = (highPrice.bid + lowPrice.bid + closePrice.bid) / 3;
-                                thisPrice.typicalPrice.ask = (highPrice.ask + lowPrice.ask + closePrice.ask) / 3;
-
-                                List<double> closePrices = ticks.Select(x => (double)(x.bid + x.offer) / 2).ToList();
-                                StandardDeviation sd = new(closePrices);
-                                thisPrice.stdDev = sd.Value;
-
-
-                                thisCandle.Date = tickStart;
-                                thisCandle.Close = ((thisPrice.closePrice.bid ?? 0) + (thisPrice.closePrice.ask ?? 0)) / 2;
-                                thisCandle.Open = ((thisPrice.openPrice.bid ?? 0) + (thisPrice.openPrice.ask ?? 0)) / 2;
-                                thisCandle.High = ((thisPrice.highPrice.bid ?? 0) + (thisPrice.highPrice.ask ?? 0)) / 2;
-                                thisCandle.Low = ((thisPrice.lowPrice.bid ?? 0) + (thisPrice.lowPrice.ask ?? 0)) / 2;
-                                thisCandle.Typical = ((thisPrice.typicalPrice.bid ?? 0) + (thisPrice.typicalPrice.ask ?? 0)) / 2;
-                                thisCandle.stdDev = sd.Value;
-                                thisCandle.spread = (double)((thisPrice.closePrice.ask ?? 0) - (thisPrice.closePrice.bid ?? 0));
-                                //this.lastCandle = thisCandle.DeepCopy();
-
-                                //Remove the first candle and add this one to ensure we keep a rolling set of candles
+                                gotCandle = true;
                                 this.candleList.RemoveAt(0);
                                 this.candleList.Add(await thisCandle.DeepCopyAsync());
-
-
-                                AddStatusMessage($"New Tick :{thisPrice.startDate} - {thisPrice.endDate}: Typical:{Math.Round(thisPrice.typicalPrice.bid ?? 0, 2)} / {Math.Round(thisPrice.typicalPrice.ask ?? 0, 2)} ");
-                                //AddStatusMessage($"   Open: {thisPrice.openPrice.bid} / {thisPrice.openPrice.ask} ");
-                                //AddStatusMessage($"   High: {thisPrice.highPrice.bid} / {thisPrice.highPrice.ask} ");
-                                //AddStatusMessage($"   Low:  {thisPrice.lowPrice.bid} / {thisPrice.lowPrice.ask} ");
-                                //AddStatusMessage($"   Close:{thisPrice.closePrice.bid} / {thisPrice.closePrice.ask} ");
-                                //AddStatusMessage($"   Typical:{thisPrice.typicalPrice.bid} / {thisPrice.typicalPrice.ask} ");
-
-                                //this.candleList.Add(thisCandle.DeepCopy());
-                                gotCandle = true;
-                                foreach (tick item in ticks) thisEpic.ticks.Remove(item);
                             }
-                            else
+                            //else
+                            //{
+                            //    if (ticks != null)
+                            //    {
+                            //        AddStatusMessage($"No ticks found for this period {tickStart} to {tickEnd}", "WARNING", logName);
+                            //    }
+                            //    else
+                            //    {
+                            //        AddStatusMessage($"Ticks list is null for epic {epicName}", "WARNING", logName);
+                            //    }
+                            //}
+
+                            if (minuteCandleFlag)
                             {
-                                if (ticks != null)
+                                DateTime tickStartMinute = _startTime.AddMinutes(-1);
+                                DateTime tickEndMinute = _startTime.AddMinutes(1).AddMilliseconds(-1);
+                                if (thisEpic.ticksMinute == null)
                                 {
-                                    AddStatusMessage($"No ticks found for this period {tickStart} to {tickeEnd}", "WARNING", logName);
+                                    AddStatusMessage("thisEpic.ticksMinute is null - creating new list", "WARNING", logName);
+
+                                    thisEpic.ticksMinute = new List<tick>();
+                                    string msg = thisEpic.Equals(null) ? "thisEpic is null" : "thisEpic.ticksMinute was null";
+
+                                    Log log = new(the_app_db)
+                                    {
+                                        Log_Message = this.epicName + " - " + msg,
+                                        Epic = this.epicName,
+                                        Log_Type = "Error",
+                                        Log_App = "RunCode"
+                                    };
+                                    await log.Save();
                                 }
-                                else
+
+                                // Get the current second candle
+                                modQuote thisMinuteCandle = new();
+                                List<tick> ticksMinute = [.. thisEpic!.ticksMinute.Where(t => t != null && t.UTM >= tickStartMinute && t.UTM <= tickEndMinute)];
+
+                                thisMinuteCandle = await CreateCandleFromTicks(ticksMinute, tickStart, tickEnd, "Minute");
+
+                                if (thisMinuteCandle.Date != default)
                                 {
-                                    AddStatusMessage($"Ticks list is null for epic {epicName}", "WARNING", logName);
+                                    gotCandle = true;
+                                    if (this.minuteCandleList.Count > 0) this.minuteCandleList.RemoveAt(0);
+                                    this.minuteCandleList.Add(await thisMinuteCandle.DeepCopyAsync());
+                                    this.lastMinuteCandle = thisMinuteCandle;
                                 }
+                                //else
+                                //{
+                                //    if (ticksMinute != null)
+                                //    {
+                                //        AddStatusMessage($"No minute ticks found for this period {tickStartMinute} to {tickEndMinute}", "WARNING", logName);
+                                //    }
+                                //    else
+                                //    {
+                                //        AddStatusMessage($"Minute Ticks list is null for epic {epicName}", "WARNING", logName);
+                                //    }
+                                //}
+
                             }
+                            
+
 
                             ///////////////////////////////////
                             // Now get the VIX list of ticks //
@@ -2101,8 +2097,6 @@ namespace TradingBrain.Models
 
                             //Get the last tick from the list of ticks
                             LOepic? thisEpicVix = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == "CC.D.VIX.USS.IP") ?? throw new InvalidOperationException("VIX Epic not found in PriceEpicList");
-                            //DateTime tickStartVix = _startTime.AddSeconds(-1);
-                            //DateTime tickeEndVix = _startTime.AddSeconds(1).AddMilliseconds(-1);
                             if (thisEpicVix.ticks == null)
                             {
                                 AddStatusMessage("VIX thisEpic.ticks is null - creating new list", "WARNING", logName);
@@ -2119,63 +2113,89 @@ namespace TradingBrain.Models
                                 };
                                 await log.Save();
                             }
-                            List<tick> ticksVix = thisEpicVix!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
-                            if (ticksVix != null && ticksVix.Count > 0)
+
+                            // Get the current VIX candle
+                            modQuote thisCandleVix = new();
+                            List<tick> ticksVix = [.. thisEpicVix!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickEnd)];
+
+                            thisCandleVix = await CreateCandleFromTicks(ticksVix, tickStart, tickEnd, "VIX");
+
+                            if (thisCandleVix.Date != default)
                             {
-                                tbPrice thisPrice = new();
-
-                                dto.endpoint.prices.v2.Price lowPrice = new();
-                                dto.endpoint.prices.v2.Price highPrice = new();
-                                dto.endpoint.prices.v2.Price openPrice = new();
-                                dto.endpoint.prices.v2.Price closePrice = new();
-
-                                highPrice.bid = ticksVix.Max(x => x.bid);
-                                highPrice.ask = ticksVix.Max(x => x.offer);
-                                lowPrice.bid = ticksVix.Min(x => x.bid);
-                                lowPrice.ask = ticksVix.Min(x => x.offer);
-
-                                tick? thisOpenTick = ticksVix.OrderBy(x => x.UTM).FirstOrDefault();
-                                if (thisOpenTick != null)
-                                {
-                                    openPrice.bid = thisOpenTick.bid;
-                                    openPrice.ask = thisOpenTick.offer;
-                                }
-
-                                tick? thisCloseTick = ticksVix.OrderByDescending(x => x.UTM).FirstOrDefault();
-                                if (thisCloseTick != null)
-                                {
-                                    closePrice.bid = thisCloseTick.bid;
-                                    closePrice.ask = thisCloseTick.offer;
-                                }
-                                thisPrice.typicalPrice ??= new dto.endpoint.prices.v2.Price();
-                                thisPrice.startDate = tickStart;
-                                thisPrice.endDate = tickeEnd;
-                                thisPrice.openPrice = openPrice;
-                                thisPrice.closePrice = closePrice;
-                                thisPrice.highPrice = highPrice;
-                                thisPrice.lowPrice = lowPrice;
-                                thisPrice.typicalPrice.bid = (highPrice.bid + lowPrice.bid + closePrice.bid) / 3;
-                                thisPrice.typicalPrice.ask = (highPrice.ask + lowPrice.ask + closePrice.ask) / 3;
-
-                                List<double> closePrices = ticksVix.Select(x => (double)(x.bid + x.offer) / 2).ToList();
-                                StandardDeviation sd = new(closePrices);
-                                thisPrice.stdDev = sd.Value;
-
-                                modQuote thisCandleVix = new modQuote();
-                                thisCandleVix.Date = tickStart;
-                                thisCandleVix.Close = ((thisPrice.closePrice.bid ?? 0) + (thisPrice.closePrice.ask ?? 0)) / 2;
-                                thisCandleVix.Open = ((thisPrice.openPrice.bid ?? 0) + (thisPrice.openPrice.ask ?? 0)) / 2;
-                                thisCandleVix.High = ((thisPrice.highPrice.bid ?? 0) + (thisPrice.highPrice.ask ?? 0)) / 2;
-                                thisCandleVix.Low = ((thisPrice.lowPrice.bid ?? 0) + (thisPrice.lowPrice.ask ?? 0)) / 2;
-                                thisCandleVix.Typical = ((thisPrice.typicalPrice.bid ?? 0) + (thisPrice.typicalPrice.ask ?? 0)) / 2;
-                                thisCandleVix.stdDev = sd.Value;
-                                thisCandleVix.spread = (double)((thisPrice.closePrice.ask ?? 0) - (thisPrice.closePrice.bid ?? 0));
-
+                                gotCandleVix = true;
                                 this.lastVixCandle = thisCandleVix;
-
-                                foreach (tick item in ticksVix) thisEpicVix.ticks.Remove(item);
-
                             }
+                            //else
+                            //{
+                            //    if (ticksVix != null)
+                            //    {
+                            //        AddStatusMessage($"No VIX ticks found for this period {tickStart} to {tickEnd}", "WARNING", logName);
+                            //    }
+                            //    else
+                            //    {
+                            //        AddStatusMessage($"VIX Ticks list is null for epic {epicName}", "WARNING", logName);
+                            //    }
+                            //}
+
+
+
+                            //List<tick> ticksVix = thisEpicVix!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickEnd).ToList();
+                            //if (ticksVix != null && ticksVix.Count > 0)
+                            //{
+                            //    tbPrice thisPrice = new();
+
+                            //    dto.endpoint.prices.v2.Price lowPrice = new();
+                            //    dto.endpoint.prices.v2.Price highPrice = new();
+                            //    dto.endpoint.prices.v2.Price openPrice = new();
+                            //    dto.endpoint.prices.v2.Price closePrice = new();
+
+                            //    highPrice.bid = ticksVix.Max(x => x.bid);
+                            //    highPrice.ask = ticksVix.Max(x => x.offer);
+                            //    lowPrice.bid = ticksVix.Min(x => x.bid);
+                            //    lowPrice.ask = ticksVix.Min(x => x.offer);
+
+                            //    tick? thisOpenTick = ticksVix.OrderBy(x => x.UTM).FirstOrDefault();
+                            //    if (thisOpenTick != null)
+                            //    {
+                            //        openPrice.bid = thisOpenTick.bid;
+                            //        openPrice.ask = thisOpenTick.offer;
+                            //    }
+
+                            //    tick? thisCloseTick = ticksVix.OrderByDescending(x => x.UTM).FirstOrDefault();
+                            //    if (thisCloseTick != null)
+                            //    {
+                            //        closePrice.bid = thisCloseTick.bid;
+                            //        closePrice.ask = thisCloseTick.offer;
+                            //    }
+                            //    thisPrice.typicalPrice ??= new dto.endpoint.prices.v2.Price();
+                            //    thisPrice.startDate = tickStart;
+                            //    thisPrice.endDate = tickEnd;
+                            //    thisPrice.openPrice = openPrice;
+                            //    thisPrice.closePrice = closePrice;
+                            //    thisPrice.highPrice = highPrice;
+                            //    thisPrice.lowPrice = lowPrice;
+                            //    thisPrice.typicalPrice.bid = (highPrice.bid + lowPrice.bid + closePrice.bid) / 3;
+                            //    thisPrice.typicalPrice.ask = (highPrice.ask + lowPrice.ask + closePrice.ask) / 3;
+
+                            //    List<double> closePrices = ticksVix.Select(x => (double)(x.bid + x.offer) / 2).ToList();
+                            //    StandardDeviation sd = new(closePrices);
+                            //    thisPrice.stdDev = sd.Value;
+
+                            //    modQuote thisCandleVix = new modQuote();
+                            //    thisCandleVix.Date = tickStart;
+                            //    thisCandleVix.Close = ((thisPrice.closePrice.bid ?? 0) + (thisPrice.closePrice.ask ?? 0)) / 2;
+                            //    thisCandleVix.Open = ((thisPrice.openPrice.bid ?? 0) + (thisPrice.openPrice.ask ?? 0)) / 2;
+                            //    thisCandleVix.High = ((thisPrice.highPrice.bid ?? 0) + (thisPrice.highPrice.ask ?? 0)) / 2;
+                            //    thisCandleVix.Low = ((thisPrice.lowPrice.bid ?? 0) + (thisPrice.lowPrice.ask ?? 0)) / 2;
+                            //    thisCandleVix.Typical = ((thisPrice.typicalPrice.bid ?? 0) + (thisPrice.typicalPrice.ask ?? 0)) / 2;
+                            //    thisCandleVix.stdDev = sd.Value;
+                            //    thisCandleVix.spread = (double)((thisPrice.closePrice.ask ?? 0) - (thisPrice.closePrice.bid ?? 0));
+
+                            //    this.lastVixCandle = thisCandleVix;
+
+                            //    foreach (tick item in ticksVix) thisEpicVix.ticks.Remove(item);
+
+                            //}
 
                             if (gotCandle && model.candles.currentCandle != null)
                             {
@@ -2205,6 +2225,8 @@ namespace TradingBrain.Models
                                 //clsCommonFunctions.AddStatusMessage($"ATR= {thisCandle.atr}");
                                 model.candles.epic = this.epicName;
                                 model.candles.currentGRIDCandle = thisCandle;
+                                model.candles.currentMinuteGRIDCandle = lastMinuteCandle;
+
                                 CommonFunctions.AddStatusMessage($"{thisCandle.Date} - close price = {Math.Round(thisCandle.Close, 2)}", "DEBUG", logName);
                                 if (closeAttemptCount > 0) CommonFunctions.AddStatusMessage($"Current closeAttemptCount = {closeAttemptCount}", "DEBUG", logName);
 
@@ -2320,18 +2342,8 @@ namespace TradingBrain.Models
                                     ///////////////////////////////////////////////////////
                                     // Run the model to determine if we are to buy or sell
                                     ////////////////////////////////////////////////////////
-                                    model.RunProTrendCodeGRID(model.candles);
-                                    //if (this.testCount < 50)
-                                    //{
-                                    //    model.buyLong = true;
-                                    //    this.testCount += 1;
-                                    //    model.modelVar.quantity = 1;
-                                    //}
-                                    //else
-                                    //{
-                                    //    clsCommonFunctions.AddStatusMessage("Test loop finished");
-                                    //    model.buyLong = false;
-                                    //}
+                                    model.RunProTrendCodeGRID(model.candles, minuteCandleFlag);
+
 
                                     CommonFunctions.AddStatusMessage($"values after  run  - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
                                     if (model.pauseTB)
@@ -2594,6 +2606,80 @@ namespace TradingBrain.Models
 
 
             return taskRet;
+        }
+        public async Task<modQuote> CreateCandleFromTicks(List<tick> ticksToUse,DateTime tickStart, DateTime tickEnd,string tickType)
+        {
+            List<tick> ticks = [.. ticksToUse.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickEnd)];
+
+            modQuote thisCandle = new();
+
+            if (ticks != null && ticks.Count > 0)
+            {
+                tbPrice thisPrice = new();
+
+                dto.endpoint.prices.v2.Price lowPrice = new();
+                dto.endpoint.prices.v2.Price highPrice = new();
+                dto.endpoint.prices.v2.Price openPrice = new();
+                dto.endpoint.prices.v2.Price closePrice = new();
+
+                highPrice.bid = ticks.Max(x => x.bid);
+                highPrice.ask = ticks.Max(x => x.offer);
+                lowPrice.bid = ticks.Min(x => x.bid);
+                lowPrice.ask = ticks.Min(x => x.offer);
+
+                tick? thisOpenTick = ticks.OrderBy(x => x.UTM).FirstOrDefault();
+                if (thisOpenTick != null)
+                {
+                    openPrice.bid = thisOpenTick.bid;
+                    openPrice.ask = thisOpenTick.offer;
+                }
+
+                tick? thisCloseTick = ticks.OrderByDescending(x => x.UTM).FirstOrDefault();
+                if (thisCloseTick != null)
+                {
+                    closePrice.bid = thisCloseTick.bid;
+                    closePrice.ask = thisCloseTick.offer;
+                }
+                thisPrice.typicalPrice ??= new dto.endpoint.prices.v2.Price();
+                thisPrice.startDate = tickStart;
+                thisPrice.endDate = tickEnd;
+                thisPrice.openPrice = openPrice;
+                thisPrice.closePrice = closePrice;
+                thisPrice.highPrice = highPrice;
+                thisPrice.lowPrice = lowPrice;
+                thisPrice.typicalPrice.bid = (highPrice.bid + lowPrice.bid + closePrice.bid) / 3;
+                thisPrice.typicalPrice.ask = (highPrice.ask + lowPrice.ask + closePrice.ask) / 3;
+
+                List<double> closePrices = ticks.Select(x => (double)(x.bid + x.offer) / 2).ToList();
+                StandardDeviation sd = new(closePrices);
+                thisPrice.stdDev = sd.Value;
+
+                thisCandle.Date = tickStart;
+                thisCandle.Close = ((thisPrice.closePrice.bid ?? 0) + (thisPrice.closePrice.ask ?? 0)) / 2;
+                thisCandle.Open = ((thisPrice.openPrice.bid ?? 0) + (thisPrice.openPrice.ask ?? 0)) / 2;
+                thisCandle.High = ((thisPrice.highPrice.bid ?? 0) + (thisPrice.highPrice.ask ?? 0)) / 2;
+                thisCandle.Low = ((thisPrice.lowPrice.bid ?? 0) + (thisPrice.lowPrice.ask ?? 0)) / 2;
+                thisCandle.Typical = ((thisPrice.typicalPrice.bid ?? 0) + (thisPrice.typicalPrice.ask ?? 0)) / 2;
+                thisCandle.stdDev = sd.Value;
+                thisCandle.spread = (double)((thisPrice.closePrice.ask ?? 0) - (thisPrice.closePrice.bid ?? 0));
+
+                AddStatusMessage($"New {tickType} tick :{thisPrice.startDate} - {thisPrice.endDate}: Typical:{Math.Round(thisPrice.typicalPrice.bid ?? 0, 2)} / {Math.Round(thisPrice.typicalPrice.ask ?? 0, 2)} ");
+
+                //gotCandle = true;
+                foreach (tick item in ticks) ticksToUse.Remove(item);
+            }
+            else
+            {
+                if (ticks != null)
+                {
+                    AddStatusMessage($"No {tickType} ticks found for this period {tickStart} to {tickEnd}", "WARNING", logName);
+                }
+                else
+                {
+                    AddStatusMessage($"{tickType} Ticks list is null for epic {epicName}", "WARNING", logName);
+                }
+            }
+            return thisCandle;
         }
         public async Task<DateTime> getPrevMAStartDate(DateTime candleStartDate, string epic)
         {

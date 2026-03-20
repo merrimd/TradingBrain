@@ -553,6 +553,7 @@ namespace TradingBrain.Models
                         };
 
                         thisEpic.ticks.Add(thisTick);
+                        thisEpic.ticksMinute.Add(thisTick);
                     }
 
 
@@ -1131,6 +1132,9 @@ namespace TradingBrain.Models
         public List<double> closePrices { get; set; }
         public tbPrice latestCandle { get; set; }
         public List<tick> ticks { get; set; }
+        public tbPrice latestMinuteCandle { get; set; }
+        public List<tick> ticksMinute { get; set; }
+
         public LOepic()
         {
             this.name = "";
@@ -1139,6 +1143,8 @@ namespace TradingBrain.Models
             this.closePrices = new List<double>();
             this.latestCandle = new tbPrice();
             this.ticks = new List<tick>();
+            this.latestMinuteCandle = new tbPrice();
+            this.ticksMinute = new List<tick>();
         }
 
         public LOepic(string _name)
@@ -1149,6 +1155,8 @@ namespace TradingBrain.Models
             this.closePrices = new List<double>();
             this.ticks = new List<tick>();
             this.latestCandle = new tbPrice();
+            this.latestMinuteCandle = new tbPrice();
+            this.ticksMinute = new List<tick>();
         }
     }
 #pragma warning disable CS8981 // The type name only contains lower-cased ascii characters. Such names may become reserved for the language.
