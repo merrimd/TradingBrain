@@ -764,7 +764,7 @@ namespace TradingBrain.Models
             }
         }
 
-        public static async Task<TradingBrainSettings> GetTradingBrainSettings(Database? the_db, string epicName, string accountId, string strategy = "SMA", string resolution = "")
+        public static async Task<TradingBrainSettings> GetTradingBrainSettings(Database? the_db, string epicName, string accountId, string strategy = "SMA", string resolution = "", string direction = "")
         {
             // find the data
             var ret = new TradingBrainSettings();
@@ -789,12 +789,28 @@ namespace TradingBrain.Models
 
             try
             {
+                string extra = "";
+                string accountString = "c.accountId";
+                if (direction != "")
+                {
+                    switch (direction)
+                    {
+                        case "LONG":
+                            extra = " AND c.direction = 'LONG' ";
+                            break;
+                        case "SHORT":
+                            extra = " AND c.direction = 'SHORT' ";
+                            accountString = "c.accountId2";
+                            break;
+                    }
+                }
+
                 if (the_db == null) { throw new InvalidOperationException("Database is null"); }
                 Container container = the_db.GetContainer("TradingBrainSettings");
                 Container container_opt = the_db.GetContainer("OptimizeRunData");
 
                 var parameterizedQuery = new QueryDefinition(
-                    query: "SELECT top 1 * FROM c WHERE c.epicName = @epicname AND (c.accountId = @accountId or c.accountId = '') AND c.strategy = @strategy AND c.resolution = @resolution Order by c.timestamp DESC"
+                    query: "SELECT top 1 * FROM c WHERE c.epicName = @epicname AND (" + accountString + " = @accountId or c.accountId = '') AND c.strategy = @strategy AND c.resolution = @resolution " + extra + " Order by c.timestamp DESC"
 
                 //query: "SELECT M.modelLogs FROM c JOIN (SELECT VALUE m FROM m IN c.runVars WHERE m.var1 = @Var1) as m WHERE c.modelRunID = @ModelRunID  Order by c.runVars.modelLogs.seqNo ASC"
                 ).WithParameter("@epicname", epicName)

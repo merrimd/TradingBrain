@@ -58,12 +58,6 @@ namespace TradingBrain.Models
         private static List<MainApp> workerList = [];
         private bool isDirty = false;
 
-        //private string pushServerUrl;
-        //public string forceT;
-        //private string forceTransport = "no";
-
-        // public IgRestApiClient? igRestApiClient;
-
         public delegate void StopDelegate();
         private static string region = "";
         public async static Task<bool> SetupDB()
@@ -74,17 +68,6 @@ namespace TradingBrain.Models
             {
                 the_db = await IGModels.clsCommonFunctions.Get_Database();
                 the_app_db = await IGModels.clsCommonFunctions.Get_App_Database();
-
-                //if (the_db != null && the_app_db != null)
-                //{
-                //    EpicContainer = the_app_db.GetContainer("Epics");
-                //    hourly_container = the_db.GetContainer("HourlyCandle");
-                //    minute_container = the_db.GetContainer("MinuteCandle");
-                //    TicksContainer = the_db.GetContainer("CandleTicks");
-                //    //candlesContainer = the_db.GetContainer("Candles");
-                //    trade_container = the_app_db.GetContainer("TradingBrainTrades");
-
-                //}
             }
             catch (Exception ex)
             {
@@ -101,29 +84,6 @@ namespace TradingBrain.Models
             {
                 the_db = await IGModels.clsCommonFunctions.Get_Database(epic);
                 the_app_db = await IGModels.clsCommonFunctions.Get_App_Database(epic);
-
-                //if (the_db != null && the_app_db != null)
-                //{
-                //    EpicContainer = the_app_db.GetContainer("Epics");
-                //    hourly_container = the_db.GetContainer("HourlyCandle");
-
-                //    if (epic == "IX.D.NIKKEI.DAILY.IP")
-                //    {
-                //        minute_container = the_db.GetContainer("MinuteCandle_NIKKEI");
-                //        TicksContainer = the_db.GetContainer("CandleTicks_NIKKEI");
-                //        trade_container = the_app_db.GetContainer("TradingBrainTrades");
-                //    }
-                //    else
-                //    {
-                //        minute_container = the_db.GetContainer("MinuteCandle");
-                //        TicksContainer = the_db.GetContainer("CandleTicks");
-                //        trade_container = the_app_db.GetContainer("TradingBrainTrades");
-                //    }
-
-                //    //candlesContainer = the_db.GetContainer("Candles");
-
-
-                //}
             }
             catch (Exception ex)
             {
@@ -295,10 +255,10 @@ namespace TradingBrain.Models
 
             var config = new NLog.Config.LoggingConfiguration();
 
-            string blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}container/${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}app-log.log";
+            string blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}container/${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}${scopeproperty:item=direction}app-log.log";
             if (strategy == "GRID")
             {
-                blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}container/${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}${date:format=HH}/app-log.log";
+                blobName = "${date:format=yyyy-MM-dd}/${scopeproperty:item=app}container/${scopeproperty:item=strategy}${scopeproperty:item=epic}${scopeproperty:item=resolution}${scopeproperty:item=direction}${date:format=HH}/app-log.log";
             }
             string blobConnectionString = Environment.GetEnvironmentVariable("BlobConnectionString") ?? "";
             if (blobConnectionString == "")
@@ -312,7 +272,7 @@ namespace TradingBrain.Models
                 ConnectionString = blobConnectionString,
                 Container = "tb-logs-" + region,
                 BlobName = blobName,
-                Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${message}|${exception:format=toString}",
+                Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${scopeproperty:item=direction}|${message}|${exception:format=toString}",
                 BatchSize = 100000,
                 TaskDelayMilliseconds = 30000
 
@@ -334,7 +294,7 @@ namespace TradingBrain.Models
             {
                 var logconsole = new NLog.Targets.ConsoleTarget("logconsole")
                 {
-                    Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${message}|${exception:format=toString}"
+                    Layout = "${longdate} |${level:uppercase=true}|${scopeproperty:item=strategy}|${scopeproperty:item=epic}-${scopeproperty:item=resolution}|${scopeproperty:item=direction}|${message}|${exception:format=toString}"
                 };
 
                 config.AddRule(LogLevel.Debug, LogLevel.Fatal, logconsole);
@@ -352,6 +312,7 @@ namespace TradingBrain.Models
             ScopeContext.PushProperty("epic", "DEFAULT/");
             ScopeContext.PushProperty("strategy", "");
             ScopeContext.PushProperty("resolution", "");
+            ScopeContext.PushProperty("direction", "");
             //Connect to IG & Lightstreamer
 
             IGContainer? igContainer = null;
@@ -441,24 +402,19 @@ namespace TradingBrain.Models
                 ScopeContext.PushProperty("epic", tbepic.epic + "/");
                 ScopeContext.PushProperty("strategy", tbepic.strategy + "/");
                 ScopeContext.PushProperty("resolution", tbepic.resolution + "/");
+                ScopeContext.PushProperty("direction", tbepic.direction + "/");
+
 
                 ILogger tbLog;
                 tbLog = LogManager.GetLogger(jobId);
 
                 tbLog.Info("-------------------------------------------------------------");
-                tbLog.Info("-- TradingBrain started - strategy: {strategy} {respolution} : {epic} --", tbepic.strategy, tbepic.resolution, tbepic.epic);
+                tbLog.Info("-- TradingBrain started - strategy: {strategy} {respolution} {direction} : {epic} --", tbepic.strategy, tbepic.resolution, tbepic.epic,tbepic.direction);
 
                 if (the_db != null && the_app_db != null)
                 {
-
-
-
                     tbLog.Info("Initialising app");
-
-                    workerList.Add(new MainApp(the_db, the_app_db, tbepic.epic, igContainer, igContainer2, tbepic.strategy, tbepic.resolution));
-
-
-
+                    workerList.Add(new MainApp(the_db, the_app_db, tbepic.epic, igContainer, igContainer2, tbepic.strategy, tbepic.resolution,tbepic.direction));
                 }
                 igContainer.workerList = workerList;
                 if (igContainer2 != null)
@@ -468,17 +424,7 @@ namespace TradingBrain.Models
             }
             System.Timers.Timer ti = new();
             ti.AutoReset = false;
-            //if (epcs[0].strategy == "GRID")
-            //{
-            //    await RunSecondAlignedTimer(async () =>
-            //    {
-            //        RunGridMainAppCode();
-            //        await Task.CompletedTask;
-            //    });
 
-            //}
-            //else
-            //{
             if (epcs[0].strategy == "RSI" ||
             epcs[0].strategy == "REI" ||
             epcs[0].strategy == "RSI-ATR" ||

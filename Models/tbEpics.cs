@@ -11,11 +11,13 @@ namespace TradingBrain.Models
         public string epic { get; set; }
         public string resolution { get; set; }
         public string strategy { get; set; }
+        public string direction { get; set; }
         public TbEpics()
         {
             epic = "";
             resolution = "";
             strategy = "";
+            direction = "";
         }
         public TbEpics(string input)
         {
@@ -34,6 +36,15 @@ namespace TradingBrain.Models
                 {
                     strategy = tmp[1];
                     resolution = tmp[2];
+                }
+                else
+                {
+                    if (tmp.Count == 4)
+                    {
+                        strategy = tmp[1];
+                        resolution = tmp[2];
+                        direction = tmp[3].ToUpper();
+                    }
                 }
             }
         }

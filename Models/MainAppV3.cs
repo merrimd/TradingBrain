@@ -141,6 +141,7 @@ namespace TradingBrain.Models
         public int retryOrderCount { get; set; } = 0;
         public string strategy { get; set; } = "";
         public string resolution { get; set; } = "";
+        public string direction { get; set; } = "";
         public bool futures { get; set; } = false;
         public string newDealReference { get; set; } = "";
         public string newSIMLDealReference { get; set; } = "";
@@ -170,7 +171,7 @@ namespace TradingBrain.Models
                 {
                     throw new InvalidOperationException("Application database is null in setInitialModelVar");
                 }
-                Task<TradingBrainSettings> tbTask = Task.Run<TradingBrainSettings>(async () => await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution));
+                Task<TradingBrainSettings> tbTask = Task.Run<TradingBrainSettings>(async () => await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution, this.direction));
                 //return tb.Result;
                 return tbTask.Result;
             }
@@ -189,7 +190,7 @@ namespace TradingBrain.Models
 
         }
         public string logName { get; set; } = "";
-        public MainApp(Database? db, Database? appDb, string epic, IGContainer? igContainer, IGContainer? igContainer2, string strategy = "SMA", string resolution = "")
+        public  MainApp(Database? db, Database? appDb, string epic, IGContainer? igContainer, IGContainer? igContainer2, string strategy = "SMA", string resolution = "", string direction = "")
         {
             try
             {
@@ -206,7 +207,6 @@ namespace TradingBrain.Models
                 currentStatus = new StatusMessage();
                 epicName = epic;
                 tb = new TradingBrainSettings();
-
 
                 the_db = db;
                 the_app_db = appDb;
@@ -233,12 +233,15 @@ namespace TradingBrain.Models
                 ScopeContext.PushProperty("epic", epic + "/");
                 ScopeContext.PushProperty("strategy", strategy + "/");
                 ScopeContext.PushProperty("resolution", resolution + "/");
+                ScopeContext.PushProperty("direction", direction + "/");
+
 
                 this._igContainer = igContainer;
                 this._igContainer2 = igContainer2;
                 this.ti = new System.Timers.Timer();
                 this.strategy = strategy;
                 this.resolution = resolution;
+                this.direction = direction;
                 this.newDealReference = "";
                 this.newSIMLDealReference = "";
                 this.newSIMSDealReference = "";
@@ -261,8 +264,15 @@ namespace TradingBrain.Models
                 ////////////////////////////////////
                 string region = IGModels.clsCommonFunctions.Get_AppSetting("region");
                 //igAccountId = IGModels.clsCommonFunctions.Get_AppSetting("accountId." + region);
-                igAccountId = igContainer.creds.igAccountId;
 
+                if (direction == "SHORT")
+                {
+                    igAccountId = igContainer2.creds.igAccountId;
+                }
+                else
+                {
+                    igAccountId = igContainer.creds.igAccountId;
+                }
                 retryOrderCount = 0;
                 retryOrder = false;
                 retryOrderLimit = 10;
@@ -820,7 +830,11 @@ namespace TradingBrain.Models
                     pos.direction = "SELL";
                     trades = await model.thisModel.gridLTradesToClose.DeepCopyAsync();
                 }
-
+                if (direction == "short" && model != null)
+                {
+                    pos.direction = "BUY";
+                    trades = await model.thisModel.gridSTradesToClose.DeepCopyAsync();
+                }
                 foreach (tradeItem trade in trades)
                 {
                     pos.dealId = trade.tbDealId;
@@ -1828,27 +1842,15 @@ namespace TradingBrain.Models
             ScopeContext.PushProperty("epic", this.epicName + "/");
             ScopeContext.PushProperty("strategy", strategy + "/");
             ScopeContext.PushProperty("resolution", resolution + "/");
-            //bool liveMode = true;
+            ScopeContext.PushProperty("direction", direction + "/");
+
             marketOpen = false;
 
             DateTime dtNow = DateTime.UtcNow;
             DateTime _startTime;
             resolution = "SECOND";
 
-            //int numCandlesToStart = 20;
-
-            // Sometimes the timer that runs the RunCode will actually start at :59.xxx rather than at :00.000. This then means the minute candle is incorrect.
-            //int seconds = dtNow.Second;
-            //if (seconds < 59)
-            //{
             _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour, dtNow.Minute, dtNow.Second, 0, DateTimeKind.Utc);
-            //}
-            //else
-            //{
-            //    _startTime = new DateTime(dtNow.Year, dtNow.Month, dtNow.Day, dtNow.Hour, dtNow.Minute, 0);
-            //}
-
-
             DateTime _endTime = _startTime;
 
             // Check to see if we have a list of candles to work with, if not, go get some
@@ -1859,7 +1861,7 @@ namespace TradingBrain.Models
             if (modelVar == null) { throw new InvalidOperationException("ModelVars is null in RunCode_GRID"); }
             if (currentStatus == null) { throw new InvalidOperationException("CurrentStatus is null in RunCode_GRID"); }
 
-            this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution);
+            this.tb = await CommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution, this.direction);
 
             if (this.tb == null || this.tb.runDetails == null || this.tb.runDetails.inputs == null || this.tb.lastRunVars == null)
             {
@@ -1867,6 +1869,7 @@ namespace TradingBrain.Models
             }
 
             paused = this.tb.lastRunVars.paused;
+            model.modelVar.paused = this.tb.lastRunVars.paused;
 
             // Check if it is monday morning and tb has still not unpaused yet (due to auto closing). If so, unpause and carry on.
             modelVar.mondayOpenTimeUTC = this.tb.lastRunVars.mondayOpenTimeUTC;
@@ -1897,14 +1900,9 @@ namespace TradingBrain.Models
                     // All candles loaded so lets crack on.
                     _igContainer.tbClient.FirstConfirmUpdate = false;
                     _igContainer2.tbClient.FirstConfirmUpdate = false;
-                    //string param = "";
-
 
                     CommonFunctions.AddStatusMessage(" ---------------------------------", "INFO", logName);
                     CommonFunctions.AddStatusMessage($" - Run Started {epicName}", "INFO", logName);
-                    //CommonFunctions.AddStatusMessage($" - Epic       - {epicName}", "INFO", logName);
-                    //CommonFunctions.AddStatusMessage($" - Strategy   - {strategy}", "INFO", logName);
-                    //CommonFunctions.AddStatusMessage($" - Resolution - {resolution}", "INFO", logName);
                     CommonFunctions.AddStatusMessage(" ---------------------------------", "INFO", logName);
                     CommonFunctions.AddStatusMessage($"Start Time = {_startTime}", "DEBUG", logName);
 
@@ -1939,9 +1937,6 @@ namespace TradingBrain.Models
                         model.doLongs = tb.doLongs;
                         model.doShorts = tb.doShorts;
                         model.doSuppTrades = tb.doSuppTrades;
-                        // clsCommonFunctions.AddStatusMessage($"Do Supplementary trades = {model.doSuppTrades}", "DEBUG", logName);
-                        // clsCommonFunctions.AddStatusMessage($"Do Long trades = {model.doLongs}", "DEBUG", logName);
-                        // clsCommonFunctions.AddStatusMessage($"Do Short trades = {model.doShorts}", "DEBUG", logName);
                         model.thisModel.inputs_RSI = await this.tb.runDetails.inputs_RSI.DeepCopyAsync();
                         model.thisModel.counterVar = Math.Max(this.tb.runDetails.counterVar, 1000);
                         model.thisModel.matchProTrend = false;
@@ -1958,12 +1953,6 @@ namespace TradingBrain.Models
                         model.modelVar.baseQuantity = tb.lastRunVars.baseQuantity;
                         model.modelVar.quantity = tb.lastRunVars.quantity;
                         model.modelVar.minQuantity = tb.lastRunVars.minQuantity;
-
-                        //if (model.modelVar.quantity == 0)
-                        //{
-                        //    model.modelVar.minQuantity = tb.lastRunVars.quantity;
-                        //    model.modelVar.quantity = tb.lastRunVars.quantity;
-                        //}
 
                         currentStatus.inputs = tb.runDetails.inputs;
                         currentStatus.countervar = Math.Max(this.tb.runDetails.counterVar, 1000);
@@ -2025,17 +2014,6 @@ namespace TradingBrain.Models
                                 this.candleList.RemoveAt(0);
                                 this.candleList.Add(await thisCandle.DeepCopyAsync());
                             }
-                            //else
-                            //{
-                            //    if (ticks != null)
-                            //    {
-                            //        AddStatusMessage($"No ticks found for this period {tickStart} to {tickEnd}", "WARNING", logName);
-                            //    }
-                            //    else
-                            //    {
-                            //        AddStatusMessage($"Ticks list is null for epic {epicName}", "WARNING", logName);
-                            //    }
-                            //}
 
                             if (minuteCandleFlag)
                             {
@@ -2071,21 +2049,7 @@ namespace TradingBrain.Models
                                     this.minuteCandleList.Add(await thisMinuteCandle.DeepCopyAsync());
                                     this.lastMinuteCandle = thisMinuteCandle;
                                 }
-                                //else
-                                //{
-                                //    if (ticksMinute != null)
-                                //    {
-                                //        AddStatusMessage($"No minute ticks found for this period {tickStartMinute} to {tickEndMinute}", "WARNING", logName);
-                                //    }
-                                //    else
-                                //    {
-                                //        AddStatusMessage($"Minute Ticks list is null for epic {epicName}", "WARNING", logName);
-                                //    }
-                                //}
-
                             }
-                            
-
 
                             ///////////////////////////////////
                             // Now get the VIX list of ticks //
@@ -2125,104 +2089,11 @@ namespace TradingBrain.Models
                                 gotCandleVix = true;
                                 this.lastVixCandle = thisCandleVix;
                             }
-                            //else
-                            //{
-                            //    if (ticksVix != null)
-                            //    {
-                            //        AddStatusMessage($"No VIX ticks found for this period {tickStart} to {tickEnd}", "WARNING", logName);
-                            //    }
-                            //    else
-                            //    {
-                            //        AddStatusMessage($"VIX Ticks list is null for epic {epicName}", "WARNING", logName);
-                            //    }
-                            //}
 
-
-
-                            //List<tick> ticksVix = thisEpicVix!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickEnd).ToList();
-                            //if (ticksVix != null && ticksVix.Count > 0)
-                            //{
-                            //    tbPrice thisPrice = new();
-
-                            //    dto.endpoint.prices.v2.Price lowPrice = new();
-                            //    dto.endpoint.prices.v2.Price highPrice = new();
-                            //    dto.endpoint.prices.v2.Price openPrice = new();
-                            //    dto.endpoint.prices.v2.Price closePrice = new();
-
-                            //    highPrice.bid = ticksVix.Max(x => x.bid);
-                            //    highPrice.ask = ticksVix.Max(x => x.offer);
-                            //    lowPrice.bid = ticksVix.Min(x => x.bid);
-                            //    lowPrice.ask = ticksVix.Min(x => x.offer);
-
-                            //    tick? thisOpenTick = ticksVix.OrderBy(x => x.UTM).FirstOrDefault();
-                            //    if (thisOpenTick != null)
-                            //    {
-                            //        openPrice.bid = thisOpenTick.bid;
-                            //        openPrice.ask = thisOpenTick.offer;
-                            //    }
-
-                            //    tick? thisCloseTick = ticksVix.OrderByDescending(x => x.UTM).FirstOrDefault();
-                            //    if (thisCloseTick != null)
-                            //    {
-                            //        closePrice.bid = thisCloseTick.bid;
-                            //        closePrice.ask = thisCloseTick.offer;
-                            //    }
-                            //    thisPrice.typicalPrice ??= new dto.endpoint.prices.v2.Price();
-                            //    thisPrice.startDate = tickStart;
-                            //    thisPrice.endDate = tickEnd;
-                            //    thisPrice.openPrice = openPrice;
-                            //    thisPrice.closePrice = closePrice;
-                            //    thisPrice.highPrice = highPrice;
-                            //    thisPrice.lowPrice = lowPrice;
-                            //    thisPrice.typicalPrice.bid = (highPrice.bid + lowPrice.bid + closePrice.bid) / 3;
-                            //    thisPrice.typicalPrice.ask = (highPrice.ask + lowPrice.ask + closePrice.ask) / 3;
-
-                            //    List<double> closePrices = ticksVix.Select(x => (double)(x.bid + x.offer) / 2).ToList();
-                            //    StandardDeviation sd = new(closePrices);
-                            //    thisPrice.stdDev = sd.Value;
-
-                            //    modQuote thisCandleVix = new modQuote();
-                            //    thisCandleVix.Date = tickStart;
-                            //    thisCandleVix.Close = ((thisPrice.closePrice.bid ?? 0) + (thisPrice.closePrice.ask ?? 0)) / 2;
-                            //    thisCandleVix.Open = ((thisPrice.openPrice.bid ?? 0) + (thisPrice.openPrice.ask ?? 0)) / 2;
-                            //    thisCandleVix.High = ((thisPrice.highPrice.bid ?? 0) + (thisPrice.highPrice.ask ?? 0)) / 2;
-                            //    thisCandleVix.Low = ((thisPrice.lowPrice.bid ?? 0) + (thisPrice.lowPrice.ask ?? 0)) / 2;
-                            //    thisCandleVix.Typical = ((thisPrice.typicalPrice.bid ?? 0) + (thisPrice.typicalPrice.ask ?? 0)) / 2;
-                            //    thisCandleVix.stdDev = sd.Value;
-                            //    thisCandleVix.spread = (double)((thisPrice.closePrice.ask ?? 0) - (thisPrice.closePrice.bid ?? 0));
-
-                            //    this.lastVixCandle = thisCandleVix;
-
-                            //    foreach (tick item in ticksVix) thisEpicVix.ticks.Remove(item);
-
-                            //}
 
                             if (gotCandle && model.candles.currentCandle != null)
                             {
-                                //this.candleList.Add(thisCandle.DeepCopy());
-
-                                //AddStatusMessage($"Candle Data : {thisCandle.Date} - {thisCandle.Open}");
                                 model.quotes = new ModelQuotes();
-
-                                //if (this.candleList == null || this.candleList.Count < numCandlesToStart)
-                                //{
-                                //    clsCommonFunctions.AddStatusMessage($"Candle list at {this.candleList.Count}, waiting for ({numCandlesToStart - this.candleList.Count} more candles...", "INFO", logName);
-                                //}
-                                //else
-                                //{
-
-                                //Remove the first item in the list to maintain a rolling set of candles
-                                //if (this.candleList.Count > numCandlesToStart * 5)
-                                //{
-                                //    this.candleList.RemoveAt(0);
-                                //}
-
-                                //clsCommonFunctions.AddStatusMessage($"Candle list at {this.candleList.Count}");
-                                //AddStatusMessage("Getting rsi quotes from DB.......");
-
-
-                                //thisCandle.atr= this.candleList.GetAtr((int)thisInput.var3).LastOrDefault().Atr ?? 0;
-                                //clsCommonFunctions.AddStatusMessage($"ATR= {thisCandle.atr}");
                                 model.candles.epic = this.epicName;
                                 model.candles.currentGRIDCandle = thisCandle;
                                 model.candles.currentMinuteGRIDCandle = lastMinuteCandle;
@@ -2230,16 +2101,17 @@ namespace TradingBrain.Models
                                 CommonFunctions.AddStatusMessage($"{thisCandle.Date} - close price = {Math.Round(thisCandle.Close, 2)}", "DEBUG", logName);
                                 if (closeAttemptCount > 0) CommonFunctions.AddStatusMessage($"Current closeAttemptCount = {closeAttemptCount}", "DEBUG", logName);
 
-                                model.candles.currentCandle.grid_long_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.var4).Average(s => s.Close));
-                                if (thisInput.svar4 > 0)
+                                if (this.direction == "SHORT")
                                 {
-                                    model.candles.currentCandle.grid_short_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.svar4).Average(s => s.Close));
+                                    model.candles.currentCandle.grid_short_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.var4).Average(s => s.Close));
+                                    model.candles.currentCandle.grid_prev_short_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.var4).Average(s => s.Close));
                                 }
-                                model.candles.currentCandle.grid_prev_long_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.var4).Average(s => s.Close));
-                                if (thisInput.svar4 > 0)
+                                else
                                 {
-                                    model.candles.currentCandle.grid_prev_short_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.svar4).Average(s => s.Close));
+                                    model.candles.currentCandle.grid_long_sma = Convert.ToDouble(candleList.TakeLast((int)thisInput.var4).Average(s => s.Close));
+                                    model.candles.currentCandle.grid_prev_long_sma = Convert.ToDouble(candleList.SkipLast(1).TakeLast((int)thisInput.var4).Average(s => s.Close));
                                 }
+
                                 if (dtNow.Second == 0 || gridMinuteSMA == 0)
                                 {
                                     CommonFunctions.AddStatusMessage($"Getting minute sma");
@@ -2251,10 +2123,6 @@ namespace TradingBrain.Models
 
                                 CommonFunctions.AddStatusMessage($"Last VIX value = {Math.Round(this.lastVixCandle.Close, 2)}", "DEBUG", logName);
                                 CommonFunctions.AddStatusMessage($"Minute sma = {model.candles.currentCandle.grid_minute_sma}");
-
-                                //CommonFunctions.AddStatusMessage($"Current : SMA Long = {model.candles.currentCandle.grid_long_sma}, Short = {model.candles.currentCandle.grid_short_sma}", "DEBUG", logName);
-                                //CommonFunctions.AddStatusMessage($"Prev : SMA Long = {model.candles.currentCandle.grid_prev_long_sma}, Short = {model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
-
 
                                 if (model.doShorts) CommonFunctions.AddStatusMessage($"current short sma = {model.candles.currentCandle.grid_short_sma}, prev sma = {model.candles.currentCandle.grid_prev_short_sma} : is current > prev - {model.candles.currentCandle.grid_short_sma > model.candles.currentCandle.grid_prev_short_sma}", "DEBUG", logName);
                                 CommonFunctions.AddStatusMessage($"current long sma = {Math.Round(model.candles.currentCandle.grid_long_sma, 2)}, prev sma = {Math.Round(model.candles.currentCandle.grid_prev_long_sma, 2)} : is current < prev - {model.candles.currentCandle.grid_long_sma < model.candles.currentCandle.grid_prev_long_sma}", "DEBUG", logName);
@@ -2274,75 +2142,75 @@ namespace TradingBrain.Models
                                         CommonFunctions.AddStatusMessage($"Short quantites = {model.thisModel.gridSTrades.Sum(x => x.quantity)}, position price = {model.thisModel.gridSTrades.Average(x => x.sellPrice)}, last price = {model.thisModel.gridSTrades.Last().sellPrice} ", "DEBUG", logName);
                                     }
 
-                                    CommonFunctions.AddStatusMessage($"Spread = {thisCandle.spread},   Long Start GridSize = {thisInput.var0} Long current gridsize = {Math.Round(model.modelVar.currentGridSize, 2)}", "DEBUG", logName);
+                                    CommonFunctions.AddStatusMessage($"Spread = {thisCandle.spread}, Start GridSize = {thisInput.var0} current gridsize = {Math.Round(model.modelVar.currentGridSize, 2)}", "DEBUG", logName);
 
 
                                     // Check to make sure a) var6 has a value other than 0 and b) that the close price now is greater than (1-var6) * close from  3600 candles ago
 
-                                    if (thisInput.var6 > 0 && modelVar.maxDropFlag == 0)
-                                    {
-                                        modQuote? candle3600Ago = candleList.OrderByDescending(c => c.Date).Skip(3600).FirstOrDefault();
-                                        if (candle3600Ago != null)
-                                        {
-                                            double thresholdPrice = (double)candle3600Ago.Close * (1 - thisInput.var6);
-                                            CommonFunctions.AddStatusMessage($"MaxDropFlag - Close price 3600 seconds ago = {Math.Round(candle3600Ago.Close, 2)}, threshold price = {Math.Round(thresholdPrice, 2)}, current price = {thisCandle.Close}", "DEBUG", logName);
-                                            if ((double)thisCandle.Close < thresholdPrice)
-                                            {
-                                                CommonFunctions.AddStatusMessage("MaxDropFlag matched", "DEBUG", logName);
-                                                tb.lastRunVars.maxDropFlag = 1;
-                                                modelVar.maxDropFlag = 1;
-                                                _ = await tb.SaveDocument(this.the_app_db);
-                                                CommonFunctions.SendBroadcast("MaxDropFlagSet", this.epicName);
-                                                currentStatus.status = "MaxDropFlagSet";
+                                    //if (thisInput.var6 > 0 && modelVar.maxDropFlag == 0)
+                                    //{
+                                    //    modQuote? candle3600Ago = candleList.OrderByDescending(c => c.Date).Skip(3600).FirstOrDefault();
+                                    //    if (candle3600Ago != null)
+                                    //    {
+                                    //        double thresholdPrice = (double)candle3600Ago.Close * (1 - thisInput.var6);
+                                    //        CommonFunctions.AddStatusMessage($"MaxDropFlag - Close price 3600 seconds ago = {Math.Round(candle3600Ago.Close, 2)}, threshold price = {Math.Round(thresholdPrice, 2)}, current price = {thisCandle.Close}", "DEBUG", logName);
+                                    //        if ((double)thisCandle.Close < thresholdPrice)
+                                    //        {
+                                    //            CommonFunctions.AddStatusMessage("MaxDropFlag matched", "DEBUG", logName);
+                                    //            tb.lastRunVars.maxDropFlag = 1;
+                                    //            modelVar.maxDropFlag = 1;
+                                    //            _ = await tb.SaveDocument(this.the_app_db);
+                                    //            CommonFunctions.SendBroadcast("MaxDropFlagSet", this.epicName);
+                                    //            currentStatus.status = "MaxDropFlagSet";
 
-                                                string region = Environment.GetEnvironmentVariable("Region") ?? "";
-                                                if (region == "")
-                                                {
-                                                    region = IGModels.clsCommonFunctions.Get_AppSetting("region");
-                                                }
-                                                CommonFunctions.AddStatusMessage("MaxDropFlag region = " + region, "DEBUG", logName);
-                                                if (region.ToUpper() == "LIVE")
-                                                {
-                                                    CommonFunctions.AddStatusMessage("Sending email ", "DEBUG", logName);
-                                                    clsEmail obj = new clsEmail();
-                                                    List<recip> recips = new List<recip>();
-                                                    recips.Add(new recip("Mike Ward", "n525fd@gmail.com"));
-                                                    recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
-                                                    string subject = "MAX DROP FLAG SET - " + this.epicName;
-                                                    string text = "The MAX DROP FLAG has been set on the " + this.epicName + " epic</br></br>";
-                                                    text += "This will mean that no more trades will be purchased until this flag has been cleared in the IGMonitor website.</br></br>";
-                                                    text += "<a href='https://igmonitor.azurewebsites.net/?strategy=GRID'>IGMonitor Website</a></br></br>";
-                                                    obj.sendEmail(recips, subject, text);
-                                                    CommonFunctions.AddStatusMessage("Email sent to  " + recips.ToList().ToString(), "DEBUG", logName);
-                                                }
-                                            }
-                                            else
-                                            {
-                                                CommonFunctions.AddStatusMessage("MaxDropFlag NOT matched", "DEBUG", logName);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            CommonFunctions.AddStatusMessage("MaxDropFlag - could not find candle from 3600 seconds ago", "DEBUG", logName);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        if (thisInput.var6 == 0)
-                                        {
-                                            CommonFunctions.AddStatusMessage("MaxDropFlag skipped as var6 = 0", "DEBUG", logName);
-                                        }
-                                        else
-                                        {
-                                            CommonFunctions.AddStatusMessage("MaxDropFlag CURRENTLY SET", "DEBUG", logName);
-                                        }
-                                    }
+                                    //            string region = Environment.GetEnvironmentVariable("Region") ?? "";
+                                    //            if (region == "")
+                                    //            {
+                                    //                region = IGModels.clsCommonFunctions.Get_AppSetting("region");
+                                    //            }
+                                    //            CommonFunctions.AddStatusMessage("MaxDropFlag region = " + region, "DEBUG", logName);
+                                    //            if (region.ToUpper() == "LIVE")
+                                    //            {
+                                    //                CommonFunctions.AddStatusMessage("Sending email ", "DEBUG", logName);
+                                    //                clsEmail obj = new clsEmail();
+                                    //                List<recip> recips = new List<recip>();
+                                    //                recips.Add(new recip("Mike Ward", "n525fd@gmail.com"));
+                                    //                recips.Add(new recip("Dave Merriman", "dave.merriman72@btinternet.com"));
+                                    //                string subject = "MAX DROP FLAG SET - " + this.epicName;
+                                    //                string text = "The MAX DROP FLAG has been set on the " + this.epicName + " epic</br></br>";
+                                    //                text += "This will mean that no more trades will be purchased until this flag has been cleared in the IGMonitor website.</br></br>";
+                                    //                text += "<a href='https://igmonitor.azurewebsites.net/?strategy=GRID'>IGMonitor Website</a></br></br>";
+                                    //                obj.sendEmail(recips, subject, text);
+                                    //                CommonFunctions.AddStatusMessage("Email sent to  " + recips.ToList().ToString(), "DEBUG", logName);
+                                    //            }
+                                    //        }
+                                    //        else
+                                    //        {
+                                    //            CommonFunctions.AddStatusMessage("MaxDropFlag NOT matched", "DEBUG", logName);
+                                    //        }
+                                    //    }
+                                    //    else
+                                    //    {
+                                    //        CommonFunctions.AddStatusMessage("MaxDropFlag - could not find candle from 3600 seconds ago", "DEBUG", logName);
+                                    //    }
+                                    //}
+                                    //else
+                                    //{
+                                    //    if (thisInput.var6 == 0)
+                                    //    {
+                                    //        CommonFunctions.AddStatusMessage("MaxDropFlag skipped as var6 = 0", "DEBUG", logName);
+                                    //    }
+                                    //    else
+                                    //    {
+                                    //        CommonFunctions.AddStatusMessage("MaxDropFlag CURRENTLY SET", "DEBUG", logName);
+                                    //    }
+                                    //}
 
 
                                     ///////////////////////////////////////////////////////
                                     // Run the model to determine if we are to buy or sell
                                     ////////////////////////////////////////////////////////
-                                    model.RunProTrendCodeGRID(model.candles, minuteCandleFlag);
+                                    await model.RunProTrendCodeGRID(model.candles, minuteCandleFlag,this.direction);
 
 
                                     CommonFunctions.AddStatusMessage($"values after  run  - buyLong={model.buyLong}, buyShort={model.buyShort}, sellLong={model.sellLong}, sellShort={model.sellShort}, shortOnMarket={model.shortOnMarket}, longOnmarket={model.longOnmarket}, onMarket={model.onMarket}", "DEBUG", logName);
@@ -2379,25 +2247,11 @@ namespace TradingBrain.Models
                                     if (openLTrades.Count > 0 && sellingLongs == false)
                                     {
                                         CommonFunctions.AddStatusMessage($"GRID Long Trades - Num Trades : {openLTrades.Count}, Sum quantity : {Math.Round(openLTrades.Sum(x => x.quantity), 2)}");
-
-                                        //foreach (tradeItem ti in openLTrades)
-                                        //{
-                                        //    clsCommonFunctions.AddStatusMessage($"Trade id : {ti.tbDealId}, started: {ti.tradeStarted}, BuyPrice: {ti.buyPrice}, Quantity: {ti.quantity}");
-
-                                        //}
-
                                     }
 
                                     if (openSTrades.Count > 0 && buyingShorts == false)
                                     {
                                         CommonFunctions.AddStatusMessage($"GRID Short Trades - Num Trades : {openSTrades.Count}, Sum quantity : {openSTrades.Sum(x => x.quantity)}");
-
-                                        //foreach (tradeItem ti in openSTrades)
-                                        //{
-                                        //    clsCommonFunctions.AddStatusMessage($"Trade id : {ti.tbDealId}, started: {ti.tradeStarted}, SellPrice: {ti.sellPrice}, Quantity: {ti.quantity}");
-
-                                        //}
-
                                     }
 
                                     if (model.buyLong)
@@ -2454,13 +2308,19 @@ namespace TradingBrain.Models
                                             closeAttemptCount = 1;
                                             _ = await CloseDealEpic("short", openSTrades.Sum(x => x.quantity), this.epicName, this._igContainer2.creds.igAccountId);
                                         }
+                                        if (model.buyShortPartial && model.thisModel.gridSTradesToClose.Count > 0)
+                                        {
+                                            TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyShortPartial", the_app_db);
+                                            CommonFunctions.AddStatusMessage("BuyShortPartial activated", "INFO", logName);
+                                            closeAttemptCount = 1;
+                                            _ = await CloseDealEpicPartial("short", this.epicName, this._igContainer2.creds.igAccountId);
+                                        }
                                     }
-
-
 
                                     //reset any deal variables that could have been placed by the RunCode
                                     model.buyLong = false;
                                     model.buyShort = false;
+                                    model.buyShortPartial = false;
                                     model.sellLong = false;
                                     model.sellLongPartial = false;
                                     model.sellShort = false;
@@ -2474,17 +2334,7 @@ namespace TradingBrain.Models
                                 else
                                 {
                                     CommonFunctions.AddStatusMessage($"Waiting for close to finish. Attempt {closeAttemptCount} of {MAX_WAIT_FOR_CLOSE_TIME}", "INFO", logName);
-                                    //if (model.thisModel.closingGridLTrade)
-                                    //{
-                                    //    clsCommonFunctions.AddStatusMessage("Currently closing long trades, no new trades will be initiated", "INFO", logName);
-                                    //}
-                                    //else
-                                    //{
-                                    //    if (model.thisModel.closingGridSTrade)
-                                    //    {
-                                    //        clsCommonFunctions.AddStatusMessage("Currently closing short trades, no new trades will be initiated", "INFO", logName);
-                                    //    }
-                                    //}
+
                                     closeAttemptCount += 1;
                                     if (closeAttemptCount == MAX_WAIT_FOR_CLOSE_TIME)
                                     {
@@ -2505,9 +2355,16 @@ namespace TradingBrain.Models
                                         _ = await CloseDealEpic("long", model.thisModel.gridLTrades.Sum(x => x.quantity), this.epicName, this._igContainer.creds.igAccountId);
                                         closeAttemptCount = 1;
                                     }
+
                                     if (closeAttemptCount >= 40 && model.thisModel.closedGridSTrades.Count > 0)
                                     {
+                                        CommonFunctions.AddStatusMessage($"still have {model.thisModel.gridSTrades.Count} trades to close.....trying again");
+                                        foreach (tradeItem trade in model.thisModel.gridSTrades)
+                                        {
+                                            CommonFunctions.AddStatusMessage($"trade {trade.tbDealId} not closed yet", "DEBUG");
+                                        }
                                         _ = await CloseDealEpic("short", model.thisModel.gridSTrades.Sum(x => x.quantity), this.epicName, this._igContainer2.creds.igAccountId);
+                                        closeAttemptCount = 1;
                                     }
                                 }
                             }
@@ -2853,7 +2710,7 @@ namespace TradingBrain.Models
                                         CommonFunctions.AddStatusMessage($"Trade update {tsm.Status} : {tsm.DealStatus} - {inputData}", "INFO");
                                         CommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, this.the_app_db);
                                         CommonFunctions.AddStatusMessage("Updating  - " + tsm.DealId + " - Current Deal = " + this.currentTrade.dealId, "INFO");
-                                        await this.GetTradeFromDB(tsm.DealId, this.strategy, this.resolution);
+                                        await this.GetTradeFromDB(tsm.DealId, this.strategy, this.resolution, this.direction);
 
                                         thisTrade.dealReference = tsm.DealReference;
                                         thisTrade.dealId = tsm.DealId;
@@ -3232,7 +3089,7 @@ namespace TradingBrain.Models
                                                     CommonFunctions.SaveLog("TradeUpdate", "UpdateTs", "Trade update " + tsm.TradeType + " - " + inputData, this.the_app_db);
                                                     CommonFunctions.AddStatusMessage("Deleting  - " + tsm.DealId + " - Current Deal = " + thisTrade.dealId, "INFO");
                                                     DateTime dtNow = DateTime.UtcNow;
-                                                    await this.GetTradeFromDB(tsm.DealId, this.strategy, this.resolution);
+                                                    await this.GetTradeFromDB(tsm.DealId, this.strategy, this.resolution,this.direction);
 
                                                     thisTrade.lastUpdated = dtNow;
                                                     thisTrade.status = tsm.Status;
@@ -4030,22 +3887,25 @@ namespace TradingBrain.Models
                 {
                     resol = "-" + this.resolution;
                 }
+                string direc = "";
+                if (this.direction != "")
+                {
+                    direc = "-" + this.direction;
+                }
                 string url = "";
 
                 url = Environment.GetEnvironmentVariable("MessagingEndPoint") ?? "";
                 if (url == "")
                 {
-
                     var igWebApiConnectionConfig = ConfigurationManager.GetSection("appSettings") as NameValueCollection;
                     if (igWebApiConnectionConfig != null && igWebApiConnectionConfig.Count > 0)
                     {
                         url = igWebApiConnectionConfig["MessagingEndPoint"] ?? "";
                     }
-
                 }
-                CommonFunctions.AddStatusMessage("Starting messaging - TradingBrain-" + this.epicName + "-" + this.igAccountId + "-" + strat + resol, "INFO", logName);
+                CommonFunctions.AddStatusMessage("Starting messaging - TradingBrain-" + this.epicName + "-" + this.igAccountId + "-" + strat + resol + direc, "INFO", logName);
                 hubConnection = new HubConnectionBuilder()
-                    .WithUrl(url, (HttpConnectionOptions options) => options.Headers.Add("userid", "TradingBrain-" + this.epicName + "-" + this.igAccountId + "-" + strat + resol))
+                    .WithUrl(url, (HttpConnectionOptions options) => options.Headers.Add("userid", "TradingBrain-" + this.epicName + "-" + this.igAccountId + "-" + strat + resol + direc))
                      .WithAutomaticReconnect()
                     .Build();
 
@@ -4982,153 +4842,160 @@ namespace TradingBrain.Models
                 {
                     IgResponse<PositionsResponse> ret;
                     //Do longs first
-                    try
+                    if (direction == "SHORT")
                     {
-
-
-                        ret = await _igContainer.igRestApiClient.getOTCOpenPositionsV1();
-
-                        foreach (OpenPosition obj in ret.Response.positions)
+                        try
                         {
-                            if (obj.market.epic == this.epicName)
+
+                            if (_igContainer2 == null)
                             {
-                                OpenPositionData tsm = obj.position;
-
-                                //First see if we already have this deal in our database.
-                                tradeItem thisTrade = await GetTradeFromDB(tsm.dealId, this.strategy, this.resolution);
-
-
-                                if (thisTrade.tbDealId != "")
-                                {
-
-                                    if (this.gridLID == "")
-                                    {
-
-                                        this.gridLID = thisTrade.BOLLI_ID;
-                                        //AddStatusMessage($"BOLLI IF found in DB   {this.bolliID}.");
-                                    }
-                                    //AddStatusMessage($"BOLLI Trade found in DB with DealID {tsm.dealId}.");
-                                    //This trade is in the database already.
-                                    this.model.thisModel.currentGRIDLTrade = thisTrade;
-                                    this.currentTrade = new clsTradeUpdate
-                                    {
-                                        epic = this.epicName,
-                                        dealId = tsm.dealId,
-                                        lastUpdated = IGModels.clsCommonFunctions.ConvertToIGDate(tsm.createdDate),
-                                        level = Convert.ToDecimal(tsm.openLevel),
-                                        stopLevel = Convert.ToDecimal(tsm.stopLevel),
-                                        size = Convert.ToDecimal(tsm.dealSize),
-                                        direction = tsm.direction
-                                    };
-                                    this.model.thisModel.currentGRIDLTrade.stopLossValue = this.model.stopPrice;
-
-                                    if (tsm.direction == "BUY")
-                                    {
-                                        this.model.longOnmarket = true;
-                                        this.model.buyShort = false;
-                                    }
-                                    else
-                                    {
-                                        this.model.shortOnMarket = true;
-                                        this.model.buyLong = false;
-                                    }
-
-                                    this.model.thisModel.currentGRIDLTrade.stopLossValue = this.model.stopPrice;
-
-                                    this.model.onMarket = true;
-
-
-                                    tradeItem? thisTde = this.model.thisModel.gridLTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDLTrade.tbDealId);
-                                    if (thisTde == null)
-                                    {
-                                        this.model.thisModel.gridLTrades.Add(thisTrade);
-                                    }
-
-                                }
+                                throw new InvalidOperationException("IG Container not set in GetPositions");
                             }
-                        }
-
-                        //then do shorts
-                    }
-                    catch (Exception ex)
-                    {
-                        CommonFunctions.AddStatusMessage($"Error in Long GetPositions - {ex.ToString()}", "ERROR");
-                    }
-                    try
-                    {
-
-                        if (_igContainer2 == null)
-                        {
-                            throw new InvalidOperationException("IG Container not set in GetPositions");
-                        }
-                        if (_igContainer2.igRestApiClient == null)
-                        {
-                            throw new InvalidOperationException("IG Rest API Client not set in GetPositions");
-                        }
-
-                        ret = await _igContainer2.igRestApiClient.getOTCOpenPositionsV1();
-
-                        foreach (OpenPosition obj in ret.Response.positions)
-                        {
-                            if (obj.market.epic == this.epicName)
+                            if (_igContainer2.igRestApiClient == null)
                             {
-                                OpenPositionData tsm = obj.position;
+                                throw new InvalidOperationException("IG Rest API Client not set in GetPositions");
+                            }
 
-                                //First see if we already have this deal in our database.
-                                tradeItem thisTrade = await GetTradeFromDB(tsm.dealId, this.strategy, this.resolution);
+                            ret = await _igContainer2.igRestApiClient.getOTCOpenPositionsV1();
 
-
-                                if (thisTrade.tbDealId != "")
+                            foreach (OpenPosition obj in ret.Response.positions)
+                            {
+                                if (obj.market.epic == this.epicName)
                                 {
+                                    OpenPositionData tsm = obj.position;
 
-                                    if (this.gridSID == "")
+                                    //First see if we already have this deal in our database.
+                                    tradeItem thisTrade = await GetTradeFromDB(tsm.dealId, this.strategy, this.resolution, this.direction);
+
+
+                                    if (thisTrade.tbDealId != "")
                                     {
 
-                                        this.gridSID = thisTrade.BOLLI_ID;
-                                    }
-                                    //This trade is in the database already.
-                                    this.model.thisModel.currentGRIDSTrade = thisTrade;
-                                    this.currentTrade = new clsTradeUpdate
-                                    {
-                                        epic = this.epicName,
-                                        dealId = tsm.dealId,
-                                        lastUpdated = IGModels.clsCommonFunctions.ConvertToIGDate(tsm.createdDate),
-                                        level = Convert.ToDecimal(tsm.openLevel),
-                                        stopLevel = Convert.ToDecimal(tsm.stopLevel),
-                                        size = Convert.ToDecimal(tsm.dealSize),
-                                        direction = tsm.direction
-                                    };
-                                    this.model.thisModel.currentGRIDSTrade.stopLossValue = this.model.stopPrice;
+                                        if (this.gridSID == "")
+                                        {
 
-                                    if (tsm.direction == "BUY")
-                                    {
-                                        this.model.longOnmarket = true;
-                                        this.model.buyShort = false;
-                                    }
-                                    else
-                                    {
-                                        this.model.shortOnMarket = true;
-                                        this.model.buyLong = false;
-                                    }
+                                            this.gridSID = thisTrade.BOLLI_ID;
+                                        }
+                                        //This trade is in the database already.
+                                        this.model.thisModel.currentGRIDSTrade = thisTrade;
+                                        this.currentTrade = new clsTradeUpdate
+                                        {
+                                            epic = this.epicName,
+                                            dealId = tsm.dealId,
+                                            lastUpdated = IGModels.clsCommonFunctions.ConvertToIGDate(tsm.createdDate),
+                                            level = Convert.ToDecimal(tsm.openLevel),
+                                            stopLevel = Convert.ToDecimal(tsm.stopLevel),
+                                            size = Convert.ToDecimal(tsm.dealSize),
+                                            direction = tsm.direction
+                                        };
+                                        this.model.thisModel.currentGRIDSTrade.stopLossValue = this.model.stopPrice;
 
-                                    this.model.thisModel.currentGRIDSTrade.stopLossValue = this.model.stopPrice;
+                                        if (tsm.direction == "BUY")
+                                        {
+                                            this.model.longOnmarket = true;
+                                            this.model.buyShort = false;
+                                        }
+                                        else
+                                        {
+                                            this.model.shortOnMarket = true;
+                                            this.model.buyLong = false;
+                                        }
 
-                                    this.model.onMarket = true;
+                                        this.model.thisModel.currentGRIDSTrade.stopLossValue = this.model.stopPrice;
+
+                                        this.model.onMarket = true;
 
 
-                                    tradeItem? thisTde = this.model.thisModel.gridSTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDSTrade.tbDealId);
-                                    if (thisTde == null)
-                                    {
-                                        this.model.thisModel.gridSTrades.Add(thisTrade);
+                                        tradeItem? thisTde = this.model.thisModel.gridSTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDSTrade.tbDealId);
+                                        if (thisTde == null)
+                                        {
+                                            this.model.thisModel.gridSTrades.Add(thisTrade);
+                                        }
                                     }
                                 }
                             }
                         }
+                        catch (Exception ex)
+                        {
+                            CommonFunctions.AddStatusMessage($"Error in Short GetPositions - {ex.ToString()}", "ERROR");
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        CommonFunctions.AddStatusMessage($"Error in Short GetPositions - {ex.ToString()}", "ERROR");
+                        try
+                        {
+
+
+                            ret = await _igContainer.igRestApiClient.getOTCOpenPositionsV1();
+
+                            foreach (OpenPosition obj in ret.Response.positions)
+                            {
+                                if (obj.market.epic == this.epicName)
+                                {
+                                    OpenPositionData tsm = obj.position;
+
+                                    //First see if we already have this deal in our database.
+                                    tradeItem thisTrade = await GetTradeFromDB(tsm.dealId, this.strategy, this.resolution, this.direction);
+
+
+                                    if (thisTrade.tbDealId != "")
+                                    {
+
+                                        if (this.gridLID == "")
+                                        {
+
+                                            this.gridLID = thisTrade.BOLLI_ID;
+                                            //AddStatusMessage($"BOLLI IF found in DB   {this.bolliID}.");
+                                        }
+                                        //AddStatusMessage($"BOLLI Trade found in DB with DealID {tsm.dealId}.");
+                                        //This trade is in the database already.
+                                        this.model.thisModel.currentGRIDLTrade = thisTrade;
+                                        this.currentTrade = new clsTradeUpdate
+                                        {
+                                            epic = this.epicName,
+                                            dealId = tsm.dealId,
+                                            lastUpdated = IGModels.clsCommonFunctions.ConvertToIGDate(tsm.createdDate),
+                                            level = Convert.ToDecimal(tsm.openLevel),
+                                            stopLevel = Convert.ToDecimal(tsm.stopLevel),
+                                            size = Convert.ToDecimal(tsm.dealSize),
+                                            direction = tsm.direction
+                                        };
+                                        this.model.thisModel.currentGRIDLTrade.stopLossValue = this.model.stopPrice;
+
+                                        if (tsm.direction == "BUY")
+                                        {
+                                            this.model.longOnmarket = true;
+                                            this.model.buyShort = false;
+                                        }
+                                        else
+                                        {
+                                            this.model.shortOnMarket = true;
+                                            this.model.buyLong = false;
+                                        }
+
+                                        this.model.thisModel.currentGRIDLTrade.stopLossValue = this.model.stopPrice;
+
+                                        this.model.onMarket = true;
+
+
+                                        tradeItem? thisTde = this.model.thisModel.gridLTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDLTrade.tbDealId);
+                                        if (thisTde == null)
+                                        {
+                                            this.model.thisModel.gridLTrades.Add(thisTrade);
+                                        }
+
+                                    }
+                                }
+                            }
+
+                            //then do shorts
+                        }
+                        catch (Exception ex)
+                        {
+                            CommonFunctions.AddStatusMessage($"Error in Long GetPositions - {ex.ToString()}", "ERROR");
+                        }
                     }
+
                 }
                 else
                 {
@@ -5141,7 +5008,7 @@ namespace TradingBrain.Models
                             OpenPositionData tsm = obj.position;
 
                             //First see if we already have this deal in our database.
-                            tradeItem thisTrade = await GetTradeFromDB(tsm.dealId, this.strategy, this.resolution);
+                            tradeItem thisTrade = await GetTradeFromDB(tsm.dealId, this.strategy, this.resolution, this.direction);
 
 
                             if (this.strategy == "BOLLI")
@@ -5355,7 +5222,7 @@ namespace TradingBrain.Models
             this.TradeErrors.Add("UNKNOWN", "The operation resulted in an unknown result condition. Check transaction history or contact support for further information");
             this.TradeErrors.Add("WRONG_SIDE_OF_MARKET", "The requested operation has been attempted on the wrong direction");
         }
-        public async Task<tradeItem> GetTradeFromDB(string dealID, string strategy, string resolution = "")
+        public async Task<tradeItem> GetTradeFromDB(string dealID, string strategy, string resolution = "", string direction = "")
         {
             tradeItem ret = new();
 
@@ -5365,8 +5232,18 @@ namespace TradingBrain.Models
                 {
                     throw new InvalidOperationException("the_app_db is null.");
                 }
+                string extra = "";
+                switch (direction)
+                {
+                    case "LONG":
+                        extra = " AND c.longShort = 'Long' ";
+                        break;
+                    case "SHORT":
+                        extra = " AND c.longShort = 'Short' ";
+                        break;
+                }
                 Microsoft.Azure.Cosmos.Container? container = the_app_db.GetContainer("TradingBrainTrades");
-                string qry = "SELECT * FROM  c WHERE  c.tbDealId=@DealID AND c.strategy = @strategy AND c.resolution = @resolution ";
+                string qry = "SELECT * FROM  c WHERE  c.tbDealId=@DealID AND c.strategy = @strategy AND c.resolution = @resolution " + extra;
                 if (strategy == "SMA")
                 {
                     qry = "SELECT * FROM  c WHERE  c.tbDealId=@DealID AND (c.strategy = @strategy or c.strategy = '' or not is_defined(c.strategy))   ";
