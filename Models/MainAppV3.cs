@@ -2622,6 +2622,12 @@ namespace TradingBrain.Models
                 {
                     throw new InvalidOperationException("DBs are null in OPUUpdate");
                 }
+                string thisDir = "";
+                if (this.direction == "LONG" || this.direction == "") 
+                {
+                    thisDir = "BUY";
+                }
+                else { thisDir = "SELL";}
 
                 this.logName = IGModels.clsCommonFunctions.GetLogName(this.epicName, strategy, resolution);
                 //MappedDiagnosticsLogicalContext.Set("jobId", this.logName);
@@ -2662,7 +2668,7 @@ namespace TradingBrain.Models
                             tradeSubUpdate.reasonDescription = this.TradeErrors[tsm.Reason ?? ""];
                         }
 
-                        if (tsm.Epic == this.epicName)
+                        if (tsm.Epic == this.epicName && tsm.Direction == thisDir)
                         {
                             if (tsm.Status == "UPDATED" && currentTrade != null && this.model.thisModel.currentTrade != null)
                             {
