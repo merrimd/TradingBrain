@@ -2244,12 +2244,12 @@ namespace TradingBrain.Models
                                     }
 
                                     //double currentPrice = 0;
-                                    if (openLTrades.Count > 0 && sellingLongs == false)
+                                    if (openLTrades.Count > 0 && sellingLongs == false && (this.direction == "LONG" || this.direction == "")) 
                                     {
                                         CommonFunctions.AddStatusMessage($"GRID Long Trades - Num Trades : {openLTrades.Count}, Sum quantity : {Math.Round(openLTrades.Sum(x => x.quantity), 2)}");
                                     }
 
-                                    if (openSTrades.Count > 0 && buyingShorts == false)
+                                    if (openSTrades.Count > 0 && buyingShorts == false && this.direction == "SHORT")
                                     {
                                         CommonFunctions.AddStatusMessage($"GRID Short Trades - Num Trades : {openSTrades.Count}, Sum quantity : {openSTrades.Sum(x => x.quantity)}");
                                     }
