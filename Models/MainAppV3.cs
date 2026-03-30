@@ -348,6 +348,7 @@ namespace TradingBrain.Models
                 currentStatus.modelRunID = modelID;
                 currentStatus.status = "running";
                 currentStatus.epicName = this.epicName;
+                currentStatus.direction = this.direction;
                 currentStatus.doSuppTrades = model.doSuppTrades;
                 currentStatus.doLongs = model.doLongs;
                 currentStatus.doShorts = model.doShorts;
@@ -4155,6 +4156,7 @@ namespace TradingBrain.Models
                             if (obj.messageValue != "" && tb != null && model != null && currentStatus != null)
                             {
                                 ModelVarsChange? newVars = JsonConvert.DeserializeObject<ModelVarsChange>(obj.messageValue) ?? new ModelVarsChange();
+
 
                                 if (newVars.baseQuantity > 0)
                                 {
