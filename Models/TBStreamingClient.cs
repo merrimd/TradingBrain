@@ -37,6 +37,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
 using TradingBrain.Models;
+using static log4net.Appender.RollingFileAppender;
 using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 using static TradingBrain.Models.CommonFunctions;
 using Container = Microsoft.Azure.Cosmos.Container;
@@ -554,8 +555,23 @@ namespace TradingBrain.Models
 
                         thisEpic.ticks.Add(thisTick);
                         thisEpic.ticksMinute.Add(thisTick);
-                    }
 
+
+                        if (DateTime.UtcNow.Second == 30)
+                        {
+                            try
+                            {
+                                //Remove minute ticks older than 150 seconds (to give a bit of a buffer over 1 minute) and second ticks older than 15 seconds (to give a bit of a buffer over 10 seconds)
+                                thisEpic!.ticksMinute.RemoveAll(t => t != null && t.UTM <= DateTime.UtcNow.AddSeconds(-150));
+                                thisEpic!.ticks.RemoveAll(t => t != null && t.UTM <= DateTime.UtcNow.AddSeconds(-15));
+                            }
+                            catch (Exception)
+                            {
+                                clsCommonFunctions.AddStatusMessage("Error removing old ticks for " + epic, "ERROR");
+                                // empty
+                            }
+                        }
+                    }
 
                 }
 

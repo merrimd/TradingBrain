@@ -1163,7 +1163,7 @@ namespace TradingBrain.Models
                             LOepic? thisEpic = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == epicName) ?? throw new InvalidOperationException("Epic not found in PriceEpicList");
                             DateTime tickStart = _startTime;
                             DateTime tickeEnd = _startTime.AddMinutes(1).AddMilliseconds(-1);
-                            List<tick> ticks = thisEpic.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList();
+                            List<tick> ticks = thisEpic.ticks.Where(t => t.UTM >= tickStart && t.UTM <= tickeEnd).ToList().DeepCopy();
 
                             tbPrice thisPrice = new();
 
@@ -1229,7 +1229,7 @@ namespace TradingBrain.Models
                             AddStatusMessage($"   Close:{thisPrice.closePrice.bid} / {thisPrice.closePrice.ask} ");
                             AddStatusMessage($"   Typical:{thisPrice.typicalPrice.bid} / {thisPrice.typicalPrice.ask} ");
 
-                            foreach (tick item in ticks) thisEpic.ticks.Remove(item);
+                            //foreach (tick item in ticks) thisEpic.ticks.Remove(item);
 
                             model.quotes = new ModelQuotes();
 
@@ -2012,7 +2012,7 @@ namespace TradingBrain.Models
                             if (thisCandle.Date != default)
                             {
                                 gotCandle = true;
-                                this.candleList.RemoveAt(0);
+                                //this.candleList.RemoveAt(0);
                                 this.candleList.Add(await thisCandle.DeepCopyAsync());
                             }
 
@@ -2037,7 +2037,7 @@ namespace TradingBrain.Models
                                     await log.Save();
                                 }
 
-                                // Get the current second candle
+                                // Get the current minute candle
                                 modQuote thisMinuteCandle = new();
                                 List<tick> ticksMinute = [.. thisEpic!.ticksMinute.Where(t => t != null && t.UTM >= tickStartMinute && t.UTM <= tickEndMinute)];
 
@@ -2050,8 +2050,10 @@ namespace TradingBrain.Models
                                     this.minuteCandleList.Add(await thisMinuteCandle.DeepCopyAsync());
                                     this.lastMinuteCandle = thisMinuteCandle;
                                 }
+                                
                             }
-
+                            clsCommonFunctions.AddStatusMessage($"ticks count = {thisEpic!.ticks.Count}", "INFO", logName);
+                            clsCommonFunctions.AddStatusMessage($"ticksMinute count = {thisEpic!.ticksMinute.Count}, MinuteCandleList count = {this.minuteCandleList.Count}", "INFO", logName);
                             ///////////////////////////////////
                             // Now get the VIX list of ticks //
                             ///////////////////////////////////
@@ -2081,7 +2083,7 @@ namespace TradingBrain.Models
 
                             // Get the current VIX candle
                             modQuote thisCandleVix = new();
-                            List<tick> ticksVix = [.. thisEpicVix!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickEnd)];
+                            List<tick> ticksVix = [.. thisEpicVix!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickEnd.DeepCopy())];
 
                             thisCandleVix = await CreateCandleFromTicks(ticksVix, tickStart, tickEnd, "VIX");
 
@@ -2524,7 +2526,7 @@ namespace TradingBrain.Models
                 AddStatusMessage($"New {tickType} tick :{thisPrice.startDate} - {thisPrice.endDate}: Typical:{Math.Round(thisPrice.typicalPrice.bid ?? 0, 2)} / {Math.Round(thisPrice.typicalPrice.ask ?? 0, 2)} ");
 
                 //gotCandle = true;
-                foreach (tick item in ticks) ticksToUse.Remove(item);
+                //foreach (tick item in ticks) ticksToUse.Remove(item);
             }
             else
             {
