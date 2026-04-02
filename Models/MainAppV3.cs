@@ -2954,9 +2954,10 @@ namespace TradingBrain.Models
 
                                             if (matchTrade != null)
                                             {
+                                                bool closingPartial = false;
                                                 if (tsm.Direction == "BUY")
                                                 {
-                                                    bool closingPartial = false;
+                                                    
                                                     this.model.thisModel.closedGridLTrades.Add(matchTrade);
                                                     this.model.thisModel.gridLTrades.Remove(matchTrade);
                                                     if (this.model.thisModel.gridLTradesToClose.Count > 0)
@@ -3012,20 +3013,43 @@ namespace TradingBrain.Models
                                                     this.model.thisModel.closedGridSTrades.Add(matchTrade);
                                                     this.model.thisModel.gridSTrades.Remove(matchTrade);
 
+                                                    if (this.model.thisModel.gridSTradesToClose.Count > 0)
+                                                    {
+                                                        this.model.thisModel.gridSTradesToClose.Remove(matchTrade);
+                                                        closingPartial = true;
+                                                    }
+                                                    this.model.modelVar.carriedForwardLoss = Math.Max(this.model.modelVar.carriedForwardLoss - (double)matchTrade.tradeValue, 0);
+
                                                     CommonFunctions.AddStatusMessage($"closedGridSTrades  = {this.model.thisModel.closedGridSTrades.Count} : gridSTrades = {this.model.thisModel.gridSTrades.Count} ", "DEBUG");
                                                     CommonFunctions.SendBroadcast("BuyingShortGrid", matchTrade.BOLLI_ID + "|" + matchTrade.epic);
-                                                    if (this.model.thisModel.gridSTrades.Count == 0)
+                                                    if (this.model.thisModel.gridSTrades.Count == 0 || closingPartial && this.model.thisModel.gridSTradesToClose.Count == 0)
                                                     {
                                                         CommonFunctions.AddStatusMessage($"closeAttemptCount going from {this.closeAttemptCount} to 0", "DEBUG");
                                                         this.closeAttemptCount = 0;
                                                         //CommonFunctions.SendBroadcast("BuyShort", JsonConvert.SerializeObject(this.model.thisModel.closedGridSTrades));
 
                                                         CommonFunctions.SendBroadcast("BuyShortGrid", matchTrade.BOLLI_ID + "|" + matchTrade.epic);
-                                                        //this.model.thisModel.closingGridSTrade = false;
+                                                        if (!closingPartial)
+                                                        {
+                                                            decimal thisEventValue = this.model.thisModel.closedGridSTrades.Sum(x => x.tradeValue);
+                                                            clsCommonFunctions.AddStatusMessage($"Grid Shorts fully closed with event value of {thisEventValue} ", "INFO");
+                                                            this.model.modelVar.deltaProfit = 0;
+                                                            clsCommonFunctions.AddStatusMessage($"Resetting deltaProfit to 0", "INFO");
+
+                                                            if (thisEventValue > 0)
+                                                            {
+                                                                decimal prevMaxStrategyProfit = this.model.modelVar.maxStrategyProfit;
+                                                                this.model.modelVar.maxStrategyProfit = Math.Max(this.model.modelVar.maxStrategyProfit, this.model.modelVar.strategyProfit);
+                                                                clsCommonFunctions.AddStatusMessage($"Setting maxStrategyProfit from {prevMaxStrategyProfit} to {this.model.modelVar.maxStrategyProfit} ", "INFO");
+                                                            }
+                                                            this.model.thisModel.currentGRIDSTrade = null;
+                                                            this.currentGRIDSTrade = null;
+                                                            this.model.onMarket = false;
+                                                            this.model.shortOnMarket = false;
+                                                        }
+
                                                         this.model.thisModel.closedGridSTrades.Clear();
-                                                        this.model.thisModel.currentGRIDSTrade = null;
-                                                        this.currentGRIDSTrade = null;
-                                                        this.model.onMarket = false;
+                                                        this.model.buyShortPartial = false;
                                                     }
                                                     //else
                                                     //{
