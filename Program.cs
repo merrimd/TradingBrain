@@ -409,7 +409,7 @@ namespace TradingBrain.Models
                 tbLog = LogManager.GetLogger(jobId);
 
                 tbLog.Info("-------------------------------------------------------------");
-                tbLog.Info("-- TradingBrain started - strategy: {strategy} {respolution} {direction} : {epic} --", tbepic.strategy, tbepic.resolution, tbepic.epic,tbepic.direction);
+                tbLog.Info("-- TradingBrain started - strategy: {strategy} {resolution} {direction} : {epic} --", tbepic.strategy, tbepic.resolution,tbepic.direction, tbepic.epic);
 
                 if (the_db != null && the_app_db != null)
                 {

@@ -790,7 +790,6 @@ namespace TradingBrain.Models
             try
             {
                 string extra = "";
-                string accountString = "c.accountId";
                 if (direction != "")
                 {
                     switch (direction)
@@ -800,7 +799,6 @@ namespace TradingBrain.Models
                             break;
                         case "SHORT":
                             extra = " AND c.direction = 'SHORT' ";
-                            accountString = "c.accountId2";
                             break;
                     }
                 }
@@ -810,13 +808,10 @@ namespace TradingBrain.Models
                 Container container_opt = the_db.GetContainer("OptimizeRunData");
 
                 var parameterizedQuery = new QueryDefinition(
-                    query: "SELECT top 1 * FROM c WHERE c.epicName = @epicname AND (" + accountString + " = @accountId or c.accountId = '') AND c.strategy = @strategy AND c.resolution = @resolution " + extra + " Order by c.timestamp DESC"
-
-                //query: "SELECT M.modelLogs FROM c JOIN (SELECT VALUE m FROM m IN c.runVars WHERE m.var1 = @Var1) as m WHERE c.modelRunID = @ModelRunID  Order by c.runVars.modelLogs.seqNo ASC"
+                    query: "SELECT top 1 * FROM c WHERE c.epicName = @epicname AND c.strategy = @strategy AND c.resolution = @resolution " + extra + " Order by c.timestamp DESC"
                 ).WithParameter("@epicname", epicName)
                 .WithParameter("@strategy", strategy)
-                .WithParameter("@resolution", resolution)
-                .WithParameter("@accountId", accountId);
+                .WithParameter("@resolution", resolution);
 
                 using FeedIterator<TradingBrainSettings> filteredFeed = container.GetItemQueryIterator<TradingBrainSettings>(
                     queryDefinition: parameterizedQuery

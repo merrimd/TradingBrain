@@ -265,14 +265,8 @@ namespace TradingBrain.Models
                 string region = IGModels.clsCommonFunctions.Get_AppSetting("region");
                 //igAccountId = IGModels.clsCommonFunctions.Get_AppSetting("accountId." + region);
 
-                if (direction == "SHORT")
-                {
-                    igAccountId = igContainer2.creds.igAccountId;
-                }
-                else
-                {
-                    igAccountId = igContainer.creds.igAccountId;
-                }
+
+
                 retryOrderCount = 0;
                 retryOrder = false;
                 retryOrderLimit = 10;
@@ -286,8 +280,7 @@ namespace TradingBrain.Models
                 pausedAfterNGL = false;
                 epicName = epic;
 
-                Task.Run(() => setupTradeErrors());
-                Task.Run(() => setupMessaging());
+
 
                 currentTick = new ChartUpdate();
                 currentCandle = new CandleUpdate();
@@ -304,6 +297,13 @@ namespace TradingBrain.Models
                 modelVar = tb.lastRunVars.DeepCopy() ?? new ModelVars();
                 model.modelVar = modelVar;
                 model.exchangeClosedDates = IGModels.clsCommonFunctions.GetExchangeClosedDates(epicName, the_app_db).Result;
+
+                //set the accountid to use as the first one in the tb settings - this is used for getting the price data for the model and also for placing trades. If there are multiple accounts then this will need to be updated to allow for that.
+                igAccountId = tb.accountId;
+
+                Task.Run(() => setupTradeErrors());
+                Task.Run(() => setupMessaging());
+
                 // set the region we are in
 
                 model.region = region;
@@ -334,15 +334,15 @@ namespace TradingBrain.Models
                 currentStatus.calcAvgWinningTrade = tb.lastRunVars.calcAvgWinningTrade;
 
                 //Work out the calculated average winning trade value
-                if (this.strategy == "CASEYC" && tb.lastRunVars.calcAvgWinningTrade == 0)
-                {
-                    AccumulatedValues accumValues = IGModels.clsCommonFunctions.GetAccumulatedValues(this.the_app_db, this.epicName, this.strategy, this.resolution).Result;
-                    if (accumValues != null && accumValues.accumQuantity > 0)
-                    {
-                        modelVar.calcAvgWinningTrade = accumValues.accumProfit / accumValues.accumQuantity;
-                        currentStatus.calcAvgWinningTrade = modelVar.calcAvgWinningTrade;
-                    }
-                }
+                //if (this.strategy == "CASEYC" && tb.lastRunVars.calcAvgWinningTrade == 0)
+                //{
+                //    AccumulatedValues accumValues = IGModels.clsCommonFunctions.GetAccumulatedValues(this.the_app_db, this.epicName, this.strategy, this.resolution).Result;
+                //    if (accumValues != null && accumValues.accumQuantity > 0)
+                //    {
+                //        modelVar.calcAvgWinningTrade = accumValues.accumProfit / accumValues.accumQuantity;
+                //        currentStatus.calcAvgWinningTrade = modelVar.calcAvgWinningTrade;
+                //    }
+                //}
                 //TradingBrainSettings thisTB = clsCommonFunctions.GetTradingBrainSettings(this.the_app_db, this.epicName, this.igAccountId, this.strategy, this.resolution).Result;
                 currentStatus.startDate = model.modelLogs.modelRunDate;
                 currentStatus.modelRunID = modelID;
@@ -1892,7 +1892,7 @@ namespace TradingBrain.Models
  
             }
 
-            if (!paused ||  paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
+            if (!paused || paused && pausedAfterNGL && modelVar.carriedForwardLoss > 0)
             {
                 // Check if the market is currently open. If it is not then skip till next time.
                 marketOpen = await IGModels.clsCommonFunctions.IsTradingOpen(dtNow, model.exchangeClosedDates, this.epicName);
@@ -1909,8 +1909,6 @@ namespace TradingBrain.Models
 
                     try
                     {
-
-
                         CommonFunctions.AddStatusMessage($"lastTradeDeleted  = {lastTradeDeleted}", "DEBUG", logName);
 
                         // If the trade has just been deleted then sort out the CFL
@@ -1983,7 +1981,6 @@ namespace TradingBrain.Models
                             //Get the last tick from the list of ticks
                             LOepic thisEpic = _igContainer.PriceEpicList.FirstOrDefault(x => x.name == epicName) ?? throw new InvalidOperationException("Epic not found in PriceEpicList");
 
-
                             DateTime tickStart = _startTime.AddSeconds(-1);
                             DateTime tickEnd = _startTime.AddSeconds(1).AddMilliseconds(-1);
                             if (thisEpic.ticks == null)
@@ -2007,7 +2004,7 @@ namespace TradingBrain.Models
                             modQuote thisCandle = new();
                             List<tick> ticks = [.. thisEpic!.ticks.Where(t => t != null && t.UTM >= tickStart && t.UTM <= tickEnd)];
 
-                            thisCandle = await CreateCandleFromTicks(ticks, tickStart, tickEnd,"Second");
+                            thisCandle = await CreateCandleFromTicks(ticks, tickStart, tickEnd, "Second");
 
                             if (thisCandle.Date != default)
                             {
@@ -2265,7 +2262,7 @@ namespace TradingBrain.Models
                                         requestedTrade reqTrade = new()
                                         {
                                             dealType = "POSITION",
-                                            dealReference = await PlaceDeal("long", model.modelVar.quantity, 0, this._igContainer.creds.igAccountId)
+                                            dealReference = await PlaceDeal("long", model.modelVar.quantity, 0, this.igAccountId)
                                         };
                                         requestedTrades.Add(reqTrade);
                                     }
@@ -2276,14 +2273,14 @@ namespace TradingBrain.Models
                                             TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLong", the_app_db);
                                             CommonFunctions.AddStatusMessage("SellLong activated", "INFO", logName);
                                             closeAttemptCount = 1;
-                                            _ = await CloseDealEpic("long", openLTrades.Sum(x => x.quantity), this.epicName, this._igContainer.creds.igAccountId);
+                                            _ = await CloseDealEpic("long", openLTrades.Sum(x => x.quantity), this.epicName, this.igAccountId);
                                         }
                                         if (model.sellLongPartial && model.thisModel.gridLTradesToClose.Count > 0)
                                         {
                                             TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "SellLongPartial", the_app_db);
                                             CommonFunctions.AddStatusMessage("SellLongPartial activated", "INFO", logName);
                                             closeAttemptCount = 1;
-                                            _ = await CloseDealEpicPartial("long", this.epicName, this._igContainer.creds.igAccountId);
+                                            _ = await CloseDealEpicPartial("long", this.epicName, this.igAccountId);
                                         }
                                     }
 
@@ -2297,7 +2294,7 @@ namespace TradingBrain.Models
                                         requestedTrade reqTrade = new()
                                         {
                                             dealType = "POSITION",
-                                            dealReference = await PlaceDeal("short", model.modelVar.quantity, 0, this._igContainer2.creds.igAccountId)
+                                            dealReference = await PlaceDeal("short", model.modelVar.quantity, 0, this.igAccountId)
                                         };
                                         requestedTrades.Add(reqTrade);
 
@@ -2309,14 +2306,14 @@ namespace TradingBrain.Models
                                             TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyShort", the_app_db);
                                             CommonFunctions.AddStatusMessage("BuyShort activated", "INFO", logName);
                                             closeAttemptCount = 1;
-                                            _ = await CloseDealEpic("short", openSTrades.Sum(x => x.quantity), this.epicName, this._igContainer2.creds.igAccountId);
+                                            _ = await CloseDealEpic("short", openSTrades.Sum(x => x.quantity), this.epicName, this.igAccountId);
                                         }
                                         if (model.buyShortPartial && model.thisModel.gridSTradesToClose.Count > 0)
                                         {
                                             TradingBrain.Models.CommonFunctions.SaveLog("Info", "RunCode", "BuyShortPartial", the_app_db);
                                             CommonFunctions.AddStatusMessage("BuyShortPartial activated", "INFO", logName);
                                             closeAttemptCount = 1;
-                                            _ = await CloseDealEpicPartial("short", this.epicName, this._igContainer2.creds.igAccountId);
+                                            _ = await CloseDealEpicPartial("short", this.epicName, this.igAccountId);
                                         }
                                     }
 
@@ -2355,7 +2352,7 @@ namespace TradingBrain.Models
                                         {
                                             CommonFunctions.AddStatusMessage($"trade {trade.tbDealId} not closed yet", "DEBUG");
                                         }
-                                        _ = await CloseDealEpic("long", model.thisModel.gridLTrades.Sum(x => x.quantity), this.epicName, this._igContainer.creds.igAccountId);
+                                        _ = await CloseDealEpic("long", model.thisModel.gridLTrades.Sum(x => x.quantity), this.epicName, this.igAccountId);
                                         closeAttemptCount = 1;
                                     }
 
@@ -2366,7 +2363,7 @@ namespace TradingBrain.Models
                                         {
                                             CommonFunctions.AddStatusMessage($"trade {trade.tbDealId} not closed yet", "DEBUG");
                                         }
-                                        _ = await CloseDealEpic("short", model.thisModel.gridSTrades.Sum(x => x.quantity), this.epicName, this._igContainer2.creds.igAccountId);
+                                        _ = await CloseDealEpic("short", model.thisModel.gridSTrades.Sum(x => x.quantity), this.epicName, this.igAccountId);
                                         closeAttemptCount = 1;
                                     }
                                 }
@@ -3459,18 +3456,18 @@ namespace TradingBrain.Models
                                         if (tsm.Direction == "BUY")
                                         {
                                             osDealRef = this.newGRIDLDealReference;
-                                            accountId = this._igContainer.creds.igAccountId;
+                                            accountId = this.igAccountId;
                                         }
                                         else
                                         {
                                             osDealRef = this.newGRIDSDealReference;
-                                            accountId = this._igContainer2.creds.igAccountId;
+                                            accountId = this.igAccountId;
                                         }
                                     }
                                     else
                                     {
                                         osDealRef = this.newDealReference;
-                                        accountId = this._igContainer.creds.igAccountId;
+                                        accountId = this.igAccountId;
                                     }
                                     CommonFunctions.AddStatusMessage($"Processing OPEN trade update for DealRef: {tsm.DealReference}, saved deal ref = {osDealRef}", "INFO");
                                     // Check the deal id with the deal reference from the Place Deal call to ensure we are dealing with the correct trade
@@ -4833,177 +4830,92 @@ namespace TradingBrain.Models
         public async Task<bool> GetPositions()
         {
             bool ret2 = true;
-            //var response = await igRestApiClient.SecureAuthenticate(ar, apiKey);
+
             try
             {
-                if (_igContainer == null)
-                {
-                    throw new InvalidOperationException("IG Container not set in GetPositions");
-                }
-                if (_igContainer.igRestApiClient == null)
-                {
-                    throw new InvalidOperationException("IG Rest API Client not set in GetPositions");
-                }
-                if (model == null)
-                {
-                    throw new InvalidOperationException("model not set in GetPositions");
-                }
+                if (_igContainer == null) throw new InvalidOperationException("IG Container not set in GetPositions");
+                if (_igContainer.igRestApiClient == null) throw new InvalidOperationException("IG Rest API Client not set in GetPositions");
+                if (_igContainer2 == null) throw new InvalidOperationException("IG Container2 not set in GetPositions");
+                if (_igContainer2.igRestApiClient == null) throw new InvalidOperationException("IG Rest API Client2 not set in GetPositions");
+                if (model == null) throw new InvalidOperationException("model not set in GetPositions");
+
                 if (this.strategy == "GRID")
                 {
                     IgResponse<PositionsResponse> ret;
-                    //Do longs first
-                    if (direction == "SHORT")
+                    IgResponse<PositionsResponse> ret1;
+
+                    try
                     {
-                        try
+
+                        //Combine the positions from both accounts and then loop through them to find any that match our epic and direction. This is because we can have a long in one account and a short in another for the same epic and we want to be able to show both on the UI.
+                        ret = await _igContainer.igRestApiClient.getOTCOpenPositionsV1();
+                        ret1 = await _igContainer2.igRestApiClient.getOTCOpenPositionsV1();
+
+                        List<OpenPosition> allPositions = new List<OpenPosition>();
+                        allPositions.AddRange(ret.Response.positions);
+                        allPositions.AddRange(ret1.Response.positions);
+
+                        foreach (OpenPosition obj in allPositions)
                         {
-
-                            if (_igContainer2 == null)
+                            if (obj.market.epic == this.epicName)
                             {
-                                throw new InvalidOperationException("IG Container not set in GetPositions");
-                            }
-                            if (_igContainer2.igRestApiClient == null)
-                            {
-                                throw new InvalidOperationException("IG Rest API Client not set in GetPositions");
-                            }
+                                OpenPositionData tsm = obj.position;
 
-                            ret = await _igContainer2.igRestApiClient.getOTCOpenPositionsV1();
+                                //First see if we already have this deal in our database.
+                                tradeItem thisTrade = await GetTradeFromDB(tsm.dealId, this.strategy, this.resolution, this.direction);
 
-                            foreach (OpenPosition obj in ret.Response.positions)
-                            {
-                                if (obj.market.epic == this.epicName)
+                                if (thisTrade.tbDealId != "")
                                 {
-                                    OpenPositionData tsm = obj.position;
-
-                                    //First see if we already have this deal in our database.
-                                    tradeItem thisTrade = await GetTradeFromDB(tsm.dealId, this.strategy, this.resolution, this.direction);
-
-
-                                    if (thisTrade.tbDealId != "")
+                                    this.currentTrade = new clsTradeUpdate
                                     {
+                                        epic = this.epicName,
+                                        dealId = tsm.dealId,
+                                        lastUpdated = IGModels.clsCommonFunctions.ConvertToIGDate(tsm.createdDate),
+                                        level = Convert.ToDecimal(tsm.openLevel),
+                                        stopLevel = Convert.ToDecimal(tsm.stopLevel),
+                                        size = Convert.ToDecimal(tsm.dealSize),
+                                        direction = tsm.direction
+                                    };
 
-                                        if (this.gridSID == "")
+
+                                    if (tsm.direction == "BUY")
+                                    {
+                                        if (this.gridLID == "") this.gridLID = thisTrade.BOLLI_ID;
+                                        this.model.thisModel.currentGRIDLTrade = thisTrade;
+
+                                        this.model.longOnmarket = true;
+                                        this.model.buyShort = false;
+                                        this.model.thisModel.currentGRIDLTrade.stopLossValue = this.model.stopPrice;
+                                        tradeItem? thisTde = this.model.thisModel.gridLTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDLTrade.tbDealId);
+                                        if (thisTde == null)
                                         {
-
-                                            this.gridSID = thisTrade.BOLLI_ID;
+                                            this.model.thisModel.gridLTrades.Add(thisTrade);
                                         }
-                                        //This trade is in the database already.
+                                    }
+                                    else
+                                    {
+                                        if (this.gridSID == "") this.gridSID = thisTrade.BOLLI_ID;
                                         this.model.thisModel.currentGRIDSTrade = thisTrade;
-                                        this.currentTrade = new clsTradeUpdate
-                                        {
-                                            epic = this.epicName,
-                                            dealId = tsm.dealId,
-                                            lastUpdated = IGModels.clsCommonFunctions.ConvertToIGDate(tsm.createdDate),
-                                            level = Convert.ToDecimal(tsm.openLevel),
-                                            stopLevel = Convert.ToDecimal(tsm.stopLevel),
-                                            size = Convert.ToDecimal(tsm.dealSize),
-                                            direction = tsm.direction
-                                        };
+                                        this.model.shortOnMarket = true;
+                                        this.model.buyLong = false;
                                         this.model.thisModel.currentGRIDSTrade.stopLossValue = this.model.stopPrice;
-
-                                        if (tsm.direction == "BUY")
-                                        {
-                                            this.model.longOnmarket = true;
-                                            this.model.buyShort = false;
-                                        }
-                                        else
-                                        {
-                                            this.model.shortOnMarket = true;
-                                            this.model.buyLong = false;
-                                        }
-
-                                        this.model.thisModel.currentGRIDSTrade.stopLossValue = this.model.stopPrice;
-
-                                        this.model.onMarket = true;
-
-
                                         tradeItem? thisTde = this.model.thisModel.gridSTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDSTrade.tbDealId);
                                         if (thisTde == null)
                                         {
                                             this.model.thisModel.gridSTrades.Add(thisTrade);
                                         }
                                     }
+
+                                    this.model.onMarket = true;
+
                                 }
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            CommonFunctions.AddStatusMessage($"Error in Short GetPositions - {ex.ToString()}", "ERROR");
-                        }
+
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        try
-                        {
-
-
-                            ret = await _igContainer.igRestApiClient.getOTCOpenPositionsV1();
-
-                            foreach (OpenPosition obj in ret.Response.positions)
-                            {
-                                if (obj.market.epic == this.epicName)
-                                {
-                                    OpenPositionData tsm = obj.position;
-
-                                    //First see if we already have this deal in our database.
-                                    tradeItem thisTrade = await GetTradeFromDB(tsm.dealId, this.strategy, this.resolution, this.direction);
-
-
-                                    if (thisTrade.tbDealId != "")
-                                    {
-
-                                        if (this.gridLID == "")
-                                        {
-
-                                            this.gridLID = thisTrade.BOLLI_ID;
-                                            //AddStatusMessage($"BOLLI IF found in DB   {this.bolliID}.");
-                                        }
-                                        //AddStatusMessage($"BOLLI Trade found in DB with DealID {tsm.dealId}.");
-                                        //This trade is in the database already.
-                                        this.model.thisModel.currentGRIDLTrade = thisTrade;
-                                        this.currentTrade = new clsTradeUpdate
-                                        {
-                                            epic = this.epicName,
-                                            dealId = tsm.dealId,
-                                            lastUpdated = IGModels.clsCommonFunctions.ConvertToIGDate(tsm.createdDate),
-                                            level = Convert.ToDecimal(tsm.openLevel),
-                                            stopLevel = Convert.ToDecimal(tsm.stopLevel),
-                                            size = Convert.ToDecimal(tsm.dealSize),
-                                            direction = tsm.direction
-                                        };
-                                        this.model.thisModel.currentGRIDLTrade.stopLossValue = this.model.stopPrice;
-
-                                        if (tsm.direction == "BUY")
-                                        {
-                                            this.model.longOnmarket = true;
-                                            this.model.buyShort = false;
-                                        }
-                                        else
-                                        {
-                                            this.model.shortOnMarket = true;
-                                            this.model.buyLong = false;
-                                        }
-
-                                        this.model.thisModel.currentGRIDLTrade.stopLossValue = this.model.stopPrice;
-
-                                        this.model.onMarket = true;
-
-
-                                        tradeItem? thisTde = this.model.thisModel.gridLTrades.Find(x => x.tbDealId == this.model.thisModel.currentGRIDLTrade.tbDealId);
-                                        if (thisTde == null)
-                                        {
-                                            this.model.thisModel.gridLTrades.Add(thisTrade);
-                                        }
-
-                                    }
-                                }
-                            }
-
-                            //then do shorts
-                        }
-                        catch (Exception ex)
-                        {
-                            CommonFunctions.AddStatusMessage($"Error in Long GetPositions - {ex.ToString()}", "ERROR");
-                        }
+                        CommonFunctions.AddStatusMessage($"Error in Long GetPositions - {ex.ToString()}", "ERROR");
                     }
 
                 }
